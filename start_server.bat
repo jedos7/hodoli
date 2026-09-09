@@ -1,7 +1,8 @@
 @echo off
 title Theme Radar server
 cd /d D:\theme_radar
-echo [Theme Radar] cleaning up any old server on port 8000...
+echo [Theme Radar] stopping any old server (even one still starting up)...
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*uvicorn app.main:app*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8000 " ^| findstr LISTENING') do taskkill /F /T /PID %%p >nul 2>&1
 echo [Theme Radar] starting server. Closing this window stops the server. (stop: Ctrl+C)
 echo [Theme Radar] the browser opens automatically when the server is ready (about 20s).

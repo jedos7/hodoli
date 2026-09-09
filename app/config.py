@@ -28,7 +28,7 @@ class Settings:
     kiwoom_env: str = field(default_factory=lambda: os.getenv("KIWOOM_ENV", "paper").lower())  # paper(모의) | real
     kiwoom_app_key: str = field(default_factory=lambda: os.getenv("KIWOOM_APP_KEY", ""))
     kiwoom_app_secret: str = field(default_factory=lambda: os.getenv("KIWOOM_APP_SECRET", ""))
-    kiwoom_rps: float = field(default_factory=lambda: float(os.getenv("KIWOOM_RPS", "4")))  # 초당 조회 수
+    kiwoom_rps: float = field(default_factory=lambda: float(os.getenv("KIWOOM_RPS", "3")))  # 초당 조회 수 (4 에서 가끔 429 가 나서 3)
     # 키움 거래대금 단위(원). 실시간 FID 14 · 일봉 trde_prica · 투자자 acc_trde_prica 모두 백만원 (문서·실응답으로 확인)
     kiwoom_amount_unit: int = field(default_factory=lambda: int(os.getenv("KIWOOM_AMOUNT_UNIT", "1000000")))
     app_key: str = field(default_factory=lambda: os.getenv("KIS_APP_KEY", ""))

@@ -54,6 +54,9 @@ class KiwoomRest:
                 await asyncio.sleep(wait)
             self._last = time.monotonic()
         r = await self.client.post(path, headers=headers, json=body)
+        if r.status_code == 429:  # 호출 제한: 잠깐 쉬고 한 번 더
+            await asyncio.sleep(1.2)
+            r = await self.client.post(path, headers=headers, json=body)
         r.raise_for_status()
         data = r.json()
         rc = str(data.get("return_code", "0"))
