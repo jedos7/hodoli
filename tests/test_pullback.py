@@ -18,17 +18,27 @@ def test_textbook_pullback_is_strict():
     cs = _flat(40)                                   # 20일선 = 10000 근처
     cs += [_c(1, 10000, 11300, 9950, 11200, 1_000_000)]   # 급등 +12%, 거래량 100만
     cs += [_c(2, 11200, 11600, 11100, 11500, 600_000)]    # 고점 11600
-    cs += [_c(3, 11400, 11450, 11000, 11050, 300_000)]    # 눌림 1일: 고점 대비 -4.7% (부족)
-    cs += [_c(4, 11000, 11100, 10700, 10800, 250_000)]    # 눌림 2일: -6.9%, 거래량 0.28배, 저점 10700 > 9950
+    cs += [_c(3, 11400, 11450, 11000, 11050, 400_000)]    # 눌림 1일: -4.7%, 거래량 0.4배 (안 줄음)
+    cs += [_c(4, 11000, 11100, 10700, 10800, 150_000)]    # 눌림 2일: -6.9%, 평균 거래량 0.275배, 저점 10700 > 9950
     cs += _flat(5, 11300, 100000, start=10)               # 3일 뒤 수익률 계산용
     setups = find_pullbacks(cs, "000001", "테스트", "테마")
     by_day = {s.date: s for s in setups}
     assert "20260203" in by_day and "20260204" in by_day
     d3, d4 = by_day["20260203"], by_day["20260204"]
-    assert any("눌림 폭 부족" in r for r in d3.reasons)
+    assert any("거래량 안 줄음" in r for r in d3.reasons)
     assert d4.strict, d4.reasons
-    assert d4.pull_days == 2 and round(d4.vol_ratio, 2) == 0.28 and d4.peak_high == 11600
-    assert d4.fwd_ret is not None and d4.fwd_ret > 0
+    assert d4.pull_days == 2 and round(d4.vol_ratio, 3) == 0.275 and d4.peak_high == 11600
+    assert d4.fwd_ret is not None and d4.fwd_ret > 0 and 3 in d4.fwd and d4.low_hold
+
+
+def test_long_pullback_is_flagged():
+    cs = _flat(40)
+    cs += [_c(1, 10000, 11300, 9950, 11200, 1_000_000), _c(2, 11200, 11600, 11100, 11500, 500_000)]
+    for d in range(3, 8):                                          # 5일간 얕게 눌림, 거래량 0.1배
+        cs += [_c(d, 11000, 11050, 10900, 10950, 100_000)]
+    s = {x.date: x for x in find_pullbacks(cs, "000001", "테스트", "테마")}
+    assert s["20260205"].strict                                    # 눌림 3일째
+    assert any("눌림 길어짐" in r for r in s["20260207"].reasons)  # 5일째
 
 
 def test_heavy_volume_and_ma_break_are_reasons():

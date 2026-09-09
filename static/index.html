@@ -687,7 +687,7 @@ function renderPB(){
   const src={mock:'합성 일봉',naver:'네이버 일봉',kiwoom:'키움 일봉',kis:'KIS 일봉'}[d.source]||d.source;
   $('#hgCount').textContent=`확정 일봉 ${d.asof} 까지 · 최근 ${d.recentDays}거래일에서 ${rows.length}자리 (전체 ${d.rows.length}) · ${src} · ${d.universe==='market'?'시장 전체':'테마 종목'} ${d.stocks}종목`;
   $('#hgNotice').innerHTML=`<b>눌림목 — 크게 오른 뒤 거래량 줄며 얕게 쉬는 자리.</b><br>${mode==='strict'?'엄선':'전체'} 실측 ${st.n}자리 — 3일 보유 승률 <span class="stat">${st.win}%</span> · 건당 <span class="stat">${pct(st.avg)}</span> · 기준선 대비 <span class="stat">${st.vsBase>=0?'+':''}${st.vsBase}%p</span> <span style="color:var(--ink-2)">(전반 ${pct(st.h1)} / 후반 ${pct(st.h2)})</span><br>
-    · 엄선 조건은 고점 대비 -5~-15% 눌림 · 눌리는 동안 거래량 급등일의 절반 이하 · 20일선 위 · 급등봉 저점 유지, 네 가지입니다.<br>
+    · 엄선 조건은 고점 대비 -3~-10% 얕은 눌림 · 눌림 3일 이내 · 눌리는 동안 거래량 급등일의 0.3배 이하 · 20일선 위 · 급등봉 저점 유지입니다. 시장 전체 1년치 조합 비교에서 가장 좋았던 값입니다.<br>
     · 급등 다음 날 눌림은 후보에서 뺐습니다. 사기 전에 "지지선 아래 2~3%면 자른다"는 손절선을 먼저 정하세요.`;
   const reasons={};dropped.forEach(r=>r.reasons.forEach(x=>{const k=x.replace(/\(.*\)/,'');reasons[k]=(reasons[k]||0)+1}));
   $('#hgExcl').innerHTML=`🔍 <b>${dropped.length}자리를 뺐습니다</b> — ${Object.entries(reasons).map(([k,v])=>k+' '+v+'건').join(' · ')||'없음'}<br>위 '고르기'를 전체로 바꾸면 다 보입니다. 엄선을 빼면 승률이 ${d.stats.strict.win}% → ${d.stats.all.win}%, 건당 ${pct(d.stats.strict.avg)} → ${pct(d.stats.all.avg)} 로 바뀝니다.`;
@@ -698,8 +698,8 @@ function renderPB(){
     html+=`<tr class="${r.strict?'':'drop'}"><td class="n">${r.date.slice(4,6)}/${r.date.slice(6)}</td>
       <td><span class="nm">${r.name}</span><span class="sub">${r.theme}${drop?' · '+drop:''}</span></td>
       <td><span class="n up">${r.spikeDate.slice(4,6)}/${r.spikeDate.slice(6)}</span><span class="sub n up">${pct(r.spikePct,1)}</span></td>
-      <td><span class="n ${r.depthPct<=-5&&r.depthPct>=-15?'good':''}">${r.depthPct.toFixed(1)}%</span><span class="sub n">고점 ${r.peakHigh.toLocaleString('ko-KR')} (${r.peakDate.slice(4,6)}/${r.peakDate.slice(6)})</span></td>
-      <td><span class="n">${r.pullDays}일</span><span class="sub n ${r.volRatio<=0.5?'good':''}">${r.volRatio.toFixed(2)}배</span></td>
+      <td><span class="n ${r.depthPct<=-3&&r.depthPct>=-10?'good':''}">${r.depthPct.toFixed(1)}%</span><span class="sub n">고점 ${r.peakHigh.toLocaleString('ko-KR')} (${r.peakDate.slice(4,6)}/${r.peakDate.slice(6)})</span></td>
+      <td><span class="n ${r.pullDays<=3?'good':''}">${r.pullDays}일</span><span class="sub n ${r.volRatio<=0.3?'good':''}">${r.volRatio.toFixed(2)}배</span></td>
       <td class="n ${r.ma20Pct>=0?'good':'down'}">${pct(r.ma20Pct,1)}</td>
       <td class="n">${r.close.toLocaleString('ko-KR')}</td>
       <td>${now?`<span class="n" style="font-weight:600">${now.toLocaleString('ko-KR')}</span><span class="sub n ${cls(nowChg)}">${pct(nowChg,1)}</span>`:'<span class="n flat">–</span>'}</td>

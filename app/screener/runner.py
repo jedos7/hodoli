@@ -158,14 +158,51 @@ def drop_incomplete_today(candles: dict[str, list[Candle]], now: datetime | None
     return n
 
 
-async def run_screener(source: str = "naver", universe: str = "themes", days: int = 250, recent: int = 5,
-                       min_amount_eok: float = 30.0, progress: Progress | None = None, write: bool = True,
-                       include_today: bool = False) -> dict:
+def cache_path(source: str, universe: str):
+    return settings.data_dir / f"candles_{source}_{universe}.json"
+
+
+def save_cache(source: str, universe: str, uni: list[tuple[str, str, str]], candles: dict[str, list[Candle]]) -> None:
+    """일봉을 파일에 둔다. 조건 조합 비교(scripts/sweep_pullback.py)처럼 같은 일봉을 여러 번 쓸 때 다시 받지 않기 위해."""
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    data = {"savedAt": datetime.now().isoformat(timespec="seconds"), "source": source, "universe": universe, "universeList": uni,
+            "candles": {c: [[x.date, x.open, x.high, x.low, x.close, x.volume, x.amount] for x in cs] for c, cs in candles.items()}}
+    cache_path(source, universe).write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+
+
+def load_cache(source: str, universe: str) -> tuple[list[tuple[str, str, str]], dict[str, list[Candle]], str] | None:
+    p = cache_path(source, universe)
+    if not p.exists():
+        return None
+    d = json.loads(p.read_text("utf-8"))
+    candles = {c: [Candle(*row) for row in rows] for c, rows in d["candles"].items()}
+    return [tuple(u) for u in d["universeList"]], candles, d.get("savedAt", "")
+
+
+async def get_candles(source: str, universe: str, days: int, min_amount_eok: float, progress: Progress | None = None,
+                      use_cache: bool = False) -> tuple[str, list[tuple[str, str, str]], dict[str, list[Candle]]]:
+    """(실제 소스, 종목 목록, 일봉). use_cache 면 파일에서, 아니면 새로 받아 파일에 저장."""
     if source == "auto":
         source = "naver" if settings.is_mock else settings.broker
+    if use_cache:
+        cached = load_cache(source, universe)
+        if cached:
+            uni, candles, saved = cached
+            log.info("일봉 캐시 사용: %s/%s %d종목 (%s)", source, universe, len(uni), saved)
+            return source, uni, candles
+        log.info("일봉 캐시 없음 → 새로 받음")
     uni = await load_universe(universe, source, min_amount_eok)
     log.info("스크리너: 소스 %s · 범위 %s · %d종목", source, universe, len(uni))
     candles = await fetch_candles(source, uni, days, progress)
+    if source != "mock":
+        save_cache(source, universe, uni, candles)
+    return source, uni, candles
+
+
+async def run_screener(source: str = "naver", universe: str = "themes", days: int = 250, recent: int = 5,
+                       min_amount_eok: float = 30.0, progress: Progress | None = None, write: bool = True,
+                       include_today: bool = False, use_cache: bool = False) -> dict:
+    source, uni, candles = await get_candles(source, universe, days, min_amount_eok, progress, use_cache)
     if source != "mock" and not include_today:
         dropped = drop_incomplete_today(candles)
         if dropped:
@@ -181,6 +218,13 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
     }
 
     def package(setups: list) -> dict:
+        # 같은 종목·같은 날에 급등봉이 여러 개 걸리면(연속 급등) 가장 최근 급등봉 기준 하나만 남긴다 — 하루 한 거래로 센다
+        latest: dict[tuple[str, str], object] = {}
+        for s in setups:
+            k = (s.code, s.date)
+            if k not in latest or s.spike_date > latest[k].spike_date:
+                latest[k] = s
+        setups = list(latest.values())
         strict = [s for s in setups if s.strict]
         rows = sorted((s for s in setups if s.date in recent_days), key=lambda s: (s.date, -s.amount_eok), reverse=True)
         return meta | {

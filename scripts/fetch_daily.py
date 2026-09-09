@@ -31,6 +31,7 @@ async def main() -> None:
     ap.add_argument("--recent", type=int, default=5, help="표에 보여줄 최근 거래일 수")
     ap.add_argument("--min-amount", type=float, default=30.0, help="market 범위일 때 오늘 거래대금 하한(억)")
     ap.add_argument("--include-today", action="store_true", help="장중에도 오늘(미완성) 봉을 판정에 포함")
+    ap.add_argument("--use-cache", action="store_true", help="data/candles_*.json 에 저장된 일봉을 다시 쓴다 (새로 받지 않음)")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -39,7 +40,8 @@ async def main() -> None:
         if i % 50 == 0 or i == n:
             print(f"  {i}/{n} {name}")
 
-    r = await run_screener(args.source, args.universe, args.days, args.recent, args.min_amount, progress, include_today=args.include_today)
+    r = await run_screener(args.source, args.universe, args.days, args.recent, args.min_amount, progress, include_today=args.include_today,
+                           use_cache=args.use_cache)
     st = r["stats"]
     print(f"\n확정 일봉 {r['asof']} 까지 · {r['source']} · {r['universe']} {r['stocks']}종목 · {time.time() - t0:.0f}초"
           + ("" if r["todayIncluded"] else " · 장중이라 오늘 봉 제외"))

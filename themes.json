@@ -73,7 +73,7 @@
    "newsAt": "2026-09-09 11:18",
    "newsPress": "전자신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:14:19"
+   "updatedAt": "2026-09-09T15:24:40"
   },
   {
    "id": "nv449",
@@ -117,7 +117,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:14:20"
+   "updatedAt": "2026-09-09T15:24:41"
   },
   {
    "id": "nv559",
@@ -187,7 +187,7 @@
    "newsAt": "2026-09-07 14:50",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:14:22"
+   "updatedAt": "2026-09-09T15:24:43"
   },
   {
    "id": "nv178",
@@ -254,7 +254,7 @@
    "newsAt": "2026-09-09 10:58",
    "newsPress": "뉴스1",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:14:24"
+   "updatedAt": "2026-09-09T15:24:45"
   },
   {
    "id": "nv579",
@@ -322,7 +322,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:14:26"
+   "updatedAt": "2026-09-09T15:24:47"
   },
   {
    "id": "nv180",
@@ -389,7 +389,7 @@
    "newsAt": "2026-09-09 13:49",
    "newsPress": "서울경제",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:14:28"
+   "updatedAt": "2026-09-09T15:24:49"
   },
   {
    "id": "nv92",
@@ -454,7 +454,7 @@
    "newsAt": "2026-09-09 10:16",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:14:30"
+   "updatedAt": "2026-09-09T15:24:51"
   },
   {
    "id": "nv608",
@@ -530,7 +530,7 @@
    "newsAt": "2026-09-09 14:14",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:14:32"
+   "updatedAt": "2026-09-09T15:24:53"
   },
   {
    "id": "nv472",
@@ -598,7 +598,7 @@
    "newsAt": "2026-09-07 16:46",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:14:34"
+   "updatedAt": "2026-09-09T15:24:55"
   },
   {
    "id": "nv405",
@@ -656,7 +656,7 @@
    "newsAt": "2026-09-07 10:08",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:14:36"
+   "updatedAt": "2026-09-09T15:24:57"
   },
   {
    "id": "nv503",
@@ -703,7 +703,7 @@
    "newsAt": "2026-09-09 15:03",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:14:37"
+   "updatedAt": "2026-09-09T15:24:58"
   },
   {
    "id": "nv155",
@@ -711,7 +711,7 @@
    "name": "반도체 대표주(생산)",
    "grade": "B",
    "report": "리포트 7일 2건 · 증권사 1곳 · 최근 미래에셋 09/07",
-   "news": "DB하이텍 — \"8인치 SiC 파운드리 시장 선점\"…DB하이텍, 양산 체제 속도",
+   "news": "삼성전자 — 삼성전자, 프랑스 미스트랄 AI와 손잡고 '반도체 특화 AI' 개발",
    "chg": 3.63,
    "chg3d": 4.05,
    "up": 3,
@@ -745,11 +745,11 @@
    "brokers": [
     "미래에셋증권"
    ],
-   "newsUrl": "https://n.news.naver.com/mnews/article/277/0005814016",
-   "newsAt": "2026-09-09 13:49",
+   "newsUrl": "https://n.news.naver.com/mnews/article/422/0000904437",
+   "newsAt": "2026-09-09 15:21",
    "newsPress": "아시아경제",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:14:38"
+   "updatedAt": "2026-09-09T15:24:59"
   }
  ]
 }
