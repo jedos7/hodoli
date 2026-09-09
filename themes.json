@@ -73,7 +73,7 @@
    "newsAt": "2026-09-09 11:18",
    "newsPress": "전자신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T17:01:45"
+   "updatedAt": "2026-09-09T17:13:50"
   },
   {
    "id": "nv449",
@@ -117,7 +117,7 @@
    "newsAt": "2026-09-09 16:25",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T17:01:46"
+   "updatedAt": "2026-09-09T17:13:50"
   },
   {
    "id": "nv559",
@@ -187,7 +187,7 @@
    "newsAt": "2026-09-07 14:50",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T17:01:48"
+   "updatedAt": "2026-09-09T17:13:53"
   },
   {
    "id": "nv178",
@@ -254,7 +254,7 @@
    "newsAt": "2026-09-07 10:54",
    "newsPress": "뉴스1",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T17:01:50"
+   "updatedAt": "2026-09-09T17:13:55"
   },
   {
    "id": "nv579",
@@ -322,7 +322,7 @@
    "newsAt": "2026-09-09 16:25",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T17:01:52"
+   "updatedAt": "2026-09-09T17:13:57"
   },
   {
    "id": "nv92",
@@ -387,7 +387,7 @@
    "newsAt": "2026-09-09 10:16",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T17:01:54"
+   "updatedAt": "2026-09-09T17:13:59"
   },
   {
    "id": "nv180",
@@ -454,7 +454,7 @@
    "newsAt": "2026-09-08 14:56",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T17:01:56"
+   "updatedAt": "2026-09-09T17:14:01"
   },
   {
    "id": "nv608",
@@ -530,7 +530,7 @@
    "newsAt": "2026-09-09 16:53",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T17:01:58"
+   "updatedAt": "2026-09-09T17:14:03"
   },
   {
    "id": "nv472",
@@ -598,7 +598,7 @@
    "newsAt": "2026-09-07 16:46",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T17:02:00"
+   "updatedAt": "2026-09-09T17:14:05"
   },
   {
    "id": "nv401",
@@ -663,7 +663,7 @@
    "newsAt": "2026-09-09 07:52",
    "newsPress": "SBS Biz",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T17:02:02"
+   "updatedAt": "2026-09-09T17:14:07"
   },
   {
    "id": "nv405",
@@ -721,7 +721,7 @@
    "newsAt": "2026-09-07 10:08",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T17:02:04"
+   "updatedAt": "2026-09-09T17:14:08"
   },
   {
    "id": "nv503",
@@ -768,7 +768,7 @@
    "newsAt": "2026-09-09 15:03",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T17:02:05"
+   "updatedAt": "2026-09-09T17:14:09"
   }
  ]
 }

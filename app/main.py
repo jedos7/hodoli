@@ -537,6 +537,19 @@ def api_calendar_status():
     return calendar_job
 
 
+def _lookup_name(code: str) -> str:
+    """전체 테마 매핑(data/theme_map.json, 2천여 종목)에서 종목명을 찾는다."""
+    try:
+        tm = json.loads((settings.data_dir / "theme_map.json").read_text("utf-8"))
+        for t in tm["themes"].values():
+            for s in t["stocks"]:
+                if s["code"] == code:
+                    return s["name"]
+    except (OSError, ValueError, KeyError):
+        pass
+    return ""
+
+
 # ── 장중 돌파 감시 ──────────────────────────────────────────────
 @app.get("/api/watch")
 def api_watch():
@@ -553,8 +566,13 @@ async def api_watch_reload():
 async def api_watch_add(code: str, entry: int, stop: int, name: str = ""):
     if entry <= 0 or stop <= 0 or stop >= entry:
         raise HTTPException(400, "entry(매수 기준가) > stop(손절가) > 0 이어야 합니다")
-    nm = name or (state.stocks[code].name if code in state.stocks else code)
-    it = state.watch.add(code, nm, entry, stop)
+    nm = name or (state.stocks[code].name if code in state.stocks else "") or _lookup_name(code) or ""
+    if not nm and isinstance(feed, KiwoomFeed):
+        try:
+            nm = (await feed.rest.basic(code)).name
+        except Exception:
+            nm = ""
+    it = state.watch.add(code, nm or code, entry, stop)
     if feed:
         await feed.watch_codes([code])
     return it.as_dict()

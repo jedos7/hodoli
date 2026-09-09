@@ -172,6 +172,12 @@ button,select{font:inherit;color:inherit}
 .watch .st{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap}
 .watch .st.waiting{background:var(--surface);color:var(--ink-2);border:1px solid var(--line)} .watch .st.broke{background:var(--good);color:#fff} .watch .st.stopped{background:var(--line);color:var(--ink-2)}
 .bell{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:0 6px;cursor:pointer;font-size:11px;text-transform:none;font-weight:500}
+.wform{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:4px;margin-bottom:6px;font-size:11.5px}
+.wform input{min-width:0;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:4px;padding:3px 6px;font:inherit;font-family:var(--mono)}
+.wform button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer;font:inherit;font-size:11px}
+.wform button[type=submit]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.wform .hint{grid-column:1/-1;font-size:10.5px;color:var(--ink-3)} .wform .hint.err{color:var(--up)}
+.watch .w .del{cursor:pointer;color:var(--ink-3);font-size:10px;margin-left:6px}
 @keyframes flash{0%,100%{background:transparent}50%{background:var(--good-soft)}}
 /* ── 일정 ── */
 .evlist{display:flex;flex-direction:column;gap:8px;font-size:12.5px;max-height:65vh;overflow:auto}
@@ -317,7 +323,14 @@ table.hg tr.drop td{opacity:.55}
       <div class="sec"><h3>생애주기</h3><div class="stage" id="stage"></div></div>
       <div class="sec"><h3>테마 상태</h3><dl class="kv" id="dStat"></dl></div>
     </div>
-    <div class="panel" id="watchPanel" hidden><div class="sec"><h3>눌림목 돌파 감시 <span style="display:inline-flex;gap:6px;align-items:center;text-transform:none;font-weight:400"><span id="watchMeta"></span><button class="bell" id="bellBtn" title="돌파 알림 소리 켜기/끄기">🔔 소리</button></span></h3>
+    <div class="panel" id="watchPanel" hidden><div class="sec"><h3>눌림목 돌파 감시 <span style="display:inline-flex;gap:6px;align-items:center;text-transform:none;font-weight:400"><span id="watchMeta"></span><button class="bell" id="watchAddBtn" title="감시 종목 직접 등록">＋ 등록</button><button class="bell" id="bellBtn" title="돌파 알림 소리 켜기/끄기">🔔 소리</button></span></h3>
+      <form class="wform" id="watchForm" hidden autocomplete="off">
+        <input id="wfCode" placeholder="종목코드 6자리" maxlength="6" inputmode="numeric" required>
+        <input id="wfEntry" placeholder="매수 기준가" inputmode="numeric" required>
+        <input id="wfStop" placeholder="손절가" inputmode="numeric" required>
+        <button type="submit">추가</button><button type="button" id="wfCancel">취소</button>
+        <div class="hint" id="wfHint">기준가를 넘기면 돌파, 손절가 아래면 이탈 알림. 종목명은 코드로 자동 조회됩니다.</div>
+      </form>
       <div class="watch" id="watch"></div>
       <div style="margin-top:6px;font-size:10.5px;color:var(--ink-3)">규칙: 현재가가 매수 기준가(자리 날 고가)를 넘으면 돌파, 손절가(자리 날 저가) 아래면 이탈. 자리는 15:45 스크리너 결과의 최신 엄선 종목.</div></div></div>
     <div class="panel"><div class="sec"><h3>실시간 이벤트 <span style="text-transform:none;font-weight:400" id="evCount"></span></h3><div class="events" id="events"></div></div></div>
@@ -512,7 +525,24 @@ function renderWatch(list){
     return `<div class="w ${w.status}" title="자리 ${w.setup_date} · ${w.source}">
       <div class="nm">${w.name}<small>${w.code}${w.theme?' · '+w.theme:''}</small></div>
       <div class="px">${w.price?w.price.toLocaleString('ko-KR'):'–'}<small>기준 ${w.entry.toLocaleString('ko-KR')} / 손절 ${w.stop.toLocaleString('ko-KR')}${gap!=null?' · '+(gap>=0?'+':'')+gap.toFixed(1)+'%':''}</small></div>
-      <span class="st ${w.status}">${w.status==='broke'?'돌파 '+(w.broke_at||'').slice(0,5):w.status==='stopped'?'이탈':'대기'}</span></div>`}).join('')||'<div style="color:var(--ink-3)">오늘 감시할 엄선 자리가 없습니다.</div>';
+      <span class="st ${w.status}">${w.status==='broke'?'돌파 '+(w.broke_at||'').slice(0,5):w.status==='stopped'?'이탈':'대기'}${w.source==='수동'?`<span class="del" data-code="${w.code}" title="감시 해제">✕</span>`:''}</span></div>`}).join('')||'<div style="color:var(--ink-3)">오늘 감시할 엄선 자리가 없습니다. 직접 넣으려면 ＋ 등록.</div>';
+}
+// 감시 종목 직접 등록 / 해제
+if(USE_SERVER){
+  const f=$('#watchForm'),hint=$('#wfHint');
+  $('#watchAddBtn').addEventListener('click',()=>{f.hidden=!f.hidden;if(!f.hidden)$('#wfCode').focus()});
+  $('#wfCancel').addEventListener('click',()=>{f.hidden=true});
+  f.addEventListener('submit',async e=>{e.preventDefault();
+    const code=$('#wfCode').value.trim(),entry=$('#wfEntry').value.replace(/[^\d]/g,''),stop=$('#wfStop').value.replace(/[^\d]/g,'');
+    hint.className='hint';
+    if(!/^\d{6}$/.test(code)){hint.textContent='종목코드는 숫자 6자리입니다.';hint.className='hint err';return}
+    if(!(+entry>+stop&&+stop>0)){hint.textContent='매수 기준가가 손절가보다 커야 합니다.';hint.className='hint err';return}
+    const r=await fetch(`/api/watch/add?code=${code}&entry=${entry}&stop=${stop}`,{method:'POST'});const d=await r.json();
+    if(!r.ok){hint.textContent=d.detail||'등록 실패';hint.className='hint err';return}
+    hint.textContent=`${d.name} 등록 — 기준 ${(+entry).toLocaleString('ko-KR')} / 손절 ${(+stop).toLocaleString('ko-KR')} (위험 ${d.riskPct}%)`;
+    $('#wfCode').value='';$('#wfEntry').value='';$('#wfStop').value='';
+  });
+  $('#watch').addEventListener('click',async e=>{const x=e.target.closest('.del');if(!x)return;if(!confirm('감시를 해제할까요?'))return;await fetch('/api/watch/'+x.dataset.code,{method:'DELETE'})});
 }
 function onAlert(a){
   pushEvent(a.kind,a.text);
