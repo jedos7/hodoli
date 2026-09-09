@@ -16,6 +16,7 @@ theme-radar/
 │  │  ├─ naver_theme.py  네이버 금융 테마 목록·구성 종목·편입 사유 수집
 │  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
 │  │  ├─ naver_news.py   종목별 증권사 리포트 건수 · 최신 뉴스 (카드의 리포트 줄·뉴스 줄)
+│  │  ├─ naver_futures.py 코스피200 선물 투자자별 매매동향 (외인 선물)
 │  │  └─ overnight.py    야간 지표: 전일 20:05 대비 해외 지수·유가·환율 (야후 파이낸스)
 │  ├─ feeds.py           MockFeed(랜덤워크) / KiwoomFeed / KisFeed (REST 초기값 + WebSocket 체결)
 │  ├─ kiwoom/
@@ -79,7 +80,7 @@ uvicorn app.main:app --reload   # http://127.0.0.1:8000
 | 일봉 | `ka10081` (스크리너 `--source kiwoom`) |
 
 공식 명세·예제: https://github.com/Kiwoom-Securities/Kiwoom-REST-API (`kiwoom/_data/kiwoom_api_spec.json` 에 전체 항목 정의).
-외인 선물 한 칸은 아직 한국투자증권 API 로만 조회하며 키움에서는 비어 있습니다.
+외인 선물 한 칸은 키움에 해당 API 가 없어 네이버 금융에서 받습니다 (아래 '외인 선물' 참고).
 
 ### 한국투자증권 (BROKER=kis)
 
@@ -186,13 +187,12 @@ py scripts\collect_themes.py --merge            # 손으로 넣은 테마(id 가
 - 서버는 `OVERNIGHT_MINUTES`(기본 5분) 주기로 갱신하고 `data/overnight.json` 에도 씁니다. `POST /api/overnight/refresh` 로 즉시 갱신, `py scripts\fetch_overnight.py` 로 단독 실행.
 - 프론트는 서버 피드일 때 1분마다 `/api/overnight` 를 읽고, 표 머리에 기준 시각과 갱신 시각을 보여줍니다.
 
-### 외인 선물 (app/kis/futures.py)
+### 외인 선물 (app/collectors/naver_futures.py)
 
-코스피200 선물 외국인 순매수(계약 수)는 야후에 없어 KIS 조회 API 로 받습니다. 표에는 전일 값, 당일 값(장중 잠정), 차이(계약)가 나옵니다.
-모의 모드에서는 흉내 값이 들어가고 출처가 "모의" 로 표시됩니다.
-
-기본 설정은 '시장별 투자자매매동향(일별)' 을 선물 시장 코드로 호출하는 **추정치**입니다. 계정·문서 버전에 따라 거래 ID 나 시장 코드가 다를 수 있으니
-실계정에서 처음 켤 때 아래로 원본 응답을 보고 `.env` 의 `KIS_FUT_PATH / KIS_FUT_TR_ID / KIS_FUT_PARAMS / KIS_FUT_FIELD` 를 맞추세요.
+코스피200 선물 외국인 순매수(계약 수)입니다. 표에는 전일 값(확정), 당일 값(장중 잠정), 차이(계약)가 나옵니다.
+기본 소스는 네이버 금융 '투자자별 매매동향 · 선물' 페이지라 증권사·키와 무관하게 동작합니다. 키움 REST API 명세에는 선물·옵션 분류가 없어 키움에서는 받을 수 없습니다.
+`FUT_SOURCE=kis` 로 바꾸면 한국투자증권 API(`app/kis/futures.py`)로 조회하며, 그 설정은 **추정치**라 아래로 원본 응답을 보고
+`.env` 의 `KIS_FUT_PATH / KIS_FUT_TR_ID / KIS_FUT_PARAMS / KIS_FUT_FIELD` 를 맞추세요.
 
 ```powershell
 py scripts\probe_kis.py --quote 005930     # 키·토큰 점검

@@ -27,6 +27,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
+from app.collectors import naver_futures
 from app.collectors import overnight as overnight_collector
 from app.collectors.naver_theme import collect
 from app.config import settings
@@ -141,14 +142,18 @@ async def autocollect() -> None:
 
 
 async def foreign_futures() -> dict:
-    """외인 선물 순매수. 모의 모드는 흉내 값, 실계정은 KIS 조회. 실패해도 예외 대신 error 를 돌려준다."""
-    if settings.is_mock:
-        base = -8107
-        return {"prev": base, "now": base + random.randint(-600, 600), "src": "모의"}
-    if not isinstance(feed, KisFeed):
-        return {"prev": None, "now": None, "src": settings.broker, "error": "외인 선물은 아직 한국투자증권 API 로만 조회합니다 (키움 선물 투자자 조회는 미연결)"}
-    r = await KisFutures(feed.rest, settings).foreign_net()
-    return {"prev": r.prev, "now": r.today, "src": f"KIS {r.today_date[4:] if r.today_date else ''}".strip(), "error": r.error}
+    """코스피200 선물 외국인 순매수(계약). 기본은 네이버 투자자별 매매동향(증권사 무관, 키 불필요).
+    FUT_SOURCE=kis 면 한국투자증권 API 로 조회. 실패해도 예외 대신 error 를 돌려준다."""
+    if settings.fut_source == "kis":
+        if not isinstance(feed, KisFeed):
+            return {"prev": None, "now": None, "src": "kis", "error": "FUT_SOURCE=kis 인데 BROKER 가 kis 가 아닙니다"}
+        r = await KisFutures(feed.rest, settings).foreign_net()
+        return {"prev": r.prev, "now": r.today, "src": f"KIS {r.today_date[4:] if r.today_date else ''}".strip(), "error": r.error}
+    try:
+        rows = await naver_futures.fetch_rows()
+        return naver_futures.foreign_summary(rows)
+    except Exception as e:
+        return {"prev": None, "now": None, "src": "네이버", "error": f"선물 투자자 조회 실패: {e}"}
 
 
 news_lock = asyncio.Lock()

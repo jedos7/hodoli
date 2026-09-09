@@ -49,7 +49,9 @@ class Settings:
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))
 
-    # 외인 선물 (코스피200 선물 외국인 순매수) 조회 설정. app/kis/futures.py 참고. 문서와 다르면 여기서 바꾼다.
+    # 외인 선물 소스: naver (기본, 네이버 투자자별 매매동향·키 불필요) | kis (한국투자증권 API, 아래 설정 사용)
+    fut_source: str = field(default_factory=lambda: os.getenv("FUT_SOURCE", "naver").lower())
+    # 한국투자증권으로 조회할 때의 설정. app/kis/futures.py 참고. 문서와 다르면 여기서 바꾼다.
     fut_path: str = field(default_factory=lambda: os.getenv("KIS_FUT_PATH", "/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market"))
     fut_tr_id: str = field(default_factory=lambda: os.getenv("KIS_FUT_TR_ID", "FHPTJ04040000"))
     fut_params: str = field(default_factory=lambda: os.getenv("KIS_FUT_PARAMS", '{"FID_INPUT_ISCD": "F001", "FID_INPUT_DATE_1": "{today}"}'))
