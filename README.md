@@ -17,7 +17,12 @@ theme-radar/
 │  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
 │  │  ├─ naver_news.py   종목별 증권사 리포트 건수 · 최신 뉴스 (카드의 리포트 줄·뉴스 줄)
 │  │  └─ overnight.py    야간 지표: 전일 20:05 대비 해외 지수·유가·환율 (야후 파이낸스)
-│  ├─ feeds.py           MockFeed(랜덤워크) / KisFeed(REST 초기값 + WebSocket 체결)
+│  ├─ feeds.py           MockFeed(랜덤워크) / KiwoomFeed / KisFeed (REST 초기값 + WebSocket 체결)
+│  ├─ kiwoom/
+│  │  ├─ auth.py         키움 접근토큰 (파일 캐시)
+│  │  ├─ rest.py         ka10001 기본정보 · ka10081 일봉 · ka10059 투자자(현재가·거래대금·순매수)
+│  │  ├─ ws.py           실시간 0B 체결 구독, LOGIN/REG/PING, 재접속
+│  │  └─ parse.py        부호 붙은 숫자, 실시간 FID → Trade, 일봉·투자자 응답 파서
 │  ├─ main.py            FastAPI: /api/*, /ws/stream, 정적 파일
 │  ├─ kis/
 │  │  ├─ auth.py         접근토큰(24h, 파일 캐시) · 웹소켓 접속키
@@ -53,7 +58,30 @@ uvicorn app.main:app --reload   # http://127.0.0.1:8000
 브라우저에서 `http://127.0.0.1:8000` 을 열면 프론트가 `/ws/stream` 에 붙어 서버 계산값을 그립니다.
 연결이 안 되면 프론트는 자체 모의 피드로 돌아갑니다 (상단 배지에 표시).
 
-## 실계정 연결
+## 증권사 연결
+
+`.env` 의 `BROKER` 로 고릅니다. `mock` 은 키 없이 가짜 시세, `kiwoom` 은 키움 REST API, `kis` 는 한국투자증권입니다.
+시세를 읽기만 하며 주문 기능은 없습니다.
+
+### 키움 REST API (BROKER=kiwoom) — 실제 접속으로 검증됨
+
+1. https://openapi.kiwoom.com 로그인 → **IP 등록**: 서버를 돌릴 PC 의 현재 IP 를 추가합니다. 등록된 IP 에서만 인증이 됩니다 (집 인터넷은 IP 가 바뀔 수 있으니 인증 오류가 나면 먼저 확인).
+2. 계좌를 API 사용 신청하고 App Key / App Secret 을 내려받습니다. **한 번만 내려받을 수 있고** 실전용·모의투자용이 따로입니다. 서로 바꿔 쓰면 오류 8030 이 납니다.
+3. `.env` 에 `BROKER=kiwoom`, `KIWOOM_ENV=real`(실전 키) 또는 `paper`(모의투자 키), 키 두 줄을 넣고 서버를 재시작합니다.
+4. 시작 시 종목마다 `ka10059` 한 번으로 현재가·전일종가·누적거래대금·외국인/기관 순매수(당일 잠정치)를 채우고, 이후 체결은 WebSocket `0B` 로 받습니다. 순매수는 2분마다 다시 받습니다.
+
+| 항목 | 값 |
+|---|---|
+| REST | `https://api.kiwoom.com` (실전) · `https://mockapi.kiwoom.com` (모의) |
+| WebSocket | `wss://api.kiwoom.com:10000/api/dostk/websocket` (모의는 mockapi) |
+| 거래대금 단위 | 백만원 (실시간 FID 14 · 일봉 `trde_prica` · 투자자 `acc_trde_prica`) → `KIWOOM_AMOUNT_UNIT=1000000` |
+| 체결강도 | 실시간 FID 228 |
+| 일봉 | `ka10081` (스크리너 `--source kiwoom`) |
+
+공식 명세·예제: https://github.com/Kiwoom-Securities/Kiwoom-REST-API (`kiwoom/_data/kiwoom_api_spec.json` 에 전체 항목 정의).
+외인 선물 한 칸은 아직 한국투자증권 API 로만 조회하며 키움에서는 비어 있습니다.
+
+### 한국투자증권 (BROKER=kis)
 
 1. https://apiportal.koreainvestment.com 에서 앱 등록 → APP KEY / SECRET 발급.
 2. `.env` 에 `KIS_ENV=vts`(모의투자) 또는 `real`, 키 두 개 입력.

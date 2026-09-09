@@ -11,9 +11,26 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 
+def _broker_default() -> str:
+    """BROKER 가 없으면 KIS_ENV 로 유추 (예전 설정 호환): mock → mock, vts/real → kis"""
+    b = os.getenv("BROKER", "").lower()
+    if b:
+        return b
+    return "mock" if os.getenv("KIS_ENV", "mock").lower() == "mock" else "kis"
+
+
 @dataclass(frozen=True)
 class Settings:
-    env: str = field(default_factory=lambda: os.getenv("KIS_ENV", "mock").lower())  # mock | vts | real
+    broker: str = field(default_factory=_broker_default)  # mock | kis | kiwoom
+    env: str = field(default_factory=lambda: os.getenv("KIS_ENV", "mock").lower())  # (KIS) mock | vts | real
+
+    # ── 키움 REST API ──
+    kiwoom_env: str = field(default_factory=lambda: os.getenv("KIWOOM_ENV", "paper").lower())  # paper(모의) | real
+    kiwoom_app_key: str = field(default_factory=lambda: os.getenv("KIWOOM_APP_KEY", ""))
+    kiwoom_app_secret: str = field(default_factory=lambda: os.getenv("KIWOOM_APP_SECRET", ""))
+    kiwoom_rps: float = field(default_factory=lambda: float(os.getenv("KIWOOM_RPS", "4")))  # 초당 조회 수
+    # 키움 거래대금 단위(원). 실시간 FID 14 · 일봉 trde_prica · 투자자 acc_trde_prica 모두 백만원 (문서·실응답으로 확인)
+    kiwoom_amount_unit: int = field(default_factory=lambda: int(os.getenv("KIWOOM_AMOUNT_UNIT", "1000000")))
     app_key: str = field(default_factory=lambda: os.getenv("KIS_APP_KEY", ""))
     app_secret: str = field(default_factory=lambda: os.getenv("KIS_APP_SECRET", ""))
     account_no: str = field(default_factory=lambda: os.getenv("KIS_ACCOUNT_NO", ""))
@@ -44,7 +61,20 @@ class Settings:
 
     @property
     def is_mock(self) -> bool:
-        return self.env == "mock"
+        return self.broker == "mock"
+
+    @property
+    def kiwoom_base(self) -> str:
+        return "https://api.kiwoom.com" if self.kiwoom_env == "real" else "https://mockapi.kiwoom.com"
+
+    @property
+    def kiwoom_ws_url(self) -> str:
+        host = "api.kiwoom.com" if self.kiwoom_env == "real" else "mockapi.kiwoom.com"
+        return f"wss://{host}:10000/api/dostk/websocket"
+
+    @property
+    def kiwoom_token_cache(self) -> Path:
+        return self.data_dir / f"kiwoom_token_{self.kiwoom_env}.json"
 
     @property
     def rest_base(self) -> str:
@@ -66,9 +96,15 @@ class Settings:
     def validate(self) -> None:
         if self.is_mock:
             return
-        missing = [k for k, v in (("KIS_APP_KEY", self.app_key), ("KIS_APP_SECRET", self.app_secret)) if not v]
+        if self.broker == "kiwoom":
+            pairs = (("KIWOOM_APP_KEY", self.kiwoom_app_key), ("KIWOOM_APP_SECRET", self.kiwoom_app_secret))
+        elif self.broker == "kis":
+            pairs = (("KIS_APP_KEY", self.app_key), ("KIS_APP_SECRET", self.app_secret))
+        else:
+            raise RuntimeError(f"BROKER={self.broker} 는 모릅니다. mock | kis | kiwoom 중 하나여야 합니다.")
+        missing = [k for k, v in pairs if not v]
         if missing:
-            raise RuntimeError(f"KIS_ENV={self.env} 인데 {', '.join(missing)} 가 비어 있습니다. .env 를 확인하세요.")
+            raise RuntimeError(f"BROKER={self.broker} 인데 {', '.join(missing)} 가 비어 있습니다. .env 를 확인하세요.")
 
 
 settings = Settings()

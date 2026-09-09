@@ -30,7 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from app.collectors import overnight as overnight_collector
 from app.collectors.naver_theme import collect
 from app.config import settings
-from app.feeds import KisFeed, MockFeed
+from app.feeds import KisFeed, KiwoomFeed, MockFeed
 from app.kis.futures import KisFutures
 from app.screener.runner import run_screener
 from app.state import MarketState
@@ -51,8 +51,13 @@ overnight_lock = asyncio.Lock()
 # ── 피드 · 방송 ────────────────────────────────────────────────
 async def start_feed() -> None:
     global feed
-    feed = MockFeed(state) if settings.is_mock else KisFeed(state, settings)
-    log.info("피드: %s (KIS_ENV=%s, %d 테마 %d 종목)", type(feed).__name__, settings.env, len(state.themes), len(state.stocks))
+    if settings.is_mock:
+        feed = MockFeed(state)
+    elif settings.broker == "kiwoom":
+        feed = KiwoomFeed(state, settings)
+    else:
+        feed = KisFeed(state, settings)
+    log.info("피드: %s (BROKER=%s, %d 테마 %d 종목)", type(feed).__name__, settings.broker, len(state.themes), len(state.stocks))
     await feed.start()
 
 
@@ -137,9 +142,11 @@ async def autocollect() -> None:
 
 async def foreign_futures() -> dict:
     """외인 선물 순매수. 모의 모드는 흉내 값, 실계정은 KIS 조회. 실패해도 예외 대신 error 를 돌려준다."""
-    if settings.is_mock or not isinstance(feed, KisFeed):
+    if settings.is_mock:
         base = -8107
         return {"prev": base, "now": base + random.randint(-600, 600), "src": "모의"}
+    if not isinstance(feed, KisFeed):
+        return {"prev": None, "now": None, "src": settings.broker, "error": "외인 선물은 아직 한국투자증권 API 로만 조회합니다 (키움 선물 투자자 조회는 미연결)"}
     r = await KisFutures(feed.rest, settings).foreign_net()
     return {"prev": r.prev, "now": r.today, "src": f"KIS {r.today_date[4:] if r.today_date else ''}".strip(), "error": r.error}
 
@@ -247,7 +254,8 @@ app = FastAPI(title="테마 레이더 API", lifespan=lifespan)
 # ── 조회 ───────────────────────────────────────────────────────
 @app.get("/api/health")
 def health():
-    return {"ok": True, "env": settings.env, "tick": state.tick, "themes": len(state.themes), "stocks": len(state.stocks),
+    return {"ok": True, "broker": settings.broker, "env": settings.kiwoom_env if settings.broker == "kiwoom" else settings.env,
+            "feed": type(feed).__name__ if feed else None, "tick": state.tick, "themes": len(state.themes), "stocks": len(state.stocks),
             "clients": len(clients), "collect": last_collect | {"every_minutes": settings.collect_minutes},
             "overnight": {"asof": overnight_data.get("asof"), "base_at": overnight_data.get("base_at"), "every_minutes": settings.overnight_minutes}}
 
@@ -304,8 +312,8 @@ async def api_screener_run(source: str = "naver", universe: str = "themes", min_
     """일봉을 받아 고가놀이를 다시 찾는다. 백그라운드로 돌고 /api/screener/status 로 진행을 본다."""
     if screener_job["running"]:
         raise HTTPException(409, "이미 찾는 중입니다.")
-    if source not in ("auto", "naver", "kis", "mock") or universe not in ("themes", "market"):
-        raise HTTPException(400, "source 는 auto|naver|kis|mock, universe 는 themes|market")
+    if source not in ("auto", "naver", "kis", "kiwoom", "mock") or universe not in ("themes", "market"):
+        raise HTTPException(400, "source 는 auto|naver|kis|kiwoom|mock, universe 는 themes|market")
     screener_job.update(running=True, done=0, total=0, current="종목 목록 준비", startedAt=datetime.now().isoformat(timespec="seconds"),
                         finishedAt=None, error=None, source=source, universe=universe)
     asyncio.create_task(_screener_task(source, universe, min_amount), name="screener")

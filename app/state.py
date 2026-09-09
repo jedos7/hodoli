@@ -132,6 +132,18 @@ class MarketState:
             return
         s.frgn_eok, s.orgn_eok, s.investor_src, s.investor_ts = frgn_eok, orgn_eok, src, ts or time.time()
 
+    def seed(self, code: str, price: int, acc_amount_eok: float, prev_close: int | None = None, change_rate: float | None = None) -> None:
+        """시작 시 초기값. 누적 거래대금을 '유입' 으로 세지 않는다 (그러면 5분 유입 = 전체가 되어 활동도가 99 로 몰린다)."""
+        s = self.stocks.get(code)
+        if s is None:
+            return
+        if prev_close:
+            s.ref = prev_close
+        s.price = price
+        s.acc_amount = acc_amount_eok
+        s.change_rate = change_rate if change_rate is not None else (price / s.ref - 1) * 100 if s.ref else 0.0
+        s.last_ts = time.time()
+
     def set_ref(self, code: str, prev_close: int) -> None:
         if code in self.stocks and prev_close > 0:
             self.stocks[code].ref = prev_close

@@ -77,6 +77,23 @@ async def fetch_candles(source: str, universe: list[tuple[str, str, str]], days:
         for i, (code, name, _) in enumerate(universe, 1):
             out[code] = synthetic_candles(days, seed=int(code), start_price=random.Random(code).choice([3000, 12000, 45000, 150000]))
         return out
+    if source == "kiwoom":
+        settings.validate()
+        from app.kiwoom.auth import KiwoomAuth
+        from app.kiwoom.rest import KiwoomRest
+
+        rest = KiwoomRest(settings, KiwoomAuth(settings))
+        try:
+            for i, (code, name, _) in enumerate(universe, 1):
+                try:
+                    out[code] = await rest.daily_candles(code, days)
+                except Exception as e:
+                    log.warning("키움 일봉 실패 %s(%s): %s", name, code, e)
+                if progress:
+                    progress(i, n, name)
+        finally:
+            await rest.close()
+        return out
     if source == "kis":
         settings.validate()
         from app.kis.auth import KisAuth
@@ -144,7 +161,7 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
                        min_amount_eok: float = 30.0, progress: Progress | None = None, write: bool = True,
                        include_today: bool = False) -> dict:
     if source == "auto":
-        source = "kis" if not settings.is_mock else "naver"
+        source = "naver" if settings.is_mock else settings.broker
     uni = await load_universe(universe, source, min_amount_eok)
     log.info("스크리너: 소스 %s · 범위 %s · %d종목", source, universe, len(uni))
     candles = await fetch_candles(source, uni, days, progress)

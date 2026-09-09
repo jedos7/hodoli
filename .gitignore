@@ -6,3 +6,4 @@ data/*.json
 !data/.gitkeep
 .pytest_cache/
 themes.json.bak
+data/*.log

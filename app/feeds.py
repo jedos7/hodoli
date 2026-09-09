@@ -85,6 +85,67 @@ class MockFeed:
             await asyncio.sleep(self.interval)
 
 
+class KiwoomFeed:
+    """키움 REST API: 시작 시 ka10001 로 현재가·전일 종가, 이후 WebSocket 0B 체결로 갱신, ka10059 로 외인·기관 순매수."""
+
+    def __init__(self, state: MarketState, settings: Settings):
+        from app.kiwoom.auth import KiwoomAuth
+        from app.kiwoom.rest import KiwoomRest
+        from app.kiwoom.ws import KiwoomWebSocket
+
+        self.state = state
+        self.s = settings
+        self.auth = KiwoomAuth(settings)
+        self.rest = KiwoomRest(settings, self.auth)
+        self.ws = KiwoomWebSocket(settings, self.auth, self._on_trade)
+        self._task: asyncio.Task | None = None
+        self._inv_task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        await self._refresh_all(initial=True)
+        self.state.recompute()
+        self._task = asyncio.create_task(self.ws.run(self.state.codes), name="kiwoom-ws")
+        self._inv_task = asyncio.create_task(self._investor_loop(), name="kiwoom-investor")
+
+    async def _refresh_all(self, initial: bool = False) -> None:
+        """ka10059 로 종목마다 현재가·전일종가·누적거래대금·외인/기관 순매수를 채운다 (종목당 조회 1회)."""
+        from datetime import date
+
+        today = date.today().strftime("%Y%m%d")
+        for code in self.state.codes:
+            try:
+                d = await self.rest.snapshot(code)
+            except Exception as e:
+                log.warning("키움 조회 실패 %s: %s", code, e)
+                continue
+            if not d:
+                continue
+            s = self.state.stocks[code]
+            if initial:
+                self.state.seed(code, d["price"], d["acc_amount"] / 1e8, prev_close=d["prev_close"])
+            elif d["acc_amount"] / 1e8 > s.acc_amount:  # 실시간이 끊겼을 때를 대비해 누적 거래대금은 큰 쪽으로
+                self.state.update(code, d["price"], d["acc_amount"] / 1e8)
+            src = "당일" if d["date"] == today else d["date"][4:6] + "/" + d["date"][6:]
+            self.state.set_investor(code, d["frgn"] / 1e8, d["orgn"] / 1e8, src)
+
+    async def stop(self) -> None:
+        self.ws.stop()
+        for t in (self._task, self._inv_task):
+            if t:
+                t.cancel()
+        await self.rest.close()
+
+    def _on_trade(self, t: Trade) -> None:
+        self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
+        self.state.tick += 1
+
+    async def _investor_loop(self) -> None:
+        """2분마다 외국인·기관 순매수(당일 잠정치)를 다시 받는다."""
+        while True:
+            await asyncio.sleep(120.0)
+            await self._refresh_all()
+
+
 class KisFeed:
     def __init__(self, state: MarketState, settings: Settings):
         self.state = state
@@ -101,8 +162,7 @@ class KisFeed:
         for code in self.state.codes:
             try:
                 q = await self.rest.quote(code)
-                self.state.set_ref(code, q.prev_close)
-                self.state.update(code, q.price, q.acc_amount / 1e8, change_rate=q.change_rate)
+                self.state.seed(code, q.price, q.acc_amount / 1e8, prev_close=q.prev_close, change_rate=q.change_rate)
             except Exception as e:  # 한 종목 실패로 전체를 멈추지 않는다
                 log.warning("초기 시세 실패 %s: %s", code, e)
         self.state.recompute()

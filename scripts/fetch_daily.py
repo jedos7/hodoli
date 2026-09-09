@@ -25,7 +25,7 @@ from app.screener.runner import run_screener  # noqa: E402
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", choices=["auto", "naver", "kis", "mock"], default="naver")
+    ap.add_argument("--source", choices=["auto", "naver", "kis", "kiwoom", "mock"], default="naver")
     ap.add_argument("--universe", choices=["themes", "market"], default="themes")
     ap.add_argument("--days", type=int, default=250)
     ap.add_argument("--recent", type=int, default=5, help="표에 보여줄 최근 거래일 수")
