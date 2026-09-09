@@ -15,7 +15,8 @@
   GET  /api/events?days=30    일정 (규칙 계산 + FOMC + 등록). POST /api/events?date=&kind=&title=… 등록, DELETE /api/events/{id}
   GET  /api/research          리서치 브리핑 (최근 7일 산업·경제·시황 리포트 요약 + 테마별 목표가 방향). POST /api/research/refresh
   GET  /api/calendar          일별 테마 달력 (거래일별 테마 상위4·중앙값·대표·상위 종목). POST /api/calendar/run, GET /api/calendar/status
-  GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집, 16:10 달력) 상태
+  GET  /api/nxtclose          19:50 NXT 하락 마감 종가배팅 후보 (KRX 종가 대비 NXT 가격). POST /api/nxtclose/run 즉시 점검
+  GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집, 16:10 달력, 19:50 NXT) 상태
   POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
   POST /api/overnight/refresh 야간 지표 즉시 갱신
@@ -40,6 +41,7 @@ from fastapi.staticfiles import StaticFiles
 from app.collectors import naver_futures
 from app.collectors import overnight as overnight_collector
 from app.collectors.naver_research import briefing as research_briefing
+from app import nxt_close
 from app.events import Events
 from app.screener.theme_calendar import build_calendar
 from app.collectors.naver_theme import collect
@@ -340,10 +342,21 @@ async def job_calendar() -> dict:
         calendar_job.update(running=False, finishedAt=datetime.now().isoformat(timespec="seconds"))
 
 
+async def job_nxt_close(closing: bool = True) -> dict:
+    """19:50 NXT 마감 직전: 후보 종목의 NXT 현재가를 읽어 KRX 종가보다 내려 있으면 종가배팅 후보 알림."""
+    if not isinstance(feed, KiwoomFeed):
+        raise RuntimeError("NXT 시세는 키움 피드에서만 읽을 수 있습니다 (BROKER=kiwoom)")
+    cands = nxt_close.load_candidates()
+    result = await nxt_close.check(feed.rest, cands, closing)
+    for a in nxt_close.alerts_for(result):
+        state.alerts.append(a)
+    return {"candidates": len(result["candidates"]), "picks": len(result["picks"])}
+
+
 events = Events(settings.data_dir / "events.json")
 scheduler = Scheduler(
     [Job("screener", settings.schedule_screener, job_screener), Job("collect", settings.schedule_collect, job_collect),
-     Job("calendar", settings.schedule_calendar, job_calendar)],
+     Job("calendar", settings.schedule_calendar, job_calendar), Job("nxt_close", settings.schedule_nxt, job_nxt_close)],
     settings.data_dir / "schedule.json",
 )
 
@@ -535,6 +548,23 @@ async def api_calendar_run():
 @app.get("/api/calendar/status")
 def api_calendar_status():
     return calendar_job
+
+
+@app.get("/api/nxtclose")
+def api_nxtclose():
+    return _read_json("nxt_close.json") or {"at": None, "candidates": [], "picks": []}
+
+
+@app.post("/api/nxtclose/run")
+async def api_nxtclose_run():
+    """지금 바로 NXT 현재가로 후보를 점검한다 (20:00 전이면 '마감' 이 아니라 '현재' 기준)."""
+    now = datetime.now()
+    closing = (now.hour, now.minute) >= (19, 45)
+    try:
+        r = await job_nxt_close(closing)
+    except Exception as e:
+        raise HTTPException(502, str(e))
+    return r | {"closing": closing}
 
 
 def _lookup_name(code: str) -> str:

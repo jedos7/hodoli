@@ -160,7 +160,7 @@ button,select{font:inherit;color:inherit}
 .events .t{font-family:var(--mono);color:var(--ink-3);font-size:10.5px;flex:none}
 .events .k{flex:none;font-size:10px;font-weight:700;padding:0 4px;border-radius:2px}
 .events .k.up{background:var(--up-soft)} .events .k.hot{background:var(--accent-soft);color:var(--accent-ink)} .events .k.top{background:var(--up);color:#fff} .events .k.sys{background:var(--surface-2);color:var(--ink-2)}
-.events .k.brk{background:var(--good);color:#fff} .events .k.stop{background:var(--down);color:#fff}
+.events .k.brk{background:var(--good);color:#fff} .events .k.stop{background:var(--down);color:#fff} .events .k.nxt{background:var(--accent);color:#fff}
 /* ── 돌파 감시 패널 ── */
 .watch{display:flex;flex-direction:column;gap:3px;font-size:11.5px}
 .watch .w{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 8px;align-items:center;padding:4px 6px;border-radius:4px;background:var(--surface-2)}
@@ -323,7 +323,7 @@ table.hg tr.drop td{opacity:.55}
       <div class="sec"><h3>생애주기</h3><div class="stage" id="stage"></div></div>
       <div class="sec"><h3>테마 상태</h3><dl class="kv" id="dStat"></dl></div>
     </div>
-    <div class="panel" id="watchPanel" hidden><div class="sec"><h3>눌림목 돌파 감시 <span style="display:inline-flex;gap:6px;align-items:center;text-transform:none;font-weight:400"><span id="watchMeta"></span><button class="bell" id="watchAddBtn" title="감시 종목 직접 등록">＋ 등록</button><button class="bell" id="bellBtn" title="돌파 알림 소리 켜기/끄기">🔔 소리</button></span></h3>
+    <div class="panel" id="watchPanel" hidden><div class="sec"><h3>눌림목 돌파 감시 <span style="display:inline-flex;gap:6px;align-items:center;text-transform:none;font-weight:400"><span id="watchMeta"></span><button class="bell" id="watchAddBtn" title="감시 종목 직접 등록">＋ 등록</button><button class="bell" id="nxtBtn" title="NXT 야간장 현재가로 종가배팅 후보(KRX 종가보다 내려온 종목) 점검. 19:50 에 자동으로도 돕니다">🌙 NXT</button><button class="bell" id="bellBtn" title="돌파 알림 소리 켜기/끄기">🔔 소리</button></span></h3>
       <form class="wform" id="watchForm" hidden autocomplete="off">
         <input id="wfCode" placeholder="종목코드 6자리" maxlength="6" inputmode="numeric" required>
         <input id="wfEntry" placeholder="매수 기준가" inputmode="numeric" required>
@@ -508,7 +508,7 @@ const savePrefs=()=>{try{localStorage.setItem('radar',JSON.stringify({sort:$('#s
 if(prefs.sort)$('#sortSel').value=prefs.sort;if(prefs.n)$('#nSel').value=prefs.n;if(prefs.k)$('#kSel').value=prefs.k;
 
 /* ───────────────────────── 이벤트/속보 ───────────────────────── */
-const KIND={up:'돌파',hot:'수급',top:'상한가',sys:'시스템',brk:'매수기준 돌파',stop:'손절 이탈'};
+const KIND={up:'돌파',hot:'수급',top:'상한가',sys:'시스템',brk:'매수기준 돌파',stop:'손절 이탈',nxt:'종가배팅'};
 
 /* ── 돌파 감시: 서버가 보내는 watch 목록 · alert 메시지 ── */
 let bellOn=true;try{bellOn=localStorage.getItem('bell')!=='off'}catch(e){}
@@ -543,11 +543,17 @@ if(USE_SERVER){
     $('#wfCode').value='';$('#wfEntry').value='';$('#wfStop').value='';
   });
   $('#watch').addEventListener('click',async e=>{const x=e.target.closest('.del');if(!x)return;if(!confirm('감시를 해제할까요?'))return;await fetch('/api/watch/'+x.dataset.code,{method:'DELETE'})});
+  // NXT 종가배팅 후보 즉시 점검 (알림은 서버가 실시간 채널로 보낸다)
+  $('#nxtBtn').addEventListener('click',async()=>{const b=$('#nxtBtn');b.disabled=true;b.textContent='점검 중…';
+    try{const r=await fetch('/api/nxtclose/run',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||r.status);}
+    catch(e){pushEvent('sys','NXT 점검 실패 — '+e.message)}finally{b.disabled=false;b.textContent='🌙 NXT'}});
+  // 서버에 남은 최근 알림(19:50 종가배팅 후보 등)을 처음 열 때 이벤트 목록에 채운다
+  fetch('/api/alerts').then(r=>r.json()).then(d=>{for(const a of (d.alerts||[]).slice(-20)){events.push({t:(a.ts||'').slice(11,19),kind:a.kind,text:a.text})}renderEvents();renderAlerts()}).catch(()=>{});
 }
 function onAlert(a){
   pushEvent(a.kind,a.text);
   const bar=$('.alerts');bar.classList.remove('flash');void bar.offsetWidth;bar.classList.add('flash');
-  beep(a.kind==='brk'?3:1);
+  beep(a.kind==='brk'?3:a.kind==='nxt'?2:1);
   if(a.kind==='brk'&&'Notification' in window&&Notification.permission==='granted'){try{new Notification('매수 기준가 돌파',{body:a.text})}catch(e){}}
 }
 document.addEventListener('DOMContentLoaded',()=>{const b=$('#bellBtn');if(!b)return;const paint=()=>{b.textContent=bellOn?'🔔 소리':'🔕 무음'};paint();
