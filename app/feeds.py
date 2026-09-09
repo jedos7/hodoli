@@ -115,6 +115,9 @@ class KiwoomFeed:
         """감시 종목이 바뀌었을 때 실시간 구독에 추가한다."""
         return await self.ws.ensure(codes)
 
+    def status(self) -> dict:
+        return {"type": "kiwoom", **self.ws.status()}
+
     async def _refresh_all(self, initial: bool = False) -> None:
         """ka10059 로 종목마다 현재가·전일종가·누적거래대금·외인/기관 순매수를 채운다 (종목당 조회 1회)."""
         from datetime import date

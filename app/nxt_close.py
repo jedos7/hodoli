@@ -32,6 +32,20 @@ class Candidate:
     nx_price: int = 0
     nx_move: float = 0.0   # NXT 현재가 / KRX 종가 - 1 (%)
     pick: bool = False     # NXT 하락 → 후보
+    nx_traded: bool = False  # NXT 에서 거래(가격)가 있었는가
+
+
+def candles_today() -> bool:
+    """일봉 캐시의 마지막 날짜가 오늘인가. 아니면(휴장·스크리너 미실행) 종가배팅 비교가 무의미하다."""
+    c = settings.data_dir / "candles_kiwoom_market.json"
+    if not c.exists():
+        return False
+    try:
+        d = json.loads(c.read_text("utf-8"))
+        last = max((rows[-1][0] for rows in d["candles"].values() if rows), default="")
+        return last == datetime.now().strftime("%Y%m%d")
+    except (OSError, ValueError, KeyError, IndexError):
+        return False
 
 
 def load_candidates(min_spike: float = 8.0, min_amount_eok: float = 50.0) -> list[Candidate]:
@@ -73,6 +87,7 @@ async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
             b = await rest.basic(cnd.code + "_NX")
             if b.price > 0 and cnd.krx_close > 0:
                 cnd.nx_price = b.price
+                cnd.nx_traded = True
                 cnd.nx_move = (b.price / cnd.krx_close - 1) * 100
                 cnd.pick = cnd.nx_move < 0
         except Exception as e:

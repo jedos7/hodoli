@@ -115,7 +115,7 @@ async def broadcaster() -> None:
             del alert_log[:-200]
             log.info("알림 %s: %s", a["kind"], a["text"])
             await broadcast({"type": "alert", **a})
-            await notifier.send_alert(a)
+            asyncio.create_task(notifier.send_alert(a), name="telegram")  # 전송이 느려도 방송 루프를 막지 않게
         await asyncio.sleep(1.0)
 
 
@@ -359,6 +359,10 @@ async def job_nxt_close(closing: bool = True) -> dict:
     """19:50 NXT 마감 직전: 후보 종목의 NXT 현재가를 읽어 KRX 종가보다 내려 있으면 종가배팅 후보 알림."""
     if not isinstance(feed, KiwoomFeed):
         raise RuntimeError("NXT 시세는 키움 피드에서만 읽을 수 있습니다 (BROKER=kiwoom)")
+    if not nxt_close.candles_today():
+        state.alerts.append({"kind": "sys", "at": datetime.now().strftime("%H:%M:%S"),
+                             "text": "종가배팅 점검 건너뜀 — 오늘 확정 일봉이 없습니다 (휴장일이거나 15:45 스크리너가 아직 안 돌았음)"})
+        return {"candidates": 0, "picks": 0, "skipped": "no candles today"}
     cands = nxt_close.load_candidates()
     result = await nxt_close.check(feed.rest, cands, closing)
     for a in nxt_close.alerts_for(result):
@@ -406,7 +410,14 @@ def health():
             "clients": len(clients), "collect": last_collect | {"every_minutes": settings.collect_minutes},
             "overnight": {"asof": overnight_data.get("asof"), "base_at": overnight_data.get("base_at"), "every_minutes": settings.overnight_minutes},
             "schedule": {j.name: {"at": j.at or None, "lastDate": j.last_date, "ok": j.last_result.get("ok")} for j in scheduler.jobs},
-            "telegram": notifier.status()}
+            "telegram": notifier.status(),
+            "realtime": feed.status() if feed and hasattr(feed, "status") else {"type": type(feed).__name__ if feed else None},
+            "marketOpen": _krx_open(datetime.now())}
+
+
+def _krx_open(now: datetime) -> bool:
+    """정규장(09:00~15:30) 평일인가. 휴장일은 모른다."""
+    return now.weekday() < 5 and (9, 0) <= (now.hour, now.minute) <= (15, 30)
 
 
 @app.get("/api/themes")

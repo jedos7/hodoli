@@ -34,6 +34,17 @@ class KiwoomWebSocket:
         self._codes: list[str] = []       # 구독하려는 전체 목록 (재접속 때 다시 건다)
         self._subscribed: set[str] = set()
         self._grp = 0
+        self.last_trade_at: float = 0.0   # 마지막 체결 수신 시각 (epoch) — 끊김 감시용
+        self.reconnects = 0
+
+    @property
+    def connected(self) -> bool:
+        return self._ws is not None
+
+    def status(self) -> dict:
+        import time
+        return {"connected": self.connected, "subscribed": len(self._subscribed), "reconnects": self.reconnects,
+                "lastTradeAgo": round(time.time() - self.last_trade_at) if self.last_trade_at else None}
 
     def stop(self) -> None:
         self._stop.set()
@@ -87,6 +98,7 @@ class KiwoomWebSocket:
                 log.exception("키움 WS 오류 → %ds 후 재접속", backoff)
             finally:
                 self._ws = None
+                self.reconnects += 1
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60)
 
@@ -99,6 +111,8 @@ class KiwoomWebSocket:
         if t == "PING":
             await ws.send(raw)
         elif t == "REAL":
+            import time
+            self.last_trade_at = time.time()
             for tr in parse_real(msg, self.s.kiwoom_amount_unit):
                 self.on_trade(tr)
         elif t == "REG":

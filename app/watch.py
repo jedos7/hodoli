@@ -64,6 +64,11 @@ class Watchlist:
             asofs.append(str(d.get("asof")))
             # 파일의 확정 일봉 날짜(asof) 자리만 감시한다. 며칠 전 자리가 최신이라고 남아 있으면 안 된다.
             latest = str(d.get("asof") or "")
+            try:  # 결과 파일이 4일 넘게 오래됐으면(스크리너가 며칠 안 돈 경우) 감시하지 않는다
+                if (datetime.now() - datetime.strptime(latest, "%Y%m%d")).days > 4:
+                    continue
+            except ValueError:
+                continue
             rows = [r for r in d.get("rows", []) if r.get("strict") and r.get("entryPrice") and r["date"] == latest]
             if not rows:
                 continue
