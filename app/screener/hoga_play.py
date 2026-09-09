@@ -92,13 +92,15 @@ def find_setups(
     return out
 
 
-def backtest(setups: list[Setup], baseline_ret: float = 0.0) -> dict:
-    """3일 보유 성과. baseline_ret 은 같은 기간 모든 봉의 3일 수익률 평균(기준선)."""
-    xs = [s for s in setups if s.fwd_ret is not None]
-    if not xs:
+def backtest(setups: list, baseline_ret: float = 0.0, rets: list[float] | None = None) -> dict:
+    """3일 보유 성과. baseline_ret 은 같은 기간 모든 봉의 3일 수익률 평균(기준선).
+    rets 를 주면 (날짜순 정렬된) 수익률 목록으로 바로 계산한다 (돌파 매수 등 다른 진입 방식용)."""
+    if rets is None:
+        xs = [s for s in setups if s.fwd_ret is not None]
+        xs.sort(key=lambda s: s.date)
+        rets = [s.fwd_ret for s in xs]
+    if not rets:
         return {"n": 0, "win": 0.0, "avg": 0.0, "vsBase": 0.0, "h1": 0.0, "h2": 0.0}
-    xs.sort(key=lambda s: s.date)
-    rets = [s.fwd_ret for s in xs]
     half = len(rets) // 2 or 1
     return {
         "n": len(rets),

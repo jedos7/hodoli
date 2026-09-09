@@ -53,6 +53,24 @@ def test_heavy_volume_and_ma_break_are_reasons():
     assert "20일선 아래" in r4 and "급등봉 저점 이탈" in r4
 
 
+def test_pull_number_prev_depth_and_confirm_entry():
+    cs = _flat(40)
+    cs += [_c(1, 10000, 11300, 9950, 11200, 1_000_000)]   # 급등, 고점 11300
+    cs += [_c(2, 11200, 11250, 10700, 10800, 200_000)]    # 1차 눌림 -4.4%
+    cs += [_c(3, 10900, 11800, 10850, 11700, 400_000)]    # 새 고점 11800 → 1차 눌림 끝
+    cs += [_c(4, 11700, 11750, 11300, 11350, 150_000)]    # 2차 눌림 -3.8%
+    cs += [_c(5, 11400, 11900, 11350, 11850, 300_000)]    # 다음 날 전일 고가(11750) 돌파 → 진입가 = max(11400, 11750) = 11750
+    cs += _flat(6, 12000, 100000, start=10)
+    s = {x.date: x for x in find_pullbacks(cs, "000001", "테스트", "테마")}
+    d4 = s["20260204"]
+    assert d4.pull_no == 2 and d4.prev_depth is not None and round(d4.prev_depth, 1) == -4.4
+    assert "20260202" not in s   # 급등 다음 날 눌림은 후보에서 뺀다
+    assert round(d4.confirm[3], 2) == round((12000 / 11750 - 1) * 100, 2)   # 진입 후 3일 뒤 종가 12000
+    assert d4.trend_days == 3            # 평탄 구간(종가 = 20일선)은 '위' 가 아니고, 급등 뒤 3일만 20일선 위
+    assert d4.adx is not None
+    assert d4.entry_price == 11750 and d4.stop_price == 11300
+
+
 def test_first_day_after_spike_is_skipped_and_breakdown_stops():
     cs = _flat(40)
     cs += [_c(1, 10000, 11300, 9950, 11200, 1_000_000), _c(2, 11100, 11150, 10500, 10600, 300_000),  # 급등 다음날 눌림 → 제외

@@ -673,7 +673,7 @@ function renderHG(){
 }
 /* ── 눌림목 탭: 같은 창에서 표만 바꾼다 ── */
 const HG_HEAD=$('#hgHead').innerHTML;
-const PB_HEAD='<tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>고점 대비</th><th>눌림 일·거래량</th><th>20일선</th><th>일봉 종가</th><th>지금</th><th>오늘</th><th>대금</th></tr>';
+const PB_HEAD='<tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>고점 대비</th><th>눌림 일·거래량</th><th>20일선·추세</th><th>매수 기준 / 손절</th><th>지금</th><th>오늘</th><th>대금</th></tr>';
 let hgTab='hoga',pbData=null;
 async function loadPB(){
   if(!USE_SERVER)return null;
@@ -686,9 +686,11 @@ function renderPB(){
   const st=d.stats[mode];const rows=d.rows.filter(r=>mode==='all'||r.strict),dropped=d.rows.filter(r=>!r.strict);
   const src={mock:'합성 일봉',naver:'네이버 일봉',kiwoom:'키움 일봉',kis:'KIS 일봉'}[d.source]||d.source;
   $('#hgCount').textContent=`확정 일봉 ${d.asof} 까지 · 최근 ${d.recentDays}거래일에서 ${rows.length}자리 (전체 ${d.rows.length}) · ${src} · ${d.universe==='market'?'시장 전체':'테마 종목'} ${d.stocks}종목`;
-  $('#hgNotice').innerHTML=`<b>눌림목 — 크게 오른 뒤 거래량 줄며 얕게 쉬는 자리.</b><br>${mode==='strict'?'엄선':'전체'} 실측 ${st.n}자리 — 3일 보유 승률 <span class="stat">${st.win}%</span> · 건당 <span class="stat">${pct(st.avg)}</span> · 기준선 대비 <span class="stat">${st.vsBase>=0?'+':''}${st.vsBase}%p</span> <span style="color:var(--ink-2)">(전반 ${pct(st.h1)} / 후반 ${pct(st.h2)})</span><br>
-    · 엄선 조건은 고점 대비 -3~-10% 얕은 눌림 · 눌림 3일 이내 · 눌리는 동안 거래량 급등일의 0.3배 이하 · 20일선 위 · 급등봉 저점 유지입니다. 시장 전체 1년치 조합 비교에서 가장 좋았던 값입니다.<br>
-    · 급등 다음 날 눌림은 후보에서 뺐습니다. 사기 전에 "지지선 아래 2~3%면 자른다"는 손절선을 먼저 정하세요.`;
+  const sc=d.stats.strictConfirm;
+  $('#hgNotice').innerHTML=`<b>눌림목 — 크게 오른 뒤 거래량 줄며 얕게 쉬는 자리.</b><br>${mode==='strict'?'엄선':'전체'} 실측 ${st.n}자리 — 종가 매수 3일 보유 승률 <span class="stat">${st.win}%</span> · 건당 <span class="stat">${pct(st.avg)}</span> · 기준선 대비 <span class="stat">${st.vsBase>=0?'+':''}${st.vsBase}%p</span> <span style="color:var(--ink-2)">(전반 ${pct(st.h1)} / 후반 ${pct(st.h2)})</span><br>
+    ${sc&&sc.n?`· <b>다음 날 매수 기준가(자리 날 고가)를 넘길 때 사면</b> 엄선 ${sc.n}자리 체결 — 승률 <span class="stat">${sc.win}%</span> · 건당 <span class="stat">${pct(sc.avg)}</span> · 기준선 대비 <span class="stat">+${sc.vsBase}%p</span> (전반 ${pct(sc.h1)} / 후반 ${pct(sc.h2)}). 안 넘기면 안 사는 것이 규칙입니다.<br>`:''}
+    · 엄선 조건은 고점 대비 -3~-10% 얕은 눌림 · 눌림 3일 이내 · 거래량 급등일의 0.3배 이하 · 20일선 위 · 급등봉 저점 유지 · 추세 짧음(20일 중 20일선 위 15일 미만)입니다. 시장 전체 1년치 조합 비교 결과입니다.<br>
+    · 손절 기준은 자리 날 저가입니다. 급등 다음 날 눌림은 후보에서 뺐습니다.`;
   const reasons={};dropped.forEach(r=>r.reasons.forEach(x=>{const k=x.replace(/\(.*\)/,'');reasons[k]=(reasons[k]||0)+1}));
   $('#hgExcl').innerHTML=`🔍 <b>${dropped.length}자리를 뺐습니다</b> — ${Object.entries(reasons).map(([k,v])=>k+' '+v+'건').join(' · ')||'없음'}<br>위 '고르기'를 전체로 바꾸면 다 보입니다. 엄선을 빼면 승률이 ${d.stats.strict.win}% → ${d.stats.all.win}%, 건당 ${pct(d.stats.strict.avg)} → ${pct(d.stats.all.avg)} 로 바뀝니다.`;
   let html='',day='';
@@ -700,9 +702,9 @@ function renderPB(){
       <td><span class="n up">${r.spikeDate.slice(4,6)}/${r.spikeDate.slice(6)}</span><span class="sub n up">${pct(r.spikePct,1)}</span></td>
       <td><span class="n ${r.depthPct<=-3&&r.depthPct>=-10?'good':''}">${r.depthPct.toFixed(1)}%</span><span class="sub n">고점 ${r.peakHigh.toLocaleString('ko-KR')} (${r.peakDate.slice(4,6)}/${r.peakDate.slice(6)})</span></td>
       <td><span class="n ${r.pullDays<=3?'good':''}">${r.pullDays}일</span><span class="sub n ${r.volRatio<=0.3?'good':''}">${r.volRatio.toFixed(2)}배</span></td>
-      <td class="n ${r.ma20Pct>=0?'good':'down'}">${pct(r.ma20Pct,1)}</td>
-      <td class="n">${r.close.toLocaleString('ko-KR')}</td>
-      <td>${now?`<span class="n" style="font-weight:600">${now.toLocaleString('ko-KR')}</span><span class="sub n ${cls(nowChg)}">${pct(nowChg,1)}</span>`:'<span class="n flat">–</span>'}</td>
+      <td><span class="n ${r.ma20Pct>=0?'good':'down'}">${pct(r.ma20Pct,1)}</span><span class="sub n ${(r.trendDays??0)<15?'good':''}">추세 ${r.trendDays??'-'}/20일</span></td>
+      <td><span class="n" style="font-weight:600">${(r.entryPrice||0).toLocaleString('ko-KR')}</span><span class="sub n down">손절 ${(r.stopPrice||0).toLocaleString('ko-KR')} (-${r.riskPct??'-'}%)</span></td>
+      <td>${now?`<span class="n" style="font-weight:600;${r.entryPrice&&now>r.entryPrice?'color:var(--up)':''}">${now.toLocaleString('ko-KR')}</span><span class="sub n ${cls(nowChg)}">${r.entryPrice&&now>r.entryPrice?'기준가 돌파':'종가 대비 '+pct(nowChg,1)}</span>`:'<span class="n flat">–</span>'}</td>
       <td class="n ${td==null?'flat':cls(td)}" style="font-weight:600">${td==null?'–':pct(td)}</td>
       <td class="n">${Math.round(r.amountEok).toLocaleString('ko-KR')}억</td></tr>`;
   }

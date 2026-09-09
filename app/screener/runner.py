@@ -227,8 +227,12 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
         setups = list(latest.values())
         strict = [s for s in setups if s.strict]
         rows = sorted((s for s in setups if s.date in recent_days), key=lambda s: (s.date, -s.amount_eok), reverse=True)
+        stats = {"strict": backtest(strict, base), "all": backtest(setups, base), "baseline": round(base, 2)}
+        if setups and hasattr(setups[0], "confirm"):  # 눌림목: 다음 날 고가 돌파 매수 성적도 같이
+            conf = sorted((s for s in strict if 3 in s.confirm), key=lambda s: s.date)
+            stats["strictConfirm"] = backtest([], base, rets=[s.confirm[3] for s in conf])
         return meta | {
-            "stats": {"strict": backtest(strict, base), "all": backtest(setups, base), "baseline": round(base, 2)},
+            "stats": stats,
             "rows": [s.as_dict() for s in rows],
             "totalRecent": len(rows),
             "droppedRecent": sum(1 for s in rows if not s.strict),
