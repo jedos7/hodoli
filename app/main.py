@@ -6,6 +6,7 @@
   GET  /api/themes            테마·종목 현재 스냅샷
   GET  /api/stocks/{code}     종목 하나
   GET  /api/screener/hoga     고가놀이 결과 (data/hoga.json)
+  GET  /api/screener/pullback 눌림목 결과 (data/pullback.json) — 다시 찾기 한 번에 둘 다 만든다
   POST /api/screener/run      일봉을 받아 고가놀이 다시 찾기 (?source=naver|kis|mock&universe=themes|market), 백그라운드
   GET  /api/screener/status   다시 찾기 진행 상황
   GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집) 상태
@@ -382,6 +383,14 @@ async def api_schedule_run(name: str):
         raise HTTPException(409, "이미 실행 중입니다.")
     asyncio.create_task(scheduler.run_job(job, force=True), name=f"schedule-{name}")
     return {"ok": True, "started": name}
+
+
+@app.get("/api/screener/pullback")
+def pullback():
+    d = _read_json("pullback.json")
+    if not d:
+        raise HTTPException(404, "data/pullback.json 이 없습니다. 다시 찾기(또는 scripts/fetch_daily.py)를 먼저 실행하세요.")
+    return d
 
 
 @app.get("/api/overnight")

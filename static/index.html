@@ -261,14 +261,18 @@ table.hg tr.drop td{opacity:.55}
 </div>
 <div class="modal" id="hgModal" hidden>
   <div class="dlg" role="dialog" aria-labelledby="hgTitle">
-    <div class="hd"><h2 id="hgTitle">▶ 고가놀이 <span>— 터뜨리고 버티며 저점을 높이는 자리</span></h2><button class="x" id="hgClose">닫기</button></div>
+    <div class="hd"><h2 id="hgTitle">▶ 고가놀이 <span>— 터뜨리고 버티며 저점을 높이는 자리</span></h2>
+      <span id="hgTabs" style="display:inline-flex;gap:4px;margin-left:14px">
+        <button class="x" data-tab="hoga" style="border-color:var(--accent);color:var(--accent-ink);font-weight:600">고가놀이</button>
+        <button class="x" data-tab="pullback">눌림목</button></span>
+      <button class="x" id="hgClose">닫기</button></div>
     <div class="bar"><label>고르기 <select id="hgFilter"><option value="strict">엄선 — 횡보 좁음 + 저점 상승 + MACD</option><option value="all">전체</option></select></label><span id="hgCount"></span>
       <span id="hgRunBox" hidden style="margin-left:auto;display:inline-flex;gap:6px;align-items:center"><span id="hgStatus" style="color:var(--ink-3)"></span>
         <select id="hgUniverse" title="찾을 범위"><option value="themes">테마 종목</option><option value="market">시장 전체 (거래대금 30억↑)</option></select>
         <button class="btn primary" id="hgRun" style="border:0;background:var(--down);color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:600">다시 찾기</button></span></div>
     <div class="notice" id="hgNotice"></div>
     <div class="excl" id="hgExcl"></div>
-    <div class="tblwrap"><table class="hg"><thead><tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>횡보 일·폭</th><th>고가대비</th><th>일봉 종가</th><th>지금</th><th>오늘</th><th>대금</th><th>시장·테마</th></tr></thead><tbody id="hgBody"></tbody></table></div>
+    <div class="tblwrap"><table class="hg"><thead id="hgHead"><tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>횡보 일·폭</th><th>고가대비</th><th>일봉 종가</th><th>지금</th><th>오늘</th><th>대금</th><th>시장·테마</th></tr></thead><tbody id="hgBody"></tbody></table></div>
     <div class="ft">'고가대비'는 급등봉 고가에서 얼마나 내려와 있나입니다 (0%에 가까울수록 고가에 붙어 있음). '횡보 폭'은 급등 후 봉들의 고저 범위이며, 좁을수록 매물 소화가 잘 된 자리입니다. 판정은 <b>완성된 일봉</b>으로만 합니다 — 장중 값으로는 자리를 새로 잡지 않습니다. 통계는 <b>모의 백테스트</b>이며 실제 성과가 아닙니다.</div>
   </div>
 </div>
@@ -667,7 +671,53 @@ function renderHG(){
   }
   $('#hgBody').innerHTML=html||'<tr><td colspan="10" style="text-align:center;color:var(--ink-3)">최근 거래일에 자리가 없습니다.</td></tr>';
 }
-$('#hgBtn').addEventListener('click',async()=>{$('#hgModal').hidden=false;$('#hgClose').focus();hgData=await loadHG();renderHG()});
+/* ── 눌림목 탭: 같은 창에서 표만 바꾼다 ── */
+const HG_HEAD=$('#hgHead').innerHTML;
+const PB_HEAD='<tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>고점 대비</th><th>눌림 일·거래량</th><th>20일선</th><th>일봉 종가</th><th>지금</th><th>오늘</th><th>대금</th></tr>';
+let hgTab='hoga',pbData=null;
+async function loadPB(){
+  if(!USE_SERVER)return null;
+  try{const r=await fetch('/api/screener/pullback');if(r.ok)return await r.json()}catch(e){}
+  return null;
+}
+function renderPB(){
+  const d=pbData;const mode=$('#hgFilter').value;
+  if(!d){$('#hgCount').textContent='눌림목 결과가 아직 없습니다. 다시 찾기를 한 번 실행하세요.';$('#hgNotice').innerHTML='';$('#hgExcl').innerHTML='';$('#hgBody').innerHTML='';return}
+  const st=d.stats[mode];const rows=d.rows.filter(r=>mode==='all'||r.strict),dropped=d.rows.filter(r=>!r.strict);
+  const src={mock:'합성 일봉',naver:'네이버 일봉',kiwoom:'키움 일봉',kis:'KIS 일봉'}[d.source]||d.source;
+  $('#hgCount').textContent=`확정 일봉 ${d.asof} 까지 · 최근 ${d.recentDays}거래일에서 ${rows.length}자리 (전체 ${d.rows.length}) · ${src} · ${d.universe==='market'?'시장 전체':'테마 종목'} ${d.stocks}종목`;
+  $('#hgNotice').innerHTML=`<b>눌림목 — 크게 오른 뒤 거래량 줄며 얕게 쉬는 자리.</b><br>${mode==='strict'?'엄선':'전체'} 실측 ${st.n}자리 — 3일 보유 승률 <span class="stat">${st.win}%</span> · 건당 <span class="stat">${pct(st.avg)}</span> · 기준선 대비 <span class="stat">${st.vsBase>=0?'+':''}${st.vsBase}%p</span> <span style="color:var(--ink-2)">(전반 ${pct(st.h1)} / 후반 ${pct(st.h2)})</span><br>
+    · 엄선 조건은 고점 대비 -5~-15% 눌림 · 눌리는 동안 거래량 급등일의 절반 이하 · 20일선 위 · 급등봉 저점 유지, 네 가지입니다.<br>
+    · 급등 다음 날 눌림은 후보에서 뺐습니다. 사기 전에 "지지선 아래 2~3%면 자른다"는 손절선을 먼저 정하세요.`;
+  const reasons={};dropped.forEach(r=>r.reasons.forEach(x=>{const k=x.replace(/\(.*\)/,'');reasons[k]=(reasons[k]||0)+1}));
+  $('#hgExcl').innerHTML=`🔍 <b>${dropped.length}자리를 뺐습니다</b> — ${Object.entries(reasons).map(([k,v])=>k+' '+v+'건').join(' · ')||'없음'}<br>위 '고르기'를 전체로 바꾸면 다 보입니다. 엄선을 빼면 승률이 ${d.stats.strict.win}% → ${d.stats.all.win}%, 건당 ${pct(d.stats.strict.avg)} → ${pct(d.stats.all.avg)} 로 바뀝니다.`;
+  let html='',day='';
+  for(const r of rows){
+    if(r.date!==day){day=r.date;html+=`<tr class="day"><td colspan="10">${r.date.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3')}</td></tr>`}
+    const s=liveStock(r.code),now=s?s.price:null,nowChg=now?(now/r.close-1)*100:null,td=s?s.chg:null,drop=r.reasons.join(' · ');
+    html+=`<tr class="${r.strict?'':'drop'}"><td class="n">${r.date.slice(4,6)}/${r.date.slice(6)}</td>
+      <td><span class="nm">${r.name}</span><span class="sub">${r.theme}${drop?' · '+drop:''}</span></td>
+      <td><span class="n up">${r.spikeDate.slice(4,6)}/${r.spikeDate.slice(6)}</span><span class="sub n up">${pct(r.spikePct,1)}</span></td>
+      <td><span class="n ${r.depthPct<=-5&&r.depthPct>=-15?'good':''}">${r.depthPct.toFixed(1)}%</span><span class="sub n">고점 ${r.peakHigh.toLocaleString('ko-KR')} (${r.peakDate.slice(4,6)}/${r.peakDate.slice(6)})</span></td>
+      <td><span class="n">${r.pullDays}일</span><span class="sub n ${r.volRatio<=0.5?'good':''}">${r.volRatio.toFixed(2)}배</span></td>
+      <td class="n ${r.ma20Pct>=0?'good':'down'}">${pct(r.ma20Pct,1)}</td>
+      <td class="n">${r.close.toLocaleString('ko-KR')}</td>
+      <td>${now?`<span class="n" style="font-weight:600">${now.toLocaleString('ko-KR')}</span><span class="sub n ${cls(nowChg)}">${pct(nowChg,1)}</span>`:'<span class="n flat">–</span>'}</td>
+      <td class="n ${td==null?'flat':cls(td)}" style="font-weight:600">${td==null?'–':pct(td)}</td>
+      <td class="n">${Math.round(r.amountEok).toLocaleString('ko-KR')}억</td></tr>`;
+  }
+  $('#hgBody').innerHTML=html||'<tr><td colspan="10" style="text-align:center;color:var(--ink-3)">최근 거래일에 자리가 없습니다.</td></tr>';
+}
+function renderTab(){
+  const pb=hgTab==='pullback';
+  $('#hgTitle').innerHTML=pb?'▶ 눌림목 <span>— 크게 오른 뒤 거래량 줄며 얕게 쉬는 자리</span>':'▶ 고가놀이 <span>— 터뜨리고 버티며 저점을 높이는 자리</span>';
+  $('#hgHead').innerHTML=pb?PB_HEAD:HG_HEAD;
+  document.querySelectorAll('#hgTabs button').forEach(b=>{const on=b.dataset.tab===hgTab;b.style.borderColor=on?'var(--accent)':'';b.style.color=on?'var(--accent-ink)':'';b.style.fontWeight=on?'600':''});
+  pb?renderPB():renderHG();
+}
+$('#hgTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;hgTab=b.dataset.tab;try{localStorage.setItem('hgTab',hgTab)}catch(x){}renderTab()});
+try{hgTab=localStorage.getItem('hgTab')||'hoga'}catch(e){}
+$('#hgBtn').addEventListener('click',async()=>{$('#hgModal').hidden=false;$('#hgClose').focus();[hgData,pbData]=await Promise.all([loadHG(),loadPB()]);renderTab()});
 // 다시 찾기: 서버가 일봉을 새로 받아 스크리너를 돌린다 (백그라운드). 진행률을 폴링하다 끝나면 표를 다시 읽는다.
 if(USE_SERVER){$('#hgRunBox').hidden=false;
   try{const u=localStorage.getItem('hgUniverse');if(u)$('#hgUniverse').value=u}catch(e){}
@@ -676,7 +726,7 @@ if(USE_SERVER){$('#hgRunBox').hidden=false;
     if(s.running){$('#hgStatus').textContent=s.total?`${s.done}/${s.total} ${s.current}`:s.current;setTimeout(poll,1500);return}
     $('#hgRun').disabled=false;
     if(s.error){$('#hgStatus').textContent='실패: '+s.error;return}
-    $('#hgStatus').textContent=s.finishedAt?'완료 '+s.finishedAt.slice(11,16):'';hgData=await loadHG();renderHG()};
+    $('#hgStatus').textContent=s.finishedAt?'완료 '+s.finishedAt.slice(11,16):'';[hgData,pbData]=await Promise.all([loadHG(),loadPB()]);renderTab()};
   $('#hgRun').addEventListener('click',async()=>{
     $('#hgRun').disabled=true;$('#hgStatus').textContent='시작…';
     // source=auto: 서버가 증권사 일봉(kiwoom/kis)을 쓰고, 모의 모드면 네이버 일봉을 쓴다
@@ -696,7 +746,7 @@ if(USE_SERVER){const b=$('#collectBtn');b.hidden=false;b.addEventListener('click
   finally{b.disabled=false;b.textContent=old}
 })}
 $('#hgModal').addEventListener('click',e=>{if(e.target===$('#hgModal'))$('#hgModal').hidden=true});
-$('#hgFilter').addEventListener('change',renderHG);
+$('#hgFilter').addEventListener('change',renderTab);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#hgModal').hidden=true});
 
 setInterval(()=>{const d=new Date();$('#clk').textContent=hhmmss(d);$('#dt').textContent=String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+' '+'일월화수목금토'[d.getDay()]},1000);

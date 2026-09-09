@@ -50,6 +50,15 @@ async def main() -> None:
         print(f"  {row['date']} {row['name']:<14} {row['theme']:<10} 급등 {row['spikeDate'][4:]} {row['spikePct']:+.1f}%  횡보 {row['holdDays']}일 {row['boxPct']:.0f}%  고가대비 {row['vsHighPct']:.1f}%{mark}")
     print(f"→ {settings.data_dir / 'hoga.json'}")
 
+    pb = r.get("pullback")
+    if pb:
+        st = pb["stats"]
+        print(f"\n[눌림목] 최근 {args.recent}거래일 {pb['totalRecent']}자리 (엄선 {pb['totalRecent'] - pb['droppedRecent']})")
+        print(f"엄선 {st['strict']['n']}자리 승률 {st['strict']['win']}% 건당 {st['strict']['avg']:+}% · 전체 {st['all']['n']}자리 승률 {st['all']['win']}% · 기준선 {st['baseline']:+}%")
+        for row in [x for x in pb["rows"] if x["strict"]][:12]:
+            print(f"  {row['date']} {row['name']:<14} {row['theme']:<10} 급등 {row['spikeDate'][4:]} {row['spikePct']:+.1f}%  고점대비 {row['depthPct']:.1f}%  눌림 {row['pullDays']}일  거래량 {row['volRatio']:.2f}배  20일선 {row['ma20Pct']:+.1f}%")
+        print(f"→ {settings.data_dir / 'pullback.json'}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

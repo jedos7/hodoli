@@ -18,6 +18,7 @@ from datetime import date, datetime, timedelta
 from app.config import settings
 from app.kis.rest import Candle
 from app.screener.hoga_play import backtest, baseline, find_setups
+from app.screener.pullback import find_pullbacks
 
 log = logging.getLogger(__name__)
 Progress = Callable[[int, int, str], None]
@@ -170,31 +171,35 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
         if dropped:
             log.info("장중이라 오늘 봉 %d종목 제외 (완성된 일봉만 판정)", dropped)
 
-    setups = []
-    for code, name, label in uni:
-        setups += find_setups(candles.get(code, []), code, name, label)
     base = baseline(candles)
-    strict = [s for s in setups if s.strict]
     asof = max((cs[-1].date for cs in candles.values() if cs), default=None)
     dates = sorted({c.date for cs in candles.values() for c in cs})
     recent_days = set(dates[-recent:])
-    rows = sorted((s for s in setups if s.date in recent_days), key=lambda s: (s.date, -s.amount_eok), reverse=True)
-
-    result = {
-        "asof": asof,
-        "env": settings.env,
-        "source": source,
-        "universe": universe,
-        "stocks": len(uni),
-        "ranAt": datetime.now().isoformat(timespec="seconds"),
-        "todayIncluded": include_today or not market_open(),
-        "stats": {"strict": backtest(strict, base), "all": backtest(setups, base), "baseline": round(base, 2)},
-        "recentDays": recent,
-        "rows": [s.as_dict() for s in rows],
-        "totalRecent": len(rows),
-        "droppedRecent": sum(1 for s in rows if not s.strict),
+    meta = {
+        "asof": asof, "env": settings.env, "source": source, "universe": universe, "stocks": len(uni),
+        "ranAt": datetime.now().isoformat(timespec="seconds"), "todayIncluded": include_today or not market_open(), "recentDays": recent,
     }
+
+    def package(setups: list) -> dict:
+        strict = [s for s in setups if s.strict]
+        rows = sorted((s for s in setups if s.date in recent_days), key=lambda s: (s.date, -s.amount_eok), reverse=True)
+        return meta | {
+            "stats": {"strict": backtest(strict, base), "all": backtest(setups, base), "baseline": round(base, 2)},
+            "rows": [s.as_dict() for s in rows],
+            "totalRecent": len(rows),
+            "droppedRecent": sum(1 for s in rows if not s.strict),
+        }
+
+    # 같은 일봉으로 두 스크리너를 한 번에
+    hoga, pull = [], []
+    for code, name, label in uni:
+        cs = candles.get(code, [])
+        hoga += find_setups(cs, code, name, label)
+        pull += find_pullbacks(cs, code, name, label)
+    result = package(hoga)
+    result["pullback"] = package(pull)
     if write:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
-        (settings.data_dir / "hoga.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")
+        (settings.data_dir / "hoga.json").write_text(json.dumps({k: v for k, v in result.items() if k != "pullback"}, ensure_ascii=False, indent=1), "utf-8")
+        (settings.data_dir / "pullback.json").write_text(json.dumps(result["pullback"], ensure_ascii=False, indent=1), "utf-8")
     return result

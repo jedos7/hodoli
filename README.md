@@ -35,6 +35,7 @@ theme-radar/
 │  └─ screener/
 │     ├─ indicators.py   EMA · MACD
 │     ├─ hoga_play.py    고가놀이 판정 + 3일 보유 백테스트
+│     ├─ pullback.py     눌림목 판정 (눌림 폭·거래량 감소·20일선·저점 유지)
 │     └─ runner.py       소스(naver/kis/mock)·범위(themes/market) 골라 실행 → data/hoga.json
 ├─ scripts/fetch_daily.py  장 마감 후 일봉 수집 → 스크리너 → data/hoga.json
 ├─ scripts/collect_themes.py  네이버 테마 수집 → themes.json
@@ -127,6 +128,18 @@ py scripts\fetch_daily.py --universe market     # 시장 전체
 서버가 떠 있으면 고가놀이 창 오른쪽 위 **다시 찾기** 버튼(범위 선택 가능)으로 같은 일을 백그라운드로 돌리고, 진행률이 표시된 뒤 표가 갱신됩니다.
 API 로는 `POST /api/screener/run?source=naver&universe=market`, 진행은 `GET /api/screener/status`.
 장 마감 후 하루 한 번 돌리는 것이 맞고, 장중에 돌리면 오늘 봉이 미완성인 채로 들어가므로 '자리 잡은 날' 판정에 오늘은 쓰지 않는 게 안전합니다.
+
+## 눌림목 스크리너 (app/screener/pullback.py)
+
+"크게 오른 뒤 거래량 줄며 얕게 쉬는 자리". 고가놀이와 같은 일봉으로 한 번에 같이 계산되어 `data/pullback.json` 에 저장되고, 고가놀이 창의 **눌림목** 탭에서 봅니다.
+
+1. 급등봉: 종가 +8% 이상, 거래대금 50억 이상.
+2. 급등 2일 뒤부터 10일 안에서, 급등 이후 고점 대비 3% 이상 내려온 날이 자리 후보. 급등봉 시가 아래로 무너지면 끝.
+3. 엄선 조건 (하나라도 어기면 탈락 사유 기록): 눌림 폭 고점 대비 -5 ~ -15%, 눌리는 동안 평균 거래량이 급등일의 0.5배 이하, 종가가 20일선 위, 자리 날 저가가 급등봉 저가 위.
+4. 3일 보유 수익률로 승률·건당·기준선 대비를 냅니다.
+
+숫자(눌림 폭, 거래량 비율, 20일선)는 `find_pullbacks()` 의 인자로 모여 있어 백테스트를 보며 조정합니다.
+급등 첫날 눌림은 위험해서 후보에서 뺐습니다. 승률은 고가놀이보다 높고 건당 이익은 작은 편이 정상입니다.
 
 ## 하루 한 번 자동 실행 (app/scheduler.py)
 
