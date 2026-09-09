@@ -108,7 +108,8 @@ class KiwoomFeed:
     async def start(self) -> None:
         await self._refresh_all(initial=True)
         self.state.recompute()
-        self._task = asyncio.create_task(self.ws.run(self.state.codes + self.state.watch.codes), name="kiwoom-ws")
+        nx = [c + "_NX" for c in self.state.codes]  # 테마 종목은 NXT(프리·애프터장) 체결도 같이 받는다
+        self._task = asyncio.create_task(self.ws.run(self.state.codes + self.state.watch.codes + nx), name="kiwoom-ws")
         self._inv_task = asyncio.create_task(self._investor_loop(), name="kiwoom-investor")
 
     async def watch_codes(self, codes: list[str]) -> int:
@@ -147,8 +148,12 @@ class KiwoomFeed:
         await self.rest.close()
 
     def _on_trade(self, t: Trade) -> None:
+        hhmmss = t.time[:2] + ":" + t.time[2:4] + ":" + t.time[4:6] if len(t.time) >= 6 else ""
+        if t.market == "NX":
+            self.state.update_nx(t.code, t.price, hhmmss)   # 야간·프리장은 참고 가격만, 돌파 판정·대금에는 안 섞는다
+            return
         self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
-        self.state.on_trade(t.code, t.price, t.time[:2] + ":" + t.time[2:4] + ":" + t.time[4:6] if len(t.time) >= 6 else None)
+        self.state.on_trade(t.code, t.price, hhmmss or None)
         self.state.tick += 1
 
     async def _investor_loop(self) -> None:

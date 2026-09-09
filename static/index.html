@@ -136,6 +136,7 @@ button,select{font:inherit;color:inherit}
 .row .nm span{font-weight:400;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis}
 .row .nm .badge{font-size:10px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);padding:0 5px;border-radius:3px;font-family:var(--sans)}
 .row .px{text-align:right;font-family:var(--mono);font-size:12.5px}
+.row .px .nxpx{display:block;font-size:10.5px;font-weight:600;opacity:.9}
 .row .chg{text-align:right;font-family:var(--mono);font-weight:600;font-size:13px}
 .row .vol{text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink-2);grid-column:2;padding-bottom:5px}
 .row .sc{font-family:var(--mono);font-size:11px;text-align:center;border-radius:3px;padding:1px 0;background:var(--surface-2);color:var(--ink-2)}
@@ -474,7 +475,7 @@ class ServerFeed{
   apply(msg){
     for(const m of msg.themes){
       const th=themes.find(t=>t.id===m.id);if(!th)continue;
-      for(const ms of m.stocks){const s=th.stocks.find(x=>x.code===ms.code);if(s)Object.assign(s,{price:ms.price,chg:ms.chg,vol:ms.vol,score:ms.score,flow:ms.flow,cttr:ms.cttr,frgn:ms.frgn,orgn:ms.orgn,src:ms.src,why:ms.why})}
+      for(const ms of m.stocks){const s=th.stocks.find(x=>x.code===ms.code);if(s)Object.assign(s,{price:ms.price,chg:ms.chg,vol:ms.vol,score:ms.score,flow:ms.flow,cttr:ms.cttr,frgn:ms.frgn,orgn:ms.orgn,src:ms.src,why:ms.why,nx:ms.nx,nxAt:ms.nxAt,nxChg:ms.nxChg})}
       const prev=this.lastTotal[m.id]??m.total;th.hist.push(Math.max(0,m.total-prev));if(th.hist.length>120)th.hist.shift();this.lastTotal[m.id]=m.total;
       Object.assign(th,{report:m.report,news:m.news,newsUrl:m.newsUrl,newsAt:m.newsAt,total:m.total,avg:m.avg,five:m.five,prevFive:m.prevFive,conc:m.conc,width:m.width,heat:m.heat,
         leader:th.stocks.find(s=>s.code===m.leader)||th.stocks[0],top:th.stocks.find(s=>s.code===m.top)||th.stocks[0]});
@@ -629,7 +630,9 @@ function update(){
       const s=th.stocks.find(x=>x.code===row.dataset.code);if(!s)return;
       const r=n=>row.querySelector(`[data-f="${n}"]`);
       row.classList.toggle('leader',s===th.leader);
-      r('px').innerHTML=won(s.price)+' <span class="'+cls(s.chg)+'">'+arrow(s.chg)+'</span>';
+      // NXT(프리·애프터장) 체결이 있고 정규장 가격과 다르면 아래 줄에 작게 표시
+      const nxLine=(s.nx&&s.nx!==s.price)?`<span class="nxpx ${cls(s.nxChg||0)}" title="NXT ${s.nxAt||''} 체결 · 정규장 종가 대비">NXT ${s.nx.toLocaleString('ko-KR')} ${s.nxChg!=null?pct(s.nxChg,1):''}</span>`:'';
+      r('px').innerHTML=won(s.price)+' <span class="'+cls(s.chg)+'">'+arrow(s.chg)+'</span>'+nxLine;
       r('chg').textContent=pct(s.chg);r('chg').className='chg num '+cls(s.chg);
       r('vol').textContent=eok(s.vol);
       r('sc').textContent=s.score;r('sc').className='sc'+(s.score>=70?' hot':'');r('sc').title=supplyTip(s);

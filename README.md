@@ -92,6 +92,7 @@ uvicorn app.main:app --reload   # http://127.0.0.1:8000
 | WebSocket | `wss://api.kiwoom.com:10000/api/dostk/websocket` (모의는 mockapi) |
 | 거래대금 단위 | 백만원 (실시간 FID 14 · 일봉 `trde_prica` · 투자자 `acc_trde_prica`) → `KIWOOM_AMOUNT_UNIT=1000000` |
 | 체결강도 | 실시간 FID 228 |
+| NXT 시세 | 테마 종목은 `코드_NX` 도 같이 구독. 프리장(08:00~)·애프터장(15:40~20:00) 체결이 카드의 가격 아래 "NXT 261,000 -1.7%" 로 표시되며, 돌파 판정·거래대금에는 섞지 않음 |
 | 일봉 | `ka10081` (스크리너 `--source kiwoom`) |
 
 공식 명세·예제: https://github.com/Kiwoom-Securities/Kiwoom-REST-API (`kiwoom/_data/kiwoom_api_spec.json` 에 전체 항목 정의).

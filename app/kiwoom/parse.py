@@ -45,8 +45,10 @@ def parse_real(msg: dict, amount_unit: int = 1) -> list[Trade]:
         v = d.get("values", {})
         price = abs(inum(v.get("10")))
         vol = inum(v.get("15"))
+        item = str(d.get("item", ""))
+        market = "NX" if item.endswith("_NX") else "KRX"
         out.append(Trade(
-            code=str(d.get("item", "")).replace("A", "")[:6],
+            code=item.replace("A", "")[:6],
             time=str(v.get("20", "")),
             price=price,
             change=inum(v.get("11")),
@@ -60,6 +62,7 @@ def parse_real(msg: dict, amount_unit: int = 1) -> list[Trade]:
             cttr=num(v.get("228")),
             buy_total=0,
             sell_total=0,
+            market=market,
         ))
     return out
 

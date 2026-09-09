@@ -18,6 +18,8 @@ def test_parse_real_0b():
     assert t.volume == 10 and t.acc_volume == 123456 and t.acc_amount == 8800 * 1_000_000 and t.cttr == 132.55
     assert t.time == "093012" and t.open == 71200 and t.high == 71800 and t.low == 71000
     assert parse_real({"trnm": "PING"}) == []
+    nx = parse_real({"trnm": "REAL", "data": [{"type": "0B", "item": "005930_NX", "values": {"10": "-71000", "20": "183000"}}]})
+    assert nx[0].code == "005930" and nx[0].market == "NX" and t.market == "KRX"
 
 
 def test_parse_basic_and_prev_close():

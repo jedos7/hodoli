@@ -37,6 +37,8 @@ class Stock:
     investor_src: str = ""         # "추정" | "전일" | "모의" | ""
     investor_ts: float = 0.0
     why: str = ""                  # 테마 편입 사유 (수집기가 채움)
+    nx_price: int = 0              # NXT(프리·애프터장) 최근 체결가
+    nx_at: str = ""                # 그 시각 HH:MM:SS
 
     @property
     def net_investor_eok(self) -> float | None:
@@ -50,7 +52,9 @@ class Stock:
                 "cttr": None if self.cttr is None else round(self.cttr, 1),
                 "frgn": None if self.frgn_eok is None else round(self.frgn_eok, 1),
                 "orgn": None if self.orgn_eok is None else round(self.orgn_eok, 1),
-                "src": self.investor_src, "why": self.why}
+                "src": self.investor_src, "why": self.why,
+                "nx": self.nx_price or None, "nxAt": self.nx_at,
+                "nxChg": round((self.nx_price / self.price - 1) * 100, 2) if self.nx_price and self.price else None}
 
 
 @dataclass
@@ -133,6 +137,12 @@ class MarketState:
             s.cttr = cttr
         if inc > 0:
             self.theme_of[code].inflow.append((ts, inc))
+
+    def update_nx(self, code: str, price: int, at: str = "") -> None:
+        """NXT 체결. 정규장 가격·거래대금과 섞지 않고 따로 둔다."""
+        s = self.stocks.get(code)
+        if s and price > 0:
+            s.nx_price, s.nx_at = price, at
 
     def set_investor(self, code: str, frgn_eok: float | None, orgn_eok: float | None, src: str, ts: float | None = None) -> None:
         s = self.stocks.get(code)
