@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+data/kis_token.json
+data/*.json
+!data/.gitkeep
+.pytest_cache/
+themes.json.bak

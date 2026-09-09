@@ -1,0 +1,150 @@
+"""시세 피드. 두 구현 모두 MarketState 만 갱신하고, 방송은 main 의 broadcaster 가 맡는다.
+
+MockFeed : 키 없이 랜덤워크로 시세를 만든다. 개발·UI 작업용.
+KisFeed  : 시작 시 REST 로 전일 종가·현재가를 채우고, 이후 웹소켓 체결 데이터로 갱신한다.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import random
+
+from app.config import Settings
+from app.kis.auth import KisAuth
+from app.kis.parse import Trade
+from app.kis.rest import KisRest
+from app.kis.ws import KisWebSocket
+from app.state import MarketState
+
+log = logging.getLogger(__name__)
+
+
+def _tick_size(p: float) -> int:
+    for lim, t in ((2000, 1), (5000, 5), (20000, 10), (50000, 50), (200000, 100), (500000, 500)):
+        if p < lim:
+            return t
+    return 1000
+
+
+def _round_px(p: float) -> int:
+    t = _tick_size(p)
+    return int(round(p / t) * t)
+
+
+class MockFeed:
+    def __init__(self, state: MarketState, interval: float = 1.0):
+        self.state = state
+        self.interval = interval
+        self._mom: dict[str, float] = {}
+        self._chg: dict[str, float] = {}
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        # 시작 등락률·거래대금·수급 입력값을 그럴듯하게 깔아 둔다
+        for t in self.state.themes:
+            self._mom[t.id] = random.gauss(0, 0.6)
+            for s in t.stocks:
+                self._chg[s.code] = random.gauss(2.0, 3.0)
+                s.acc_amount = random.uniform(80, 3000)
+                self._seed_supply(s)
+        self._task = asyncio.create_task(self._loop(), name="mock-feed")
+
+    def _seed_supply(self, s) -> None:
+        """체결강도와 외인·기관 순매수를 등락률과 느슨하게 연동해 만든다."""
+        c = self._chg[s.code]
+        s.cttr = max(20.0, random.gauss(100 + c * 8, 25))
+        tilt = random.gauss(c * 0.008, 0.03)  # 순매수/거래대금 비율
+        frgn = s.acc_amount * tilt * random.uniform(0.3, 0.7)
+        orgn = s.acc_amount * tilt - frgn
+        self.state.set_investor(s.code, round(frgn, 1), round(orgn, 1), "모의")
+
+    async def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+
+    async def _loop(self) -> None:
+        n = 0
+        while True:
+            n += 1
+            for t in self.state.themes:
+                if n % 40 == 0:
+                    self._mom[t.id] = max(-1.2, min(1.2, random.gauss(0, 0.6)))
+                mom = self._mom[t.id]
+                for s in t.stocks:
+                    c = self._chg[s.code]
+                    if c < 29.9:
+                        c = max(-30.0, min(30.0, c + random.gauss(0, 0.11) + mom * 0.012))
+                    self._chg[s.code] = c
+                    inc = s.acc_amount * (0.0012 + random.random() * 0.003) * (1 + abs(c) / 12) * (1.25 if mom > 0 else 0.85)
+                    cttr = max(20.0, (s.cttr or 100.0) + random.gauss(c * 0.05, 2.0))
+                    self.state.update(s.code, _round_px(s.ref * (1 + c / 100)), s.acc_amount + inc, change_rate=c, cttr=cttr)
+                    if n % 15 == 0:  # 외인·기관 순매수는 15초마다 조금씩 누적
+                        drift = inc * random.gauss(c * 0.02, 0.15)
+                        self.state.set_investor(s.code, round((s.frgn_eok or 0) + drift * 0.6, 1), round((s.orgn_eok or 0) + drift * 0.4, 1), "모의")
+            self.state.tick = n
+            await asyncio.sleep(self.interval)
+
+
+class KisFeed:
+    def __init__(self, state: MarketState, settings: Settings):
+        self.state = state
+        self.s = settings
+        self.auth = KisAuth(settings)
+        self.rest = KisRest(settings, self.auth)
+        self.ws = KisWebSocket(settings, self.auth, self._on_trade)
+        self._task: asyncio.Task | None = None
+        self._inv_task: asyncio.Task | None = None
+        self._estimate_ok = True
+
+    async def start(self) -> None:
+        # 1) REST 로 초기값: 전일 종가(ref), 현재가, 누적 거래대금
+        for code in self.state.codes:
+            try:
+                q = await self.rest.quote(code)
+                self.state.set_ref(code, q.prev_close)
+                self.state.update(code, q.price, q.acc_amount / 1e8, change_rate=q.change_rate)
+            except Exception as e:  # 한 종목 실패로 전체를 멈추지 않는다
+                log.warning("초기 시세 실패 %s: %s", code, e)
+        self.state.recompute()
+        # 2) 웹소켓 실시간 체결
+        self._task = asyncio.create_task(self.ws.run(self.state.codes), name="kis-ws")
+        # 3) 외인·기관 순매수 주기 조회
+        self._inv_task = asyncio.create_task(self._investor_loop(), name="kis-investor")
+
+    async def stop(self) -> None:
+        self.ws.stop()
+        for t in (self._task, self._inv_task):
+            if t:
+                t.cancel()
+        await self.rest.close()
+
+    def _on_trade(self, t: Trade) -> None:
+        self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
+        self.state.tick += 1
+
+    async def _investor_loop(self) -> None:
+        """장중 추정치를 우선 쓰고, 그 API 가 안 되면(모의투자 등) 전일 확정치로 대신한다.
+        한 바퀴에 종목 수만큼 호출하므로 호출 제한을 rest 가 알아서 늦춘다."""
+        interval = 60.0 if self.s.env == "real" else 180.0
+        while True:
+            for code in self.state.codes:
+                s = self.state.stocks[code]
+                try:
+                    if self._estimate_ok:
+                        est = await self.rest.investor_estimate(code)
+                        if est is not None:
+                            frgn_qty, orgn_qty, _ = est
+                            px = s.price or s.ref
+                            self.state.set_investor(code, frgn_qty * px / 1e8, orgn_qty * px / 1e8, "추정")
+                            continue
+                except Exception as e:
+                    if self._estimate_ok:
+                        log.warning("추정가집계 API 사용 불가(%s) → 전일 확정치로 대체", e)
+                    self._estimate_ok = False
+                try:
+                    d = await self.rest.investor_daily(code)
+                    if d:
+                        self.state.set_investor(code, d["frgn_amount"] / 1e8, d["orgn_amount"] / 1e8, "전일")
+                except Exception as e:
+                    log.warning("투자자 매매동향 실패 %s: %s", code, e)
+            await asyncio.sleep(interval)
