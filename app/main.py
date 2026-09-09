@@ -9,6 +9,9 @@
   GET  /api/screener/pullback 눌림목 결과 (data/pullback.json) — 다시 찾기 한 번에 둘 다 만든다
   POST /api/screener/run      일봉을 받아 고가놀이 다시 찾기 (?source=naver|kis|mock&universe=themes|market), 백그라운드
   GET  /api/screener/status   다시 찾기 진행 상황
+  GET  /api/watch             장중 돌파 감시 목록 (눌림목 최신 엄선 자리의 매수 기준가·손절가·상태)
+  POST /api/watch/reload      감시 목록을 pullback.json 에서 다시 읽기 · POST /api/watch/add?code=&entry=&stop= 수동 추가 · DELETE /api/watch/{code}
+  GET  /api/alerts            최근 알림 50건 (돌파·이탈). 실시간으로는 /ws/stream 에 type=alert 로 온다
   GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집) 상태
   POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
@@ -87,19 +90,41 @@ async def broadcast(payload: dict) -> None:
         clients.discard(ws)
 
 
+alert_log: list[dict] = []
+
+
 async def broadcaster() -> None:
     while True:
         state.recompute()
         await broadcast(state.snapshot())
+        while state.alerts:  # 감시 종목 돌파·이탈 알림은 즉시 따로 방송
+            a = state.alerts.pop(0)
+            a["ts"] = datetime.now().isoformat(timespec="seconds")
+            alert_log.append(a)
+            del alert_log[:-200]
+            log.info("알림 %s: %s", a["kind"], a["text"])
+            await broadcast({"type": "alert", **a})
         await asyncio.sleep(1.0)
+
+
+async def load_watch(reason: str = "") -> int:
+    """눌림목 결과(data/pullback.json)의 최신 엄선 자리를 감시 목록에 올리고 실시간 구독에 추가한다."""
+    n = state.watch.load_pullback(settings.data_dir / "pullback.json")
+    if feed and n:
+        await feed.watch_codes(state.watch.codes)
+    log.info("돌파 감시 목록 %d종목 (%s)%s", n, state.watch.loaded_from, f" · {reason}" if reason else "")
+    return n
 
 
 async def reload_state() -> None:
     """themes.json 을 다시 읽고 피드를 다시 붙인 뒤, 클라이언트에 새 테마 목록을 보낸다."""
     global state
     await stop_feed()
+    old_watch = state.watch
     state = MarketState.from_file(settings.themes_file)
+    state.watch = old_watch  # 감시 목록과 상태는 테마가 바뀌어도 유지
     await start_feed()
+    await feed.watch_codes(state.watch.codes)
     state.recompute()
     await broadcast(state.snapshot() | {"type": "snapshot"})
 
@@ -250,6 +275,7 @@ async def job_screener() -> dict:
 
         r = await run_screener("auto", settings.schedule_screener_universe, progress=progress)
         screener_job.update(error=None, rows=r["totalRecent"])
+        await load_watch("스케줄 스크리너")
         return {"source": r["source"], "universe": r["universe"], "stocks": r["stocks"], "asof": r["asof"], "rows": r["totalRecent"]}
     except Exception as e:
         screener_job.update(error=str(e))
@@ -273,7 +299,9 @@ scheduler = Scheduler(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.validate()
+    state.watch.load_pullback(settings.data_dir / "pullback.json")  # 피드가 구독할 수 있게 먼저 읽는다
     await start_feed()
+    log.info("돌파 감시 목록 %d종목 (%s)", len(state.watch.items), state.watch.loaded_from)
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
     if settings.collect_minutes > 0:
         tasks.append(asyncio.create_task(autocollect(), name="autocollect"))
@@ -341,6 +369,7 @@ async def _screener_task(source: str, universe: str, min_amount: float) -> None:
     try:
         r = await run_screener(source, universe, min_amount_eok=min_amount, progress=progress)
         screener_job.update(error=None, rows=r["totalRecent"])
+        await load_watch("다시 찾기")
         log.info("스크리너 완료: %s/%s %d종목 → 최근 %d자리", r["source"], r["universe"], r["stocks"], r["totalRecent"])
     except Exception as e:
         screener_job.update(error=str(e))
@@ -391,6 +420,41 @@ def pullback():
     if not d:
         raise HTTPException(404, "data/pullback.json 이 없습니다. 다시 찾기(또는 scripts/fetch_daily.py)를 먼저 실행하세요.")
     return d
+
+
+# ── 장중 돌파 감시 ──────────────────────────────────────────────
+@app.get("/api/watch")
+def api_watch():
+    return {"loadedFrom": state.watch.loaded_from, "items": state.watch.as_list()}
+
+
+@app.post("/api/watch/reload")
+async def api_watch_reload():
+    n = await load_watch("수동 새로고침")
+    return {"ok": True, "items": n}
+
+
+@app.post("/api/watch/add")
+async def api_watch_add(code: str, entry: int, stop: int, name: str = ""):
+    if entry <= 0 or stop <= 0 or stop >= entry:
+        raise HTTPException(400, "entry(매수 기준가) > stop(손절가) > 0 이어야 합니다")
+    nm = name or (state.stocks[code].name if code in state.stocks else code)
+    it = state.watch.add(code, nm, entry, stop)
+    if feed:
+        await feed.watch_codes([code])
+    return it.as_dict()
+
+
+@app.delete("/api/watch/{code}")
+def api_watch_remove(code: str):
+    if not state.watch.remove(code):
+        raise HTTPException(404, "감시 목록에 없습니다")
+    return {"ok": True}
+
+
+@app.get("/api/alerts")
+def api_alerts():
+    return {"alerts": alert_log[-50:]}
 
 
 @app.get("/api/overnight")

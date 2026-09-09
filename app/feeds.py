@@ -62,6 +62,9 @@ class MockFeed:
         if self._task:
             self._task.cancel()
 
+    async def watch_codes(self, codes: list[str]) -> int:
+        return 0  # 모의 피드는 테마 종목만 흔든다
+
     async def _loop(self) -> None:
         n = 0
         while True:
@@ -78,6 +81,7 @@ class MockFeed:
                     inc = s.acc_amount * (0.0012 + random.random() * 0.003) * (1 + abs(c) / 12) * (1.25 if mom > 0 else 0.85)
                     cttr = max(20.0, (s.cttr or 100.0) + random.gauss(c * 0.05, 2.0))
                     self.state.update(s.code, _round_px(s.ref * (1 + c / 100)), s.acc_amount + inc, change_rate=c, cttr=cttr)
+                    self.state.on_trade(s.code, s.price)
                     if n % 15 == 0:  # 외인·기관 순매수는 15초마다 조금씩 누적
                         drift = inc * random.gauss(c * 0.02, 0.15)
                         self.state.set_investor(s.code, round((s.frgn_eok or 0) + drift * 0.6, 1), round((s.orgn_eok or 0) + drift * 0.4, 1), "모의")
@@ -104,8 +108,12 @@ class KiwoomFeed:
     async def start(self) -> None:
         await self._refresh_all(initial=True)
         self.state.recompute()
-        self._task = asyncio.create_task(self.ws.run(self.state.codes), name="kiwoom-ws")
+        self._task = asyncio.create_task(self.ws.run(self.state.codes + self.state.watch.codes), name="kiwoom-ws")
         self._inv_task = asyncio.create_task(self._investor_loop(), name="kiwoom-investor")
+
+    async def watch_codes(self, codes: list[str]) -> int:
+        """감시 종목이 바뀌었을 때 실시간 구독에 추가한다."""
+        return await self.ws.ensure(codes)
 
     async def _refresh_all(self, initial: bool = False) -> None:
         """ka10059 로 종목마다 현재가·전일종가·누적거래대금·외인/기관 순매수를 채운다 (종목당 조회 1회)."""
@@ -137,6 +145,7 @@ class KiwoomFeed:
 
     def _on_trade(self, t: Trade) -> None:
         self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
+        self.state.on_trade(t.code, t.price, t.time[:2] + ":" + t.time[2:4] + ":" + t.time[4:6] if len(t.time) >= 6 else None)
         self.state.tick += 1
 
     async def _investor_loop(self) -> None:
@@ -180,7 +189,15 @@ class KisFeed:
 
     def _on_trade(self, t: Trade) -> None:
         self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
+        self.state.on_trade(t.code, t.price)
         self.state.tick += 1
+
+    async def watch_codes(self, codes: list[str]) -> int:
+        """KIS 웹소켓은 시작 시 구독 목록이 고정이라 추가 구독은 재시작이 필요하다."""
+        missing = [c for c in codes if c not in self.state.codes]
+        if missing:
+            log.warning("KIS 피드는 감시 종목 %d개를 실시간 구독에 추가하지 못합니다 (서버 재시작 필요)", len(missing))
+        return 0
 
     async def _investor_loop(self) -> None:
         """장중 추정치를 우선 쓰고, 그 API 가 안 되면(모의투자 등) 전일 확정치로 대신한다.

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app.supply import SupplyInputs
 from app.supply import score as supply_score
+from app.watch import Watchlist
 
 FIVE_MIN = 300.0
 
@@ -91,6 +92,13 @@ class MarketState:
         self.theme_of: dict[str, Theme] = {s.code: t for t in themes for s in t.stocks}
         self.tick = 0
         self.started = time.time()
+        self.watch = Watchlist()          # 장중 돌파 감시 (app/watch.py)
+        self.alerts: list[dict] = []      # 방송 대기 중인 알림 (broadcaster 가 비운다)
+
+    def on_trade(self, code: str, price: int, ts: str | None = None) -> None:
+        """감시 종목이면 돌파/이탈을 판정해 알림을 쌓는다. 테마 종목 갱신(update)과 별개."""
+        for a in self.watch.on_trade(code, price, ts):
+            self.alerts.append(a)
 
     @classmethod
     def from_file(cls, path: Path) -> "MarketState":
@@ -170,4 +178,5 @@ class MarketState:
                     five=t.five, prev_five=t.prev_five))
 
     def snapshot(self) -> dict:
-        return {"type": "tick", "t": self.tick, "ts": time.time(), "themes": [t.as_dict() for t in self.themes]}
+        return {"type": "tick", "t": self.tick, "ts": time.time(), "themes": [t.as_dict() for t in self.themes],
+                "watch": self.watch.as_list()}

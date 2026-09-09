@@ -160,6 +160,20 @@ button,select{font:inherit;color:inherit}
 .events .t{font-family:var(--mono);color:var(--ink-3);font-size:10.5px;flex:none}
 .events .k{flex:none;font-size:10px;font-weight:700;padding:0 4px;border-radius:2px}
 .events .k.up{background:var(--up-soft)} .events .k.hot{background:var(--accent-soft);color:var(--accent-ink)} .events .k.top{background:var(--up);color:#fff} .events .k.sys{background:var(--surface-2);color:var(--ink-2)}
+.events .k.brk{background:var(--good);color:#fff} .events .k.stop{background:var(--down);color:#fff}
+/* ── 돌파 감시 패널 ── */
+.watch{display:flex;flex-direction:column;gap:3px;font-size:11.5px}
+.watch .w{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 8px;align-items:center;padding:4px 6px;border-radius:4px;background:var(--surface-2)}
+.watch .w.broke{background:var(--good-soft);box-shadow:inset 3px 0 0 var(--good)} .watch .w.stopped{opacity:.55}
+.watch .w .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.watch .w .nm small{display:block;font-weight:400;color:var(--ink-3);font-family:var(--mono);font-size:10.5px}
+.watch .w .px{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.watch .w .px small{display:block;color:var(--ink-3);font-size:10.5px}
+.watch .st{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.watch .st.waiting{background:var(--surface);color:var(--ink-2);border:1px solid var(--line)} .watch .st.broke{background:var(--good);color:#fff} .watch .st.stopped{background:var(--line);color:var(--ink-2)}
+.bell{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:0 6px;cursor:pointer;font-size:11px;text-transform:none;font-weight:500}
+@keyframes flash{0%,100%{background:transparent}50%{background:var(--good-soft)}}
+.alerts.flash{animation:flash .6s 3}
 .foot{padding:8px 14px;font-size:11px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap}
 .foot code{font-family:var(--mono);background:var(--surface-2);padding:0 4px;border-radius:3px}
 
@@ -256,6 +270,9 @@ table.hg tr.drop td{opacity:.55}
       <div class="sec"><h3>생애주기</h3><div class="stage" id="stage"></div></div>
       <div class="sec"><h3>테마 상태</h3><dl class="kv" id="dStat"></dl></div>
     </div>
+    <div class="panel" id="watchPanel" hidden><div class="sec"><h3>눌림목 돌파 감시 <span style="display:inline-flex;gap:6px;align-items:center;text-transform:none;font-weight:400"><span id="watchMeta"></span><button class="bell" id="bellBtn" title="돌파 알림 소리 켜기/끄기">🔔 소리</button></span></h3>
+      <div class="watch" id="watch"></div>
+      <div style="margin-top:6px;font-size:10.5px;color:var(--ink-3)">규칙: 현재가가 매수 기준가(자리 날 고가)를 넘으면 돌파, 손절가(자리 날 저가) 아래면 이탈. 자리는 15:45 스크리너 결과의 최신 엄선 종목.</div></div></div>
     <div class="panel"><div class="sec"><h3>실시간 이벤트 <span style="text-transform:none;font-weight:400" id="evCount"></span></h3><div class="events" id="events"></div></div></div>
   </aside>
 </div>
@@ -354,6 +371,8 @@ class ServerFeed{
   stop(){if(this.ws){this.ws.onclose=null;this.ws.close();this.ws=null}}
   fallback(why){this.stop();if(feed!==this)return;feed=new MockFeed(themes);setBadge('모의 피드 · '+why,'mock');if(!paused)feed.start(onTick)}
   receive(msg){
+    if(msg.type==='alert'){onAlert(msg);return}
+    if(msg.watch)renderWatch(msg.watch);
     if(msg.type==='snapshot'||!this.gotAny){
       this.gotAny=true;setBadge('서버 피드 · '+location.host,'good');
       themes=msg.themes.map(t=>({...t,hist:[],stocks:t.stocks.map(s=>({...s,base:s.price/(1+s.chg/100),band:Math.floor(s.chg/5)}))}));
@@ -401,7 +420,33 @@ const savePrefs=()=>{try{localStorage.setItem('radar',JSON.stringify({sort:$('#s
 if(prefs.sort)$('#sortSel').value=prefs.sort;if(prefs.n)$('#nSel').value=prefs.n;if(prefs.k)$('#kSel').value=prefs.k;
 
 /* ───────────────────────── 이벤트/속보 ───────────────────────── */
-const KIND={up:'돌파',hot:'수급',top:'상한가',sys:'시스템'};
+const KIND={up:'돌파',hot:'수급',top:'상한가',sys:'시스템',brk:'매수기준 돌파',stop:'손절 이탈'};
+
+/* ── 돌파 감시: 서버가 보내는 watch 목록 · alert 메시지 ── */
+let bellOn=true;try{bellOn=localStorage.getItem('bell')!=='off'}catch(e){}
+function beep(times){
+  if(!bellOn)return;
+  try{const ac=new (window.AudioContext||window.webkitAudioContext)();let t=ac.currentTime;
+    for(let i=0;i<times;i++){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=i%2?1320:880;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.25,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.22);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+0.25);t+=0.28}
+  }catch(e){}
+}
+function renderWatch(list){
+  const p=$('#watchPanel');if(!list){p.hidden=true;return}
+  p.hidden=false;$('#watchMeta').textContent=list.length?`${list.filter(w=>w.status==='broke').length} 돌파 · ${list.filter(w=>w.status==='waiting').length} 대기`:'감시 종목 없음';
+  $('#watch').innerHTML=list.map(w=>{const gap=w.price&&w.entry?(w.price/w.entry-1)*100:null;
+    return `<div class="w ${w.status}" title="자리 ${w.setup_date} · ${w.source}">
+      <div class="nm">${w.name}<small>${w.code}${w.theme?' · '+w.theme:''}</small></div>
+      <div class="px">${w.price?w.price.toLocaleString('ko-KR'):'–'}<small>기준 ${w.entry.toLocaleString('ko-KR')} / 손절 ${w.stop.toLocaleString('ko-KR')}${gap!=null?' · '+(gap>=0?'+':'')+gap.toFixed(1)+'%':''}</small></div>
+      <span class="st ${w.status}">${w.status==='broke'?'돌파 '+(w.broke_at||'').slice(0,5):w.status==='stopped'?'이탈':'대기'}</span></div>`}).join('')||'<div style="color:var(--ink-3)">오늘 감시할 엄선 자리가 없습니다.</div>';
+}
+function onAlert(a){
+  pushEvent(a.kind,a.text);
+  const bar=$('.alerts');bar.classList.remove('flash');void bar.offsetWidth;bar.classList.add('flash');
+  beep(a.kind==='brk'?3:1);
+  if(a.kind==='brk'&&'Notification' in window&&Notification.permission==='granted'){try{new Notification('매수 기준가 돌파',{body:a.text})}catch(e){}}
+}
+document.addEventListener('DOMContentLoaded',()=>{const b=$('#bellBtn');if(!b)return;const paint=()=>{b.textContent=bellOn?'🔔 소리':'🔕 무음'};paint();
+  b.addEventListener('click',()=>{bellOn=!bellOn;try{localStorage.setItem('bell',bellOn?'on':'off')}catch(e){}paint();if(bellOn){beep(1);if('Notification' in window&&Notification.permission==='default')Notification.requestPermission()}})});
 function pushEvent(kind,text){
   events.unshift({t:hhmmss(new Date()),kind,text});if(events.length>40)events.pop();
   renderEvents();renderAlerts();
