@@ -33,6 +33,7 @@ class Candidate:
     nx_move: float = 0.0   # NXT 현재가 / KRX 종가 - 1 (%)
     pick: bool = False     # NXT 하락 → 후보
     nx_traded: bool = False  # NXT 에서 거래(가격)가 있었는가
+    near_high: float | None = None  # 낮 종가가 당일 고가 대비 몇 % (0 = 고가 마감, 음수 = 밀려 마감)
 
 
 def candles_today() -> bool:
@@ -70,13 +71,14 @@ def load_candidates(min_spike: float = 8.0, min_amount_eok: float = 50.0) -> lis
                 continue
             chg = (last[4] / prev[4] - 1) * 100
             amt = last[6] / 1e8
+            near = (last[4] / last[2] - 1) * 100 if last[2] else None   # 종가 vs 고가
             if chg >= min_spike and chg < 29 and amt >= min_amount_eok:
                 if code in out:
-                    out[code].krx_chg = chg
+                    out[code].krx_chg, out[code].near_high = chg, near
                 else:
-                    out[code] = Candidate(code, names.get(code, code), f"급등 {chg:+.1f}%", int(last[4]), chg, amt)
+                    out[code] = Candidate(code, names.get(code, code), f"급등 {chg:+.1f}%", int(last[4]), chg, amt, near_high=near)
             elif code in out:
-                out[code].krx_chg = chg
+                out[code].krx_chg, out[code].near_high = chg, near
     return list(out.values())
 
 
@@ -100,18 +102,51 @@ async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
     return result
 
 
-def alerts_for(result: dict) -> list[dict]:
+def score(c: dict) -> tuple[float, list[str]]:
+    """후보 점수와 근거. 2026-09 NXT 하락 마감 급등주 922건 검증:
+    NXT 눌림 -3% 이하 승률 77%/+7.9% · 거래대금 1,000억↑ 63%/+2.7% · 낮에 고가 대비 3% 넘게 밀려 마감 61%/+3.0% · 고가놀이 자리 71%/+2.1%"""
+    s, why = 0.0, []
+    m = c.get("nx_move", 0.0)
+    if m <= -3:
+        s += 3; why.append(f"NXT 눌림 {m:.1f}% (검증 최상)")
+    elif m <= -1:
+        s += 1; why.append(f"NXT 눌림 {m:.1f}%")
+    else:
+        why.append(f"NXT 눌림 {m:.1f}% (얕음)")
+    amt = c.get("amount_eok", 0.0)
+    if amt >= 1000:
+        s += 2; why.append(f"대금 {amt:,.0f}억 (큰 종목)")
+    elif amt >= 200:
+        s += 1; why.append(f"대금 {amt:,.0f}억")
+    else:
+        s -= 1; why.append(f"대금 {amt:,.0f}억 (작음)")
+    nh = c.get("near_high")
+    if nh is not None:
+        if nh <= -3:
+            s += 1.5; why.append("낮에 고가에서 밀려 마감")
+        elif nh >= -1:
+            s -= 0.5; why.append("낮에 고가 마감")
+    if c.get("why") == "고가놀이":
+        s += 2; why.append("고가놀이 자리")
+    return s, why
+
+
+def alerts_for(result: dict, top: int = 3) -> list[dict]:
     picks = result["picks"]
     when = "NXT 마감" if result["closing"] else "NXT 현재"
-    out = []
+    at = result["at"][11:19]
     if not picks:
         n = len(result["candidates"])
-        out.append({"kind": "nxt", "code": "", "name": "", "at": result["at"][11:19],
-                    "text": f"종가배팅 후보 없음 — {when} 기준 후보 {n}종목 중 KRX 종가 아래로 내려온 종목이 없습니다"})
-        return out
-    for c in picks[:8]:
-        out.append({"kind": "nxt", "code": c["code"], "name": c["name"], "at": result["at"][11:19], "price": c["nx_price"],
-                    "text": f"종가배팅 후보 · {c['name']} ({c['why']}) KRX 종가 {c['krx_close']:,}원 → {when} {c['nx_price']:,}원 ({c['nx_move']:+.1f}%)"})
-    if len(picks) > 8:
-        out.append({"kind": "nxt", "code": "", "name": "", "at": result["at"][11:19], "text": f"종가배팅 후보 외 {len(picks) - 8}종목 — /api/nxtclose 참고"})
+        return [{"kind": "nxt", "code": "", "name": "", "at": at,
+                 "text": f"종가배팅 후보 없음 — {when} 기준 급등주 {n}종목 중 저녁에 눌린 종목이 없습니다"}]
+    ranked = sorted(((score(c), c) for c in picks), key=lambda x: x[0][0], reverse=True)
+    lines = [f"🌙 종가배팅 후보 (저녁에 눌린 급등주) · {when} 기준 · 눌린 {len(picks)}종목 중 상위 {min(top, len(ranked))}"]
+    out = []
+    for i, ((s, why), c) in enumerate(ranked[:top], 1):
+        lines.append(f"{i}. {c['name']} ({c['why']}) {c['krx_close']:,}→{c['nx_price']:,}원 ({c['nx_move']:+.1f}%) · {' · '.join(why)}")
+    if len(ranked) > top:
+        lines.append(f"외 {len(ranked) - top}종목은 화면 목록(/api/nxtclose)에서")
+    lines.append("규칙: NXT 종가 근처에 지정가 매수 → 다음 날 시가 매도. 갭 하락 위험이 있으니 수량은 작게.")
+    out.append({"kind": "nxt", "code": ranked[0][1]["code"], "name": ranked[0][1]["name"], "at": at, "text": "\n".join(lines),
+                "top": [{"rank": i, "code": c["code"], "name": c["name"], "score": s, "why": why} for i, ((s, why), c) in enumerate(ranked[:top], 1)]})
     return out
