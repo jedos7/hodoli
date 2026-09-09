@@ -50,6 +50,7 @@ class Settings:
     schedule_screener: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER", "15:45").strip())
     schedule_screener_universe: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER_UNIVERSE", "market").strip())
     schedule_collect: str = field(default_factory=lambda: os.getenv("SCHEDULE_COLLECT", "08:50").strip())
+    schedule_calendar: str = field(default_factory=lambda: os.getenv("SCHEDULE_CALENDAR", "16:10").strip())  # 일별 테마 달력 (전 종목 일봉, 5분)
 
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))

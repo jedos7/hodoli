@@ -173,6 +173,50 @@ button,select{font:inherit;color:inherit}
 .watch .st.waiting{background:var(--surface);color:var(--ink-2);border:1px solid var(--line)} .watch .st.broke{background:var(--good);color:#fff} .watch .st.stopped{background:var(--line);color:var(--ink-2)}
 .bell{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:0 6px;cursor:pointer;font-size:11px;text-transform:none;font-weight:500}
 @keyframes flash{0%,100%{background:transparent}50%{background:var(--good-soft)}}
+/* ── 일정 ── */
+.evlist{display:flex;flex-direction:column;gap:5px;font-size:11.5px}
+.ev{display:grid;grid-template-columns:56px 1fr;gap:0 6px;align-items:start}
+.ev .d{font-family:var(--mono);font-weight:600;font-size:11px;white-space:nowrap}
+.ev .d small{display:block;color:var(--ink-3);font-weight:400}
+.ev .t{font-weight:600;display:flex;gap:4px;align-items:baseline;flex-wrap:wrap}
+.ev .t .k{font-size:10px;padding:0 4px;border-radius:3px;background:var(--surface-2);color:var(--ink-2);font-weight:600}
+.ev .t .k.정책{background:var(--up-soft);color:var(--up)} .ev .t .k.상장{background:var(--good-soft);color:var(--good)} .ev .t .k.실적{background:var(--accent-soft);color:var(--accent-ink)}
+.ev .t .dots{letter-spacing:-1px;font-size:9px;color:var(--ink-3)} .ev .t .dots.i3{color:var(--up)} .ev .t .dots.i2{color:var(--accent)}
+.ev .n{color:var(--ink-3);font-size:10.5px;line-height:1.35}
+.ev .del{cursor:pointer;color:var(--ink-3);font-size:10px;margin-left:4px}
+/* ── 리서치 ── */
+.rsdir{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;font-size:12px}
+.rsdir div b{font-weight:700} .rsdir .up{color:var(--up)} .rsdir .down{color:var(--down)}
+.rslist{display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow:auto;font-size:12px}
+.rs .h{font-weight:700;font-size:13px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.rs .h .cat{font-size:10.5px;font-weight:600;background:var(--surface-2);color:var(--ink-2);padding:0 5px;border-radius:3px}
+.rs .h .src{color:var(--ink-3);font-weight:400;font-size:11.5px}
+.rs .h a{color:inherit;text-decoration:none} .rs .h a:hover{text-decoration:underline}
+.rs ul{margin:3px 0 0;padding-left:14px;color:var(--ink-2);line-height:1.5} .rs li{margin:0}
+/* ── 일별 테마 ── */
+.calwrap{display:grid;grid-template-columns:minmax(0,1fr) 500px;gap:10px;padding:8px 14px}
+.calgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;align-content:start}
+.calgrid .wd{font-size:11px;color:var(--ink-3);text-align:center;padding:2px 0}
+.calcell{border:1px solid var(--line-2);border-radius:4px;min-height:84px;padding:4px 6px;font-size:11px;cursor:pointer;background:var(--surface)}
+.calcell.empty{background:var(--surface-2);cursor:default;opacity:.6} .calcell.nodata{cursor:default;color:var(--ink-3)}
+.calcell.sel{border-color:var(--accent);background:var(--accent-soft)} .calcell:hover:not(.empty){border-color:var(--ink-3)}
+.calcell .dn{font-weight:700;font-family:var(--mono);display:flex;gap:6px;align-items:baseline}
+.calcell .dn small{font-weight:600;font-family:var(--mono);font-size:10.5px}
+.calcell .th{display:flex;justify-content:space-between;gap:4px;white-space:nowrap;overflow:hidden}
+.calcell .th span:first-child{overflow:hidden;text-overflow:ellipsis} .calcell .th .n{font-family:var(--mono);color:var(--up);font-weight:600}
+.calday{max-height:70vh;overflow:auto;font-size:12px}
+.calday h4{margin:0 0 6px;font-size:14px} .calday .mk{color:var(--ink-2);font-size:11.5px;margin-bottom:8px}
+.tb{margin-bottom:10px;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.tb .bar{background:var(--up);color:#fff;font-weight:700;padding:4px 8px;display:flex;justify-content:space-between;align-items:center}
+.tb .bar small{font-weight:600;font-size:11px}
+.tb .meta{padding:4px 8px;font-size:11px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;border-bottom:1px solid var(--line-2)}
+.tb .meta .fire{display:inline-block;width:90px;height:7px;background:var(--line-2);border-radius:2px;overflow:hidden;vertical-align:middle}
+.tb .meta .fire i{display:block;height:100%;background:var(--up)}
+.tb .row2{display:grid;grid-template-columns:minmax(0,1fr) 64px 84px 70px 70px;gap:6px;padding:3px 8px;align-items:center;border-top:1px solid var(--line-2)}
+.tb .row2 .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb .row2 .n{font-family:var(--mono);text-align:right} .tb .row2 .amtbar{height:7px;background:var(--line-2);border-radius:2px;overflow:hidden}
+.tb .row2 .amtbar i{display:block;height:100%;background:var(--up)}
+@media (max-width:1000px){.calwrap{grid-template-columns:1fr}}
 .alerts.flash{animation:flash .6s 3}
 .foot{padding:8px 14px;font-size:11px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap}
 .foot code{font-family:var(--mono);background:var(--surface-2);padding:0 4px;border-radius:3px}
@@ -228,6 +272,8 @@ table.hg tr.drop td{opacity:.55}
   <button class="btn" id="resetBtn">초기화</button>
   <button class="btn" id="hgBtn">▶ 고가놀이</button>
   <button class="btn" id="collectBtn" hidden title="네이버 금융 테마를 수집해 테마 목록을 갱신합니다">⟳ 테마 수집</button>
+  <button class="btn" id="rsBtn" hidden title="최근 7일 증권사 리포트 요약과 목표가 방향">📚 리서치</button>
+  <button class="btn" id="calBtn" hidden title="어느 날 어느 테마로 돈이 갔나">📅 일별 테마</button>
   <div class="ticker"><div class="track" id="tick"></div></div>
 </div>
 
@@ -256,6 +302,9 @@ table.hg tr.drop td{opacity:.55}
       </div>
       <div class="sec"><h3>코스피 당일 수급 <span style="text-transform:none;font-weight:400">억원</span></h3><div id="kpFlow"></div></div>
       <div class="sec"><h3>코스닥 당일 수급</h3><div id="kdFlow"></div></div>
+      <div class="sec" id="evSec" hidden><h3>일정 <span style="text-transform:none;font-weight:400" id="evMeta"></span><button class="bell" id="evAdd" title="일정 등록">＋ 등록</button></h3>
+        <div class="evlist" id="evList"></div>
+        <div style="margin-top:4px;font-size:10.5px;color:var(--ink-3)">학회·컨퍼런스·국내 실적·신규상장은 자동 수집이 없어 직접 등록합니다. 등록할 때 테마를 지정하면 카드에 D-n 으로 뜹니다.</div></div>
     </div>
   </aside>
 
@@ -275,6 +324,26 @@ table.hg tr.drop td{opacity:.55}
       <div style="margin-top:6px;font-size:10.5px;color:var(--ink-3)">규칙: 현재가가 매수 기준가(자리 날 고가)를 넘으면 돌파, 손절가(자리 날 저가) 아래면 이탈. 자리는 15:45 스크리너 결과의 최신 엄선 종목.</div></div></div>
     <div class="panel"><div class="sec"><h3>실시간 이벤트 <span style="text-transform:none;font-weight:400" id="evCount"></span></h3><div class="events" id="events"></div></div></div>
   </aside>
+</div>
+<!-- 리서치 브리핑 -->
+<div class="modal" id="rsModal" hidden>
+  <div class="dlg" role="dialog" style="width:min(1000px,100%)">
+    <div class="hd"><h2>📚 리서치 브리핑 <span id="rsMeta">— 최근 7일</span></h2><button class="x" id="rsRefresh" style="margin-left:auto">새로 받기</button><button class="x" id="rsClose">닫기</button></div>
+    <div class="sec"><h3>추정치 방향 <span style="text-transform:none;font-weight:400">(같은 증권사 계정만 · 목표가 기준)</span></h3><div id="rsDir" class="rsdir"></div></div>
+    <div class="sec"><h3>산업 · 경제 · 시황 리포트 <span style="text-transform:none;font-weight:400">애널리스트 원문 그대로</span></h3><div id="rsList" class="rslist"></div></div>
+  </div>
+</div>
+<!-- 일별 테마 -->
+<div class="modal" id="calModal" hidden>
+  <div class="dlg" role="dialog" style="width:min(1320px,100%)">
+    <div class="hd"><h2>📅 일별 테마 <span>— 어느 날 어느 테마로 돈이 갔나</span></h2>
+      <span style="display:inline-flex;gap:6px;align-items:center;margin-left:14px;font-size:12px"><button class="x" id="calPrev">◀</button><b id="calMonth"></b><button class="x" id="calNext">▶</button>
+        <label style="margin-left:10px">정렬 <select id="calSort"><option value="top4">상위4 상승 순</option><option value="median">중앙값 순</option><option value="amount">대금 순</option></select></label>
+        <span id="calMeta" style="color:var(--ink-3)"></span><button class="x" id="calRun">다시 만들기</button></span>
+      <button class="x" id="calClose" style="margin-left:auto">닫기</button></div>
+    <div class="calwrap"><div class="calgrid" id="calGrid"></div><div class="calday" id="calDay"></div></div>
+    <div class="ft">≈ 는 지수가 아니라 전 종목 등락률 중앙값입니다. 테마 등락은 구성 종목의 종가 등락률로 계산하며, 상위4 = 테마 안에서 가장 많이 오른 4종목 평균, 중앙 = 전체 종목 중앙값, 발화 = 상승 종목 비율. 자료는 네이버 테마 매핑과 일봉이며 16:10 에 자동 갱신됩니다.</div>
+  </div>
 </div>
 <div class="modal" id="hgModal" hidden>
   <div class="dlg" role="dialog" aria-labelledby="hgTitle">
@@ -621,6 +690,95 @@ async function loadFoot(){
   }catch(e){}
 }
 if(USE_SERVER){loadFoot();setInterval(loadFoot,60000)}
+
+/* ══ 일정 ══ */
+let evByTheme={};
+async function loadEvents(){
+  try{const d=await (await fetch('/api/events?days=30')).json();
+    $('#evSec').hidden=false;$('#evMeta').textContent=`앞으로 ${d.days}일 ${d.items.length}건 · 자동 ${d.auto} · 등록 ${d.manual}`;
+    evByTheme=d.byTheme||{};
+    $('#evList').innerHTML=d.items.map(e=>`<div class="ev"><div class="d">${e.date.slice(5)}(${e.weekday})<small>D-${e.dday}</small></div>
+      <div><div class="t"><span class="dots i${e.importance}">${'●'.repeat(e.importance)}${'○'.repeat(3-e.importance)}</span><span class="k ${e.kind}">${e.kind}</span>${e.title}${e.estimated?' <span style="color:var(--accent);font-size:10px;font-weight:600">추정</span>':''}${e.source==='등록'?`<span class="del" data-id="${e.id}" title="삭제">✕</span>`:''}</div>
+      <div class="n">${e.note||''}</div></div></div>`).join('')||'<div style="color:var(--ink-3)">일정 없음</div>';
+  }catch(e){}
+}
+if(USE_SERVER){loadEvents();setInterval(loadEvents,600000);
+  $('#evList').addEventListener('click',async e=>{const x=e.target.closest('.del');if(!x)return;if(!confirm('이 일정을 삭제할까요?'))return;await fetch('/api/events/'+x.dataset.id,{method:'DELETE'});loadEvents()});
+  $('#evAdd').addEventListener('click',async()=>{
+    const date=prompt('날짜 (YYYY-MM-DD)');if(!date)return;
+    const kind=prompt('종류 (지표/정책/실적/상장/학회/기타)','실적')||'기타';
+    const title=prompt('제목');if(!title)return;
+    const note=prompt('메모 (선택)')||'';
+    const imp=prompt('중요도 1~3','2')||'2';
+    const th=themes.map(t=>t.id+'='+t.name).join(', ');
+    const themeId=prompt('테마 카드에 D-n 으로 표시하려면 테마 id 입력 (선택)\n'+th,'')||'';
+    const q=new URLSearchParams({date,kind,title,note,importance:imp,themeId});
+    const r=await fetch('/api/events?'+q,{method:'POST'});if(!r.ok){alert((await r.json()).detail||'등록 실패');return}loadEvents()});
+}
+
+/* ══ 리서치 브리핑 ══ */
+async function loadResearch(refresh){
+  $('#rsModal').hidden=false;$('#rsMeta').textContent='— 불러오는 중';
+  try{
+    if(refresh){const r=await fetch('/api/research/refresh',{method:'POST'});if(!r.ok)throw new Error((await r.json()).detail||r.status)}
+    const r=await fetch('/api/research');if(!r.ok)throw new Error((await r.json()).detail||r.status);const d=await r.json();
+    $('#rsMeta').textContent=`— 최근 ${d.days}일 · ${(d.asof||'').slice(0,16).replace('T',' ')} 기준 · 리포트 ${d.reports.length}건`;
+    $('#rsDir').innerHTML=d.direction.length?d.direction.map(x=>`<div title="${x.items.map(i=>`${i.stock} ${i.broker} ${i.from.toLocaleString('ko-KR')}→${i.to.toLocaleString('ko-KR')} (${i.date})`).join('\n')}">· <b>${x.theme}</b> <span class="up">상향 ${x.up}</span> · <span class="down">하향 ${x.down}</span></div>`).join(''):'<div style="color:var(--ink-3)">최근 7일 안에 같은 증권사의 목표가 변경이 없습니다.</div>';
+    $('#rsList').innerHTML=d.reports.map(r=>`<div class="rs"><div class="h"><span class="cat">${r.kind}${r.category?' · '+r.category:''}</span><a href="${r.url}" target="_blank" rel="noopener">${r.title}</a><span class="src">${r.broker} · ${r.date.slice(2).replace(/-/g,'.')}${r.target?' · 목표가 '+r.target.toLocaleString('ko-KR'):''}${r.opinion?' · '+r.opinion:''}</span></div>
+      ${r.bullets.length?'<ul>'+r.bullets.map(b=>'<li>'+b+'</li>').join('')+'</ul>':''}</div>`).join('')||'<div style="color:var(--ink-3)">리포트 없음</div>';
+  }catch(e){$('#rsMeta').textContent='— '+e.message}
+}
+if(USE_SERVER){$('#rsBtn').hidden=false;$('#rsBtn').addEventListener('click',()=>loadResearch(false));$('#rsRefresh').addEventListener('click',()=>loadResearch(true));$('#rsClose').addEventListener('click',()=>$('#rsModal').hidden=true);
+  $('#rsModal').addEventListener('click',e=>{if(e.target===$('#rsModal'))$('#rsModal').hidden=true})}
+
+/* ══ 일별 테마 ══ */
+let calData=null,calYM=null,calSel=null;
+const fmtP=v=>(v>0?'+':'')+v.toFixed(2)+'%';
+function calRender(){
+  const d=calData;if(!d){$('#calGrid').innerHTML='';$('#calDay').innerHTML='<div style="color:var(--ink-3)">달력 자료가 아직 없습니다. "다시 만들기"를 누르면 5분쯤 뒤 만들어집니다.</div>';return}
+  const days=Object.keys(d.days).sort();if(!calYM){const last=days[days.length-1];calYM=last.slice(0,6)}
+  if(!calSel||!calSel.startsWith(calYM)){const inM=days.filter(x=>x.startsWith(calYM));calSel=inM[inM.length-1]||null}
+  const y=+calYM.slice(0,4),m=+calYM.slice(4,6);$('#calMonth').textContent=`${y}년 ${m}월`;
+  $('#calMeta').textContent=`테마 ${d.themes}개 · 종목 ${d.stocks}개 · ${(d.asof||'').slice(5,16).replace('T',' ')} 갱신`;
+  const first=new Date(y,m-1,1),lastDay=new Date(y,m,0).getDate();
+  let html=['월','화','수','목','금'].map(w=>`<div class="wd">${w}</div>`).join('');
+  let dow=(first.getDay()+6)%7; // 월=0
+  if(dow<5)for(let i=0;i<dow;i++)html+='<div class="calcell empty"></div>';
+  for(let day=1;day<=lastDay;day++){const dt=new Date(y,m-1,day),w=(dt.getDay()+6)%7;if(w>=5)continue;
+    const key=`${y}${String(m).padStart(2,'0')}${String(day).padStart(2,'0')}`,v=d.days[key];
+    if(!v){html+=`<div class="calcell nodata"><div class="dn">${day}</div></div>`;continue}
+    const sort=$('#calSort').value,ths=[...v.themes].sort((a,b)=>b[sort]-a[sort]).slice(0,3);
+    html+=`<div class="calcell ${key===calSel?'sel':''}" data-d="${key}"><div class="dn">${day} <small class="${cls(v.kospi)}">거 ${fmtP(v.kospi)}</small></div><div class="dn" style="font-weight:400"><small class="${cls(v.kosdaq)}">코 ${fmtP(v.kosdaq)}</small></div>
+      ${ths.map(t=>`<div class="th"><span>${t.name}</span><span class="n">${(sort==='amount'?Math.round(t.amount).toLocaleString('ko-KR')+'억':fmtP(t[sort]).replace('%',''))}</span></div>`).join('')}</div>`;
+  }
+  $('#calGrid').innerHTML=html;calRenderDay();
+}
+function calRenderDay(){
+  const d=calData,v=calSel&&d.days[calSel];if(!v){$('#calDay').innerHTML='';return}
+  const y=calSel.slice(0,4),m=+calSel.slice(4,6),dd=+calSel.slice(6),wd='일월화수목금토'[new Date(y,m-1,dd).getDay()];
+  const sort=$('#calSort').value,ths=[...v.themes].sort((a,b)=>b[sort]-a[sort]).slice(0,8);
+  $('#calDay').innerHTML=`<h4>${y}년 ${m}월 ${dd}일 (${wd})</h4><div class="mk">거래소 <b class="${cls(v.kospi)}">${fmtP(v.kospi)}</b> · 코스닥 <b class="${cls(v.kosdaq)}">${fmtP(v.kosdaq)}</b> · 테마 ${v.themeCount}개 중 상위 ${ths.length}</div>`+
+    ths.map(t=>{const maxA=Math.max(...t.stocks.map(s=>s.amount),1);return `<div class="tb"><div class="bar"><span>${t.name}</span><small>아래 ${t.stocks.length}종목 ${t.top6Amount>=10000?(t.top6Amount/10000).toFixed(1)+'조':Math.round(t.top6Amount).toLocaleString('ko-KR')+'억'}</small></div>
+      <div class="meta"><span>상위4 <b class="${cls(t.top4)}">${fmtP(t.top4)}</b></span><span>중앙 <b class="${cls(t.median)}">${fmtP(t.median)}</b></span><span>${t.n}종목 (테마 전체 ${Math.round(t.amount).toLocaleString('ko-KR')}억)</span><span>대표 <b>${t.rep}</b></span><span>heat ${t.heat}</span><span>발화 <span class="fire"><i style="width:${Math.round(t.upRatio*100)}%"></i></span></span></div>
+      ${t.stocks.map(s=>`<div class="row2"><span class="nm">${s.name}</span><span class="n ${cls(s.chg)}" style="font-weight:600">${fmtP(s.chg)}</span><span class="n">${s.price.toLocaleString('ko-KR')}원</span><span class="n">${s.amount.toLocaleString('ko-KR')}억</span><span class="amtbar"><i style="width:${Math.round(s.amount/maxA*100)}%"></i></span></div>`).join('')}</div>`}).join('');
+}
+async function loadCalendar(){
+  try{const r=await fetch('/api/calendar');calData=r.ok?await r.json():null}catch(e){calData=null}
+  calRender();
+}
+async function calPoll(){const s=await (await fetch('/api/calendar/status')).json();
+  if(s.running){$('#calMeta').textContent=s.total?`만드는 중 ${s.done}/${s.total} ${s.current}`:'만드는 중…';setTimeout(calPoll,3000);return}
+  $('#calRun').disabled=false;if(s.error){$('#calMeta').textContent='실패: '+s.error;return}loadCalendar()}
+if(USE_SERVER){$('#calBtn').hidden=false;
+  $('#calBtn').addEventListener('click',()=>{$('#calModal').hidden=true;$('#calModal').hidden=false;loadCalendar();fetch('/api/calendar/status').then(r=>r.json()).then(s=>{if(s.running){$('#calRun').disabled=true;calPoll()}}).catch(()=>{})});
+  $('#calClose').addEventListener('click',()=>$('#calModal').hidden=true);$('#calModal').addEventListener('click',e=>{if(e.target===$('#calModal'))$('#calModal').hidden=true});
+  $('#calGrid').addEventListener('click',e=>{const c=e.target.closest('.calcell[data-d]');if(!c)return;calSel=c.dataset.d;calRender()});
+  $('#calSort').addEventListener('change',calRender);
+  const shift=n=>{const y=+calYM.slice(0,4),m=+calYM.slice(4,6)-1+n,dt=new Date(y,m,1);calYM=`${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}`;calSel=null;calRender()};
+  $('#calPrev').addEventListener('click',()=>shift(-1));$('#calNext').addEventListener('click',()=>shift(1));
+  $('#calRun').addEventListener('click',async()=>{$('#calRun').disabled=true;const r=await fetch('/api/calendar/run',{method:'POST'});if(!r.ok){$('#calMeta').textContent=(await r.json()).detail;$('#calRun').disabled=false;return}calPoll()});
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#rsModal').hidden=true;$('#calModal').hidden=true}});
 function renderTicker(){
   const all=themes.flatMap(t=>t.stocks).sort((a,b)=>b.vol-a.vol).slice(0,20);
   const html=all.map(s=>`<span><b>${s.name}</b><span class="num ${cls(s.chg)}">${pct(s.chg)}</span><span class="num" style="color:var(--ink-3)">${eok(s.vol)}</span></span>`).join('');

@@ -73,7 +73,7 @@
    "newsAt": "2026-09-09 11:18",
    "newsPress": "전자신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:57:43"
+   "updatedAt": "2026-09-09T16:09:55"
   },
   {
    "id": "nv449",
@@ -117,7 +117,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:57:44"
+   "updatedAt": "2026-09-09T16:09:56"
   },
   {
    "id": "nv559",
@@ -187,7 +187,7 @@
    "newsAt": "2026-09-07 14:50",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:57:45"
+   "updatedAt": "2026-09-09T16:09:58"
   },
   {
    "id": "nv178",
@@ -254,7 +254,7 @@
    "newsAt": "2026-09-09 14:53",
    "newsPress": "뉴스1",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:57:47"
+   "updatedAt": "2026-09-09T16:10:00"
   },
   {
    "id": "nv579",
@@ -322,7 +322,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:57:49"
+   "updatedAt": "2026-09-09T16:10:02"
   },
   {
    "id": "nv92",
@@ -387,7 +387,7 @@
    "newsAt": "2026-09-09 10:16",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:57:51"
+   "updatedAt": "2026-09-09T16:10:03"
   },
   {
    "id": "nv180",
@@ -454,7 +454,7 @@
    "newsAt": "2026-09-08 14:56",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:57:53"
+   "updatedAt": "2026-09-09T16:10:05"
   },
   {
    "id": "nv608",
@@ -462,7 +462,7 @@
    "name": "반도체 기판(FC-BGA/PCB/MLB 등)",
    "grade": "A",
    "report": "리포트 7일 3건 · 증권사 3곳 · 최근 대신 09/03",
-   "news": "LG이노텍 — LG이노텍, KPCA쇼서 AI 반도체 기판 기술 공개…FC-BGA 내년 양산",
+   "news": "심텍 — 심텍, 'KPCA쇼 2026'서 AI 반도체용 차세대 기판 기술 공개",
    "chg": 4.3,
    "chg3d": 0.78,
    "up": 13,
@@ -526,11 +526,11 @@
     "iM증권",
     "대신증권"
    ],
-   "newsUrl": "https://n.news.naver.com/mnews/article/014/0005573280",
-   "newsAt": "2026-09-09 14:14",
+   "newsUrl": "https://n.news.naver.com/mnews/article/293/0000090236",
+   "newsAt": "2026-09-09 16:08",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:57:55"
+   "updatedAt": "2026-09-09T16:10:07"
   },
   {
    "id": "nv472",
@@ -598,7 +598,7 @@
    "newsAt": "2026-09-07 16:46",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:57:57"
+   "updatedAt": "2026-09-09T16:10:09"
   },
   {
    "id": "nv401",
@@ -663,7 +663,7 @@
    "newsAt": "2026-09-09 07:52",
    "newsPress": "SBS Biz",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:57:59"
+   "updatedAt": "2026-09-09T16:10:11"
   },
   {
    "id": "nv405",
@@ -721,7 +721,7 @@
    "newsAt": "2026-09-07 10:08",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:58:01"
+   "updatedAt": "2026-09-09T16:10:13"
   },
   {
    "id": "nv503",
@@ -768,7 +768,7 @@
    "newsAt": "2026-09-09 15:03",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:58:02"
+   "updatedAt": "2026-09-09T16:10:14"
   }
  ]
 }

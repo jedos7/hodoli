@@ -12,7 +12,10 @@
   GET  /api/watch             장중 돌파 감시 목록 (눌림목 최신 엄선 자리의 매수 기준가·손절가·상태)
   POST /api/watch/reload      감시 목록을 pullback.json 에서 다시 읽기 · POST /api/watch/add?code=&entry=&stop= 수동 추가 · DELETE /api/watch/{code}
   GET  /api/alerts            최근 알림 50건 (돌파·이탈). 실시간으로는 /ws/stream 에 type=alert 로 온다
-  GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집) 상태
+  GET  /api/events?days=30    일정 (규칙 계산 + FOMC + 등록). POST /api/events?date=&kind=&title=… 등록, DELETE /api/events/{id}
+  GET  /api/research          리서치 브리핑 (최근 7일 산업·경제·시황 리포트 요약 + 테마별 목표가 방향). POST /api/research/refresh
+  GET  /api/calendar          일별 테마 달력 (거래일별 테마 상위4·중앙값·대표·상위 종목). POST /api/calendar/run, GET /api/calendar/status
+  GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집, 16:10 달력) 상태
   POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
   POST /api/overnight/refresh 야간 지표 즉시 갱신
@@ -28,6 +31,7 @@ import json
 import logging
 import random
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -35,6 +39,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.collectors import naver_futures
 from app.collectors import overnight as overnight_collector
+from app.collectors.naver_research import briefing as research_briefing
+from app.events import Events
+from app.screener.theme_calendar import build_calendar
 from app.collectors.naver_theme import collect
 from app.config import settings
 from app.feeds import KisFeed, KiwoomFeed, MockFeed
@@ -286,13 +293,57 @@ async def job_screener() -> dict:
 
 
 async def job_collect() -> dict:
-    """스케줄용: 테마 재수집(리포트·뉴스 포함) → 반영."""
+    """스케줄용: 테마 재수집(리포트·뉴스 포함) → 반영 → 리서치 브리핑 갱신."""
     r = await run_collect()
+    try:
+        await refresh_research()
+    except Exception as e:
+        log.warning("리서치 브리핑 갱신 실패: %s", e)
     return {"themes": r["themes"], "stocks": r["stocks"]}
 
 
+# ── 리서치 브리핑 ──
+research_lock = asyncio.Lock()
+
+
+async def refresh_research(days: int = 7) -> dict:
+    if research_lock.locked():
+        raise HTTPException(409, "이미 갱신 중입니다.")
+    async with research_lock:
+        themes = [(t.name, [(s.code, s.name) for s in t.stocks]) for t in state.themes]
+        d = await research_briefing(themes, days=days)
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        (settings.data_dir / "research.json").write_text(json.dumps(d, ensure_ascii=False, indent=1), "utf-8")
+        log.info("리서치 브리핑: 리포트 %d건 · 추정치 방향 %d테마", len(d["reports"]), len(d["direction"]))
+        return d
+
+
+# ── 일별 테마 달력 ──
+calendar_job: dict = {"running": False, "done": 0, "total": 0, "current": "", "startedAt": None, "finishedAt": None, "error": None}
+
+
+async def job_calendar() -> dict:
+    if calendar_job["running"]:
+        raise RuntimeError("달력을 이미 만드는 중")
+    calendar_job.update(running=True, done=0, total=0, current="테마 매핑", startedAt=datetime.now().isoformat(timespec="seconds"), finishedAt=None, error=None)
+
+    def progress(i, n, name):
+        calendar_job.update(done=i, total=n, current=name)
+
+    try:
+        r = await build_calendar(progress)
+        return {"themes": r["themes"], "stocks": r["stocks"], "days": len(r["days"])}
+    except Exception as e:
+        calendar_job.update(error=str(e))
+        raise
+    finally:
+        calendar_job.update(running=False, finishedAt=datetime.now().isoformat(timespec="seconds"))
+
+
+events = Events(settings.data_dir / "events.json")
 scheduler = Scheduler(
-    [Job("screener", settings.schedule_screener, job_screener), Job("collect", settings.schedule_collect, job_collect)],
+    [Job("screener", settings.schedule_screener, job_screener), Job("collect", settings.schedule_collect, job_collect),
+     Job("calendar", settings.schedule_calendar, job_calendar)],
     settings.data_dir / "schedule.json",
 )
 
@@ -421,6 +472,69 @@ def pullback():
     if not d:
         raise HTTPException(404, "data/pullback.json 이 없습니다. 다시 찾기(또는 scripts/fetch_daily.py)를 먼저 실행하세요.")
     return d
+
+
+# ── 일정 · 리서치 · 일별 테마 ──────────────────────────────────
+@app.get("/api/events")
+def api_events(days: int = 30):
+    d = events.upcoming(days)
+    # 테마 카드에 D-n 을 붙일 수 있게 themeId 별 최근접 이벤트
+    by_theme: dict[str, dict] = {}
+    for e in d["items"]:
+        if e.get("themeId") and e["themeId"] not in by_theme:
+            by_theme[e["themeId"]] = {"dday": e["dday"], "title": e["title"]}
+    return d | {"byTheme": by_theme}
+
+
+@app.post("/api/events")
+def api_events_add(date: str, kind: str, title: str, note: str = "", importance: int = 2, themeId: str = ""):
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "date 는 YYYY-MM-DD")
+    return asdict(events.add(date, kind, title, note, importance, themeId))
+
+
+@app.delete("/api/events/{id_}")
+def api_events_remove(id_: str):
+    if not events.remove(id_):
+        raise HTTPException(404, "없는 일정")
+    return {"ok": True}
+
+
+@app.get("/api/research")
+def api_research():
+    d = _read_json("research.json")
+    if not d:
+        raise HTTPException(404, "리서치 브리핑이 아직 없습니다. POST /api/research/refresh")
+    return d
+
+
+@app.post("/api/research/refresh")
+async def api_research_refresh(days: int = 7):
+    return await refresh_research(days)
+
+
+@app.get("/api/calendar")
+def api_calendar():
+    d = _read_json("theme_calendar.json")
+    if not d:
+        raise HTTPException(404, "일별 테마 달력이 아직 없습니다. POST /api/calendar/run")
+    return d
+
+
+@app.post("/api/calendar/run")
+async def api_calendar_run():
+    job = next(j for j in scheduler.jobs if j.name == "calendar")
+    if job.running:
+        raise HTTPException(409, "이미 만드는 중입니다.")
+    asyncio.create_task(scheduler.run_job(job, force=True), name="schedule-calendar")
+    return {"ok": True, "started": True}
+
+
+@app.get("/api/calendar/status")
+def api_calendar_status():
+    return calendar_job
 
 
 # ── 장중 돌파 감시 ──────────────────────────────────────────────
