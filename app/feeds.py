@@ -158,7 +158,7 @@ class KiwoomFeed:
 
     async def stop(self) -> None:
         self.ws.stop()
-        for t in (self._task, self._inv_task):
+        for t in (self._task, self._inv_task, self._nx_task):
             if t:
                 t.cancel()
         await self.rest.close()
