@@ -60,6 +60,9 @@ class Theme:
     report: str
     news: str
     stocks: list[Stock]
+    news_url: str = ""
+    news_at: str = ""
+    news_updated: str = ""
     inflow: deque = field(default_factory=lambda: deque(maxlen=4000))  # (ts, 억) 최근 유입 기록
     # 계산값
     total: float = 0.0
@@ -74,6 +77,7 @@ class Theme:
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "grade": self.grade, "report": self.report, "news": self.news,
+                "newsUrl": self.news_url, "newsAt": self.news_at, "newsUpdated": self.news_updated,
                 "total": round(self.total, 1), "avg": round(self.avg, 2), "five": round(self.five, 1),
                 "prevFive": round(self.prev_five, 1), "leader": self.leader.code if self.leader else None,
                 "top": self.top.code if self.top else None, "conc": round(self.conc, 1), "width": self.width,
@@ -95,7 +99,8 @@ class MarketState:
         for t in d["themes"]:
             stocks = [Stock(code=s["code"], name=s["name"], theme_id=t["id"], ref=int(s["ref"]), price=int(s["ref"]), why=s.get("why", ""))
                       for s in t["stocks"]]
-            themes.append(Theme(id=t["id"], name=t["name"], grade=t.get("grade", "-"), report=t.get("report", ""), news=t.get("news", ""), stocks=stocks))
+            themes.append(Theme(id=t["id"], name=t["name"], grade=t.get("grade", "-"), report=t.get("report", ""), news=t.get("news", ""),
+                                stocks=stocks, news_url=t.get("newsUrl", ""), news_at=t.get("newsAt", ""), news_updated=t.get("updatedAt", "")))
         st = cls(themes)
         st.recompute()
         return st

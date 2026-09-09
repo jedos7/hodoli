@@ -12,6 +12,7 @@
   POST /api/overnight/refresh 야간 지표 즉시 갱신
   POST /api/collect           네이버 테마 수집 → themes.json 갱신 → 즉시 반영
   POST /api/themes/reload     themes.json 을 다시 읽어 반영 (손으로 고쳤을 때)
+  POST /api/news/refresh      테마 카드 리포트 줄·뉴스 줄 즉시 갱신 (평소엔 NEWS_MINUTES 주기)
   WS   /ws/stream             1초마다 테마 스냅샷 방송. 테마 목록이 바뀌면 type=snapshot 을 보낸다.
 """
 from __future__ import annotations
@@ -143,6 +144,60 @@ async def foreign_futures() -> dict:
     return {"prev": r.prev, "now": r.today, "src": f"KIS {r.today_date[4:] if r.today_date else ''}".strip(), "error": r.error}
 
 
+news_lock = asyncio.Lock()
+
+
+async def refresh_news() -> dict:
+    """테마마다 리포트 줄·뉴스 줄을 새로 만들고 themes.json 에도 써 둔다 (재시작해도 유지)."""
+    from app.collectors.naver_news import NaverNews
+
+    if news_lock.locked():
+        raise HTTPException(409, "이미 갱신 중입니다.")
+    async with news_lock:
+        nn = NaverNews()
+        updated = 0
+        try:
+            for t in state.themes:
+                leader = t.leader or t.stocks[0]
+                try:
+                    x = await nn.enrich([(s.code, s.name) for s in t.stocks], leader.code, settings.report_days)
+                except Exception as e:
+                    log.warning("뉴스 갱신 실패 %s: %s", t.name, e)
+                    continue
+                t.report, t.news_updated = x["report"], x["updatedAt"]
+                if x["news"]:
+                    t.news, t.news_url, t.news_at = x["news"], x["newsUrl"], x["newsAt"]
+                updated += 1
+        finally:
+            await nn.close()
+        # themes.json 에 반영
+        try:
+            p = settings.themes_file
+            d = json.loads(p.read_text("utf-8"))
+            by = {t.id: t for t in state.themes}
+            for td in d["themes"]:
+                t = by.get(td["id"])
+                if t:
+                    td.update(report=t.report, news=t.news, newsUrl=t.news_url, newsAt=t.news_at, updatedAt=t.news_updated)
+            p.write_text(json.dumps(d, ensure_ascii=False, indent=1), "utf-8")
+        except Exception as e:
+            log.warning("themes.json 뉴스 반영 실패: %s", e)
+        log.info("리포트·뉴스 갱신: %d/%d 테마", updated, len(state.themes))
+        return {"ok": True, "updated": updated, "themes": len(state.themes)}
+
+
+async def news_loop() -> None:
+    minutes = settings.news_minutes
+    log.info("리포트·뉴스: %d분 주기", minutes)
+    await asyncio.sleep(5)
+    while True:
+        try:
+            await refresh_news()
+        except Exception as e:
+            log.warning("리포트·뉴스 갱신 실패: %s", e)
+        await asyncio.sleep(minutes * 60)
+
+
 async def refresh_overnight() -> dict:
     """야간 지표를 새로 받아 메모리와 data/overnight.json 에 둔다."""
     async with overnight_lock:
@@ -176,6 +231,8 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(autocollect(), name="autocollect"))
     if settings.overnight_minutes > 0:
         tasks.append(asyncio.create_task(overnight_loop(), name="overnight"))
+    if settings.news_minutes > 0:
+        tasks.append(asyncio.create_task(news_loop(), name="news"))
     try:
         yield
     finally:
@@ -279,6 +336,11 @@ async def api_overnight_refresh():
 @app.post("/api/collect")
 async def api_collect():
     return await run_collect()
+
+
+@app.post("/api/news/refresh")
+async def api_news_refresh():
+    return await refresh_news()
 
 
 @app.post("/api/themes/reload")

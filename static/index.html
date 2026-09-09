@@ -360,7 +360,7 @@ class ServerFeed{
       const th=themes.find(t=>t.id===m.id);if(!th)continue;
       for(const ms of m.stocks){const s=th.stocks.find(x=>x.code===ms.code);if(s)Object.assign(s,{price:ms.price,chg:ms.chg,vol:ms.vol,score:ms.score,flow:ms.flow,cttr:ms.cttr,frgn:ms.frgn,orgn:ms.orgn,src:ms.src,why:ms.why})}
       const prev=this.lastTotal[m.id]??m.total;th.hist.push(Math.max(0,m.total-prev));if(th.hist.length>120)th.hist.shift();this.lastTotal[m.id]=m.total;
-      Object.assign(th,{total:m.total,avg:m.avg,five:m.five,prevFive:m.prevFive,conc:m.conc,width:m.width,heat:m.heat,
+      Object.assign(th,{report:m.report,news:m.news,newsUrl:m.newsUrl,newsAt:m.newsAt,total:m.total,avg:m.avg,five:m.five,prevFive:m.prevFive,conc:m.conc,width:m.width,heat:m.heat,
         leader:th.stocks.find(s=>s.code===m.leader)||th.stocks[0],top:th.stocks.find(s=>s.code===m.top)||th.stocks[0]});
     }
   }
@@ -433,7 +433,7 @@ function build(){
         <span class="heat">활동도 <b data-f="heat"></b><span class="pill accent" data-f="heatpill"></span></span></div>
       <div class="meta"><span>🔥 <b class="num" data-f="total"></b></span><span>5분 <b class="num" data-f="five"></b></span><span>평균 <b class="num" data-f="avg"></b></span><span class="lead">👑 <span data-f="leader"></span></span></div>
       <div class="conc"><span>시장 집중</span><div class="bar"><i data-f="concbar"></i></div><b class="num" data-f="conc"></b></div>
-      <div class="news"><div class="src">${th.report}</div><div>${th.news}</div></div>
+      <div class="news"><div class="src" data-f="report"></div><div data-f="news"></div></div>
       <div class="rows">${rows.map(s=>`<div class="row" data-code="${s.code}">
           <div class="nm" title="${(s.why||'').replace(/"/g,'&quot;')}">${s.name}<span>${s.code}</span></div>
           <div class="px num" data-f="px"></div><div class="chg" data-f="chg"></div>
@@ -454,6 +454,10 @@ function update(){
     f('total').textContent=eok(th.total);f('five').textContent='+'+eok(th.five);
     f('avg').textContent=pct(th.avg);f('avg').className='num '+cls(th.avg);
     f('leader').textContent=th.leader.name;f('conc').textContent=Math.round(th.conc);f('concbar').style.width=clamp(th.conc,2,100)+'%';
+    // 리포트·뉴스 줄은 서버가 주기적으로 바꾸므로 값이 달라졌을 때만 다시 그린다
+    const rp=f('report');if(rp.textContent!==(th.report||''))rp.textContent=th.report||'';
+    const nw=f('news'),key=(th.news||'')+'|'+(th.newsUrl||'');
+    if(nw.dataset.key!==key){nw.dataset.key=key;nw.innerHTML=th.newsUrl?`<a href="${th.newsUrl}" target="_blank" rel="noopener" title="${th.newsAt||''}" style="color:inherit;text-decoration:none">${th.news}</a>`:(th.news||'');}
     const maxAbs=Math.max(...th.stocks.map(s=>Math.abs(s.chg)),0.1);
     const rows=[...th.stocks].sort((a,b)=>b.chg-a.chg).slice(0,K);
     card.querySelectorAll('.row').forEach((row,i)=>{

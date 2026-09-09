@@ -146,15 +146,21 @@ def grade_of(chg: float, width: float) -> str:
 
 
 async def collect(top: int = 12, per: int = 6, min_stocks: int = 3, min_amount_eok: float = 10.0,
-                  candidates: int | None = None, collector: NaverThemeCollector | None = None) -> dict:
+                  candidates: int | None = None, collector: NaverThemeCollector | None = None, enrich: bool = True) -> dict:
     """themes.json 형식의 dict 를 만든다.
 
     - 목록의 등락률 순으로 후보를 훑으며, 거래대금 min_amount_eok 억 이상인 종목이 min_stocks 개 이상인 테마만 채택.
     - 종목은 거래대금 순으로 per 개. 같은 종목이 여러 테마에 걸리면 먼저 채택된(순위 높은) 테마에만 넣는다
       (서버 상태가 종목코드 하나를 테마 하나에만 귀속시키기 때문).
+    - enrich=True 면 증권사 리포트 건수와 대장주 최신 뉴스로 리포트 줄·뉴스 줄을 채운다 (naver_news.py).
     """
     own = collector is None
     c = collector or NaverThemeCollector()
+    news = None
+    if enrich:
+        from app.collectors.naver_news import NaverNews
+
+        news = NaverNews()
     try:
         rows = await c.theme_list()
         rows.sort(key=lambda r: r.chg, reverse=True)
@@ -177,17 +183,23 @@ async def collect(top: int = 12, per: int = 6, min_stocks: int = 3, min_amount_e
             total = len(row.leaders) and (row.up + row.flat + row.down) or 1
             width = row.up / max(1, row.up + row.flat + row.down)
             lead = picked[0]
-            themes.append({
+            theme = {
                 "id": f"nv{row.no}", "no": row.no, "name": row.name,
                 "grade": grade_of(row.chg, width),
-                "report": f"네이버 테마 · 상승 {row.up} · 보합 {row.flat} · 하락 {row.down} · 3일 {row.chg3d:+.2f}%",
+                "report": f"상승 {row.up} · 보합 {row.flat} · 하락 {row.down} · 3일 {row.chg3d:+.2f}%",
                 "news": (lead.name + " — " + lead.why)[:110] if lead.why else "",
                 "chg": row.chg, "chg3d": row.chg3d, "up": row.up, "flat": row.flat, "down": row.down,
                 "stocks": [{"code": s.code, "name": s.name, "ref": s.prev_close, "why": s.why[:140]} for s in picked],
-            })
+            }
+            if news:
+                leader = max(picked, key=lambda s: s.chg)  # 뉴스는 등락률 1위 종목부터
+                theme.update(await news.enrich([(s.code, s.name) for s in picked], leader.code))
+            themes.append(theme)
         return {"_comment": "네이버 금융 테마에서 자동 수집. ref = 수집 시점 현재가로 역산한 전일 종가.",
                 "source": "naver", "collected_at": datetime.now().isoformat(timespec="seconds"),
                 "themes": themes}
     finally:
         if own:
             await c.close()
+        if news:
+            await news.close()

@@ -25,6 +25,10 @@ class Settings:
     collect_top: int = field(default_factory=lambda: int(os.getenv("THEME_COLLECT_TOP", "12")))
     collect_per: int = field(default_factory=lambda: int(os.getenv("THEME_COLLECT_PER", "6")))
 
+    # 리포트·뉴스 줄 갱신 주기(분). 0 이면 테마 수집 때만 채운다.
+    news_minutes: int = field(default_factory=lambda: int(os.getenv("NEWS_MINUTES", "10")))
+    report_days: int = field(default_factory=lambda: int(os.getenv("REPORT_DAYS", "7")))
+
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))
 

@@ -15,6 +15,7 @@ theme-radar/
 │  ├─ collectors/
 │  │  ├─ naver_theme.py  네이버 금융 테마 목록·구성 종목·편입 사유 수집
 │  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
+│  │  ├─ naver_news.py   종목별 증권사 리포트 건수 · 최신 뉴스 (카드의 리포트 줄·뉴스 줄)
 │  │  └─ overnight.py    야간 지표: 전일 20:05 대비 해외 지수·유가·환율 (야후 파이낸스)
 │  ├─ feeds.py           MockFeed(랜덤워크) / KisFeed(REST 초기값 + WebSocket 체결)
 │  ├─ main.py            FastAPI: /api/*, /ws/stream, 정적 파일
@@ -132,6 +133,15 @@ py scripts\collect_themes.py --merge            # 손으로 넣은 테마(id 가
 
 비공식 페이지를 읽는 것이라 구조가 바뀌면 `parse_theme_list` / `parse_theme_detail` 만 고치면 됩니다. 실패하면 이전 `themes.json` 이 그대로 유지됩니다.
 
+## 리포트 줄 · 뉴스 줄 (app/collectors/naver_news.py)
+
+테마 카드의 두 줄을 실제 데이터로 채웁니다.
+
+- **리포트 줄**: 테마 종목 전체의 최근 `REPORT_DAYS`(기본 7)일 증권사 리포트를 네이버 금융 리서치 목록에서 세어 "리포트 7일 3건 · 증권사 2곳 · 최근 미래에셋 09/07" 형식으로 씁니다. 없으면 "리포트 7일 없음".
+- **뉴스 줄**: 등락률 1위 종목(없으면 다음 종목)의 최신 기사 제목을 네이버 종목 뉴스에서 가져와 "종목명 — 제목" 으로 쓰고, 클릭하면 기사로 갑니다. 마우스를 올리면 기사 시각이 보입니다.
+- 테마 수집 때 함께 채우고, 서버가 `NEWS_MINUTES`(기본 10분) 주기로 다시 갱신해 화면과 `themes.json` 에 반영합니다. 즉시 갱신은 `POST /api/news/refresh`.
+- 테마당 요청은 종목 수 + 1 이라 12테마 기준 70~80건, 15초 안팎입니다.
+
 ## 야간 지표 (app/collectors/overnight.py)
 
 "전일 20:05 (NXT 마감) 대비" 표입니다. 나스닥, 코스피200, WTI, 브렌트, 환율, SK하이닉스 GDR, VIX, 달러지수, 금,
@@ -161,7 +171,6 @@ py scripts\probe_kis.py                    # 현재 설정으로 외인 선물 �
 
 ## 아직 비어 있는 것
 
-- **리포트·뉴스 줄**: 수집 테마는 대장주의 편입 사유를, 수동 테마는 정적 문자열을 씁니다. 증권사 리포트 수는 없습니다.
 - **주문**: 의도적으로 넣지 않았습니다. 필요하면 `app/kis/order.py` 로 분리하고 `KIS_ACCOUNT_NO` 를 씁니다.
 
 ## 필드 참고 (H0STCNT0 실시간 체결)
