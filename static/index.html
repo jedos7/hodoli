@@ -631,7 +631,7 @@ function update(){
       const r=n=>row.querySelector(`[data-f="${n}"]`);
       row.classList.toggle('leader',s===th.leader);
       // NXT(프리·애프터장) 체결이 있고 정규장 가격과 다르면 아래 줄에 작게 표시
-      const nxLine=(s.nx&&s.nx!==s.price)?`<span class="nxpx ${cls(s.nxChg||0)}" title="NXT ${s.nxAt||''} 체결 · 정규장 종가 대비">NXT ${s.nx.toLocaleString('ko-KR')} ${s.nxChg!=null?pct(s.nxChg,1):''}</span>`:'';
+      const nxLine=(s.nx&&s.nx!==s.price)?`<span class="nxpx ${cls(s.nxChg||0)}" title="NXT 마지막 체결 ${s.nxAt==='조회'?'(조회값)':s.nxAt||''} · 정규장 가격 대비">NXT ${s.nx.toLocaleString('ko-KR')} ${s.nxChg!=null?pct(s.nxChg,1):''}</span>`:'';
       r('px').innerHTML=won(s.price)+' <span class="'+cls(s.chg)+'">'+arrow(s.chg)+'</span>'+nxLine;
       r('chg').textContent=pct(s.chg);r('chg').className='chg num '+cls(s.chg);
       r('vol').textContent=eok(s.vol);

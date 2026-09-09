@@ -104,6 +104,7 @@ class KiwoomFeed:
         self.ws = KiwoomWebSocket(settings, self.auth, self._on_trade)
         self._task: asyncio.Task | None = None
         self._inv_task: asyncio.Task | None = None
+        self._nx_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         await self._refresh_all(initial=True)
@@ -111,6 +112,21 @@ class KiwoomFeed:
         nx = [c + "_NX" for c in self.state.codes]  # 테마 종목은 NXT(프리·애프터장) 체결도 같이 받는다
         self._task = asyncio.create_task(self.ws.run(self.state.codes + self.state.watch.codes + nx), name="kiwoom-ws")
         self._inv_task = asyncio.create_task(self._investor_loop(), name="kiwoom-investor")
+        self._nx_task = asyncio.create_task(self._seed_nx(), name="kiwoom-nx-seed")
+
+    async def _seed_nx(self) -> None:
+        """NXT 마지막 체결가를 조회(ka10001, 코드_NX)로 채운다. 프리장(08:00~08:50)이 끝난 뒤 켜거나 테마가 바뀌어도
+        카드에 NXT 가격이 보이게. 실시간 NXT 체결이 이미 들어온 종목은 건너뛴다. 시작을 막지 않게 뒤에서 돈다."""
+        for code in self.state.codes:
+            s = self.state.stocks.get(code)
+            if not s or s.nx_price:
+                continue
+            try:
+                b = await self.rest.basic(code + "_NX")
+                if b.price > 0 and b.volume > 0:  # 거래가 있었던 종목만
+                    self.state.update_nx(code, b.price, "조회")
+            except Exception as e:
+                log.debug("NXT 조회 실패 %s: %s", code, e)
 
     async def watch_codes(self, codes: list[str]) -> int:
         """감시 종목이 바뀌었을 때 실시간 구독에 추가한다."""

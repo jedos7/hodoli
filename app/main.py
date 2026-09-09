@@ -134,8 +134,11 @@ async def reload_state() -> None:
     global state
     await stop_feed()
     old_watch = state.watch
+    old_nx = {c: (s.nx_price, s.nx_at) for c, s in state.stocks.items() if s.nx_price}
     state = MarketState.from_file(settings.themes_file)
     state.watch = old_watch  # 감시 목록과 상태는 테마가 바뀌어도 유지
+    for c, (p, at) in old_nx.items():  # 같은 종목이 남아 있으면 NXT 가격도 이어 간다
+        state.update_nx(c, p, at)
     await start_feed()
     await feed.watch_codes(state.watch.codes)
     state.recompute()
