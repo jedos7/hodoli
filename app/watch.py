@@ -49,27 +49,34 @@ class Watchlist:
         return list(self.items)
 
     def load_pullback(self, path: Path, keep_manual: bool = True) -> int:
-        """pullback.json 의 가장 최근 자리(엄선)로 감시 목록을 만든다. 이미 있는 항목은 상태를 유지한다."""
-        if not path.exists():
-            return 0
-        d = json.loads(path.read_text("utf-8"))
-        rows = [r for r in d.get("rows", []) if r.get("strict")]
-        if not rows:
-            return 0
-        latest = max(r["date"] for r in rows)
+        return self.load_setups([(path, "눌림목")], keep_manual)
+
+    def load_setups(self, sources: list[tuple[Path, str]], keep_manual: bool = True) -> int:
+        """스크리너 결과 파일들(pullback.json, hoga.json)의 가장 최근 자리(엄선)로 감시 목록을 만든다.
+        같은 종목이 두 스크리너에 모두 걸리면 먼저 온 소스(눌림목)를 쓴다. 이미 있는 항목은 상태를 유지한다."""
         manual = {c: it for c, it in self.items.items() if it.source == "수동"} if keep_manual else {}
         new: dict[str, WatchItem] = {}
-        for r in rows:
-            if r["date"] != latest or not r.get("entryPrice"):
+        asofs = []
+        for path, source in sources:
+            if not path.exists():
                 continue
-            old = self.items.get(r["code"])
-            if old and old.setup_date == r["date"]:
-                new[r["code"]] = old  # 같은 자리면 상태 유지
-            else:
-                new[r["code"]] = WatchItem(r["code"], r["name"], int(r["entryPrice"]), int(r["stopPrice"]), r["date"], r.get("theme", ""))
+            d = json.loads(path.read_text("utf-8"))
+            rows = [r for r in d.get("rows", []) if r.get("strict") and r.get("entryPrice")]
+            if not rows:
+                continue
+            latest = max(r["date"] for r in rows)
+            asofs.append(str(d.get("asof")))
+            for r in rows:
+                if r["date"] != latest or r["code"] in new:
+                    continue
+                old = self.items.get(r["code"])
+                if old and old.setup_date == r["date"] and old.source == source:
+                    new[r["code"]] = old  # 같은 자리면 상태 유지
+                else:
+                    new[r["code"]] = WatchItem(r["code"], r["name"], int(r["entryPrice"]), int(r["stopPrice"]), r["date"], r.get("theme", ""), source=source)
         new.update(manual)
         self.items = new
-        self.loaded_from = f"{d.get('asof')} · {len(new)}종목"
+        self.loaded_from = f"{max(asofs) if asofs else '-'} · {len(new)}종목"
         return len(new)
 
     def add(self, code: str, name: str, entry: int, stop: int, theme: str = "") -> WatchItem:

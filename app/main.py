@@ -109,7 +109,8 @@ async def broadcaster() -> None:
 
 async def load_watch(reason: str = "") -> int:
     """눌림목 결과(data/pullback.json)의 최신 엄선 자리를 감시 목록에 올리고 실시간 구독에 추가한다."""
-    n = state.watch.load_pullback(settings.data_dir / "pullback.json")
+    # 감시는 눌림목만: 고가놀이는 '다음 날 돌파 매수' 가 오히려 나빠(조합 비교) 돌파 알림의 대상이 아니다
+    n = state.watch.load_setups([(settings.data_dir / "pullback.json", "눌림목")])
     if feed and n:
         await feed.watch_codes(state.watch.codes)
     log.info("돌파 감시 목록 %d종목 (%s)%s", n, state.watch.loaded_from, f" · {reason}" if reason else "")
@@ -299,7 +300,7 @@ scheduler = Scheduler(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.validate()
-    state.watch.load_pullback(settings.data_dir / "pullback.json")  # 피드가 구독할 수 있게 먼저 읽는다
+    state.watch.load_setups([(settings.data_dir / "pullback.json", "눌림목")])  # 피드가 구독할 수 있게 먼저 읽는다
     await start_feed()
     log.info("돌파 감시 목록 %d종목 (%s)", len(state.watch.items), state.watch.loaded_from)
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]

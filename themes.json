@@ -73,7 +73,7 @@
    "newsAt": "2026-09-09 11:18",
    "newsPress": "전자신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:48:32"
+   "updatedAt": "2026-09-09T15:57:43"
   },
   {
    "id": "nv449",
@@ -117,7 +117,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:48:33"
+   "updatedAt": "2026-09-09T15:57:44"
   },
   {
    "id": "nv559",
@@ -187,7 +187,7 @@
    "newsAt": "2026-09-07 14:50",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:48:35"
+   "updatedAt": "2026-09-09T15:57:45"
   },
   {
    "id": "nv178",
@@ -195,7 +195,7 @@
    "name": "전선",
    "grade": "A",
    "report": "리포트 7일 없음",
-   "news": "가온전선 — 캐나다 전력시장 첫 진출…가온전선 18%대 급등[핫종목]",
+   "news": "가온전선 — 가온전선, 캐나다에도 진출",
    "chg": 7.29,
    "chg3d": 1.62,
    "up": 8,
@@ -250,11 +250,11 @@
    ],
    "reportCount": 0,
    "brokers": [],
-   "newsUrl": "https://n.news.naver.com/mnews/article/421/0009159827",
-   "newsAt": "2026-09-09 10:58",
+   "newsUrl": "https://n.news.naver.com/mnews/article/021/0002817550",
+   "newsAt": "2026-09-09 14:53",
    "newsPress": "뉴스1",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:48:37"
+   "updatedAt": "2026-09-09T15:57:47"
   },
   {
    "id": "nv579",
@@ -322,7 +322,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T15:48:39"
+   "updatedAt": "2026-09-09T15:57:49"
   },
   {
    "id": "nv92",
@@ -387,7 +387,7 @@
    "newsAt": "2026-09-09 10:16",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:48:41"
+   "updatedAt": "2026-09-09T15:57:51"
   },
   {
    "id": "nv180",
@@ -454,7 +454,7 @@
    "newsAt": "2026-09-08 14:56",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:48:43"
+   "updatedAt": "2026-09-09T15:57:53"
   },
   {
    "id": "nv608",
@@ -530,7 +530,7 @@
    "newsAt": "2026-09-09 14:14",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T15:48:45"
+   "updatedAt": "2026-09-09T15:57:55"
   },
   {
    "id": "nv472",
@@ -598,7 +598,7 @@
    "newsAt": "2026-09-07 16:46",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:48:47"
+   "updatedAt": "2026-09-09T15:57:57"
   },
   {
    "id": "nv401",
@@ -663,7 +663,7 @@
    "newsAt": "2026-09-09 07:52",
    "newsPress": "SBS Biz",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:48:49"
+   "updatedAt": "2026-09-09T15:57:59"
   },
   {
    "id": "nv405",
@@ -721,7 +721,7 @@
    "newsAt": "2026-09-07 10:08",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T15:48:50"
+   "updatedAt": "2026-09-09T15:58:01"
   },
   {
    "id": "nv503",
@@ -768,7 +768,7 @@
    "newsAt": "2026-09-09 15:03",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T15:48:51"
+   "updatedAt": "2026-09-09T15:58:02"
   }
  ]
 }
