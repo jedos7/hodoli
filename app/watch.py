@@ -61,11 +61,12 @@ class Watchlist:
             if not path.exists():
                 continue
             d = json.loads(path.read_text("utf-8"))
-            rows = [r for r in d.get("rows", []) if r.get("strict") and r.get("entryPrice")]
+            asofs.append(str(d.get("asof")))
+            # 파일의 확정 일봉 날짜(asof) 자리만 감시한다. 며칠 전 자리가 최신이라고 남아 있으면 안 된다.
+            latest = str(d.get("asof") or "")
+            rows = [r for r in d.get("rows", []) if r.get("strict") and r.get("entryPrice") and r["date"] == latest]
             if not rows:
                 continue
-            latest = max(r["date"] for r in rows)
-            asofs.append(str(d.get("asof")))
             for r in rows:
                 if r["date"] != latest or r["code"] in new:
                     continue

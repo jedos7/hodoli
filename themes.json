@@ -73,7 +73,7 @@
    "newsAt": "2026-09-09 11:18",
    "newsPress": "전자신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T16:09:55"
+   "updatedAt": "2026-09-09T17:01:45"
   },
   {
    "id": "nv449",
@@ -81,7 +81,7 @@
    "name": "2차전지(생산)",
    "grade": "A",
    "report": "리포트 7일 없음",
-   "news": "테마 관련 기사 없음",
+   "news": "SK이노베이션 — \"2개월 걸렸다...쉽지 않네\" 2차전지株 '급속충전'",
    "chg": 8.66,
    "chg3d": -0.09,
    "up": 3,
@@ -113,11 +113,11 @@
    ],
    "reportCount": 0,
    "brokers": [],
-   "newsUrl": "",
-   "newsAt": "",
+   "newsUrl": "https://n.news.naver.com/mnews/article/215/0001265423",
+   "newsAt": "2026-09-09 16:25",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T16:09:56"
+   "updatedAt": "2026-09-09T17:01:46"
   },
   {
    "id": "nv559",
@@ -187,7 +187,7 @@
    "newsAt": "2026-09-07 14:50",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T16:09:58"
+   "updatedAt": "2026-09-09T17:01:48"
   },
   {
    "id": "nv178",
@@ -195,7 +195,7 @@
    "name": "전선",
    "grade": "A",
    "report": "리포트 7일 없음",
-   "news": "가온전선 — 가온전선, 캐나다에도 진출",
+   "news": "대원전선 — [ET특징주]가온전선, AI 데이터센터·美 전력망 투자 기대감에 상승세",
    "chg": 7.29,
    "chg3d": 1.62,
    "up": 8,
@@ -250,11 +250,11 @@
    ],
    "reportCount": 0,
    "brokers": [],
-   "newsUrl": "https://n.news.naver.com/mnews/article/021/0002817550",
-   "newsAt": "2026-09-09 14:53",
+   "newsUrl": "https://n.news.naver.com/mnews/article/030/0003464201",
+   "newsAt": "2026-09-07 10:54",
    "newsPress": "뉴스1",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T16:10:00"
+   "updatedAt": "2026-09-09T17:01:50"
   },
   {
    "id": "nv579",
@@ -262,7 +262,7 @@
    "name": "2차전지(나트륨이온)",
    "grade": "A",
    "report": "리포트 7일 없음",
-   "news": "테마 관련 기사 없음",
+   "news": "에코프로비엠 — \"2개월 걸렸다...쉽지 않네\" 2차전지株 '급속충전'",
    "chg": 6.44,
    "chg3d": -0.4,
    "up": 9,
@@ -318,11 +318,11 @@
    ],
    "reportCount": 0,
    "brokers": [],
-   "newsUrl": "",
-   "newsAt": "",
+   "newsUrl": "https://n.news.naver.com/mnews/article/215/0001265423",
+   "newsAt": "2026-09-09 16:25",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-09-09T16:10:02"
+   "updatedAt": "2026-09-09T17:01:52"
   },
   {
    "id": "nv92",
@@ -387,7 +387,7 @@
    "newsAt": "2026-09-09 10:16",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T16:10:03"
+   "updatedAt": "2026-09-09T17:01:54"
   },
   {
    "id": "nv180",
@@ -454,7 +454,7 @@
    "newsAt": "2026-09-08 14:56",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T16:10:05"
+   "updatedAt": "2026-09-09T17:01:56"
   },
   {
    "id": "nv608",
@@ -462,7 +462,7 @@
    "name": "반도체 기판(FC-BGA/PCB/MLB 등)",
    "grade": "A",
    "report": "리포트 7일 3건 · 증권사 3곳 · 최근 대신 09/03",
-   "news": "심텍 — 심텍, 'KPCA쇼 2026'서 AI 반도체용 차세대 기판 기술 공개",
+   "news": "심텍 — 심텍, '국제 반도체 기판 산업전' 참가…AI 기판 기술로 산업부장관상...",
    "chg": 4.3,
    "chg3d": 0.78,
    "up": 13,
@@ -526,11 +526,11 @@
     "iM증권",
     "대신증권"
    ],
-   "newsUrl": "https://n.news.naver.com/mnews/article/293/0000090236",
-   "newsAt": "2026-09-09 16:08",
+   "newsUrl": "https://n.news.naver.com/mnews/article/014/0005573434",
+   "newsAt": "2026-09-09 16:53",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 6,
-   "updatedAt": "2026-09-09T16:10:07"
+   "updatedAt": "2026-09-09T17:01:58"
   },
   {
    "id": "nv472",
@@ -598,7 +598,7 @@
    "newsAt": "2026-09-07 16:46",
    "newsPress": "이데일리",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T16:10:09"
+   "updatedAt": "2026-09-09T17:02:00"
   },
   {
    "id": "nv401",
@@ -663,7 +663,7 @@
    "newsAt": "2026-09-09 07:52",
    "newsPress": "SBS Biz",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T16:10:11"
+   "updatedAt": "2026-09-09T17:02:02"
   },
   {
    "id": "nv405",
@@ -721,7 +721,7 @@
    "newsAt": "2026-09-07 10:08",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-09-09T16:10:13"
+   "updatedAt": "2026-09-09T17:02:04"
   },
   {
    "id": "nv503",
@@ -768,7 +768,7 @@
    "newsAt": "2026-09-09 15:03",
    "newsPress": "매일신문",
    "newsScore": 4,
-   "updatedAt": "2026-09-09T16:10:14"
+   "updatedAt": "2026-09-09T17:02:05"
   }
  ]
 }

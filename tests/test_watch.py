@@ -40,3 +40,6 @@ def test_load_from_pullback_keeps_state_and_manual(tmp_path):
     assert w.items["A"].status == "broke"
     w.load_pullback(p)                                              # 같은 자리 다시 읽어도 상태 유지
     assert w.items["A"].status == "broke" and "M" in w.items
+    # 확정일(asof)이 넘어갔는데 그날 엄선 자리가 없으면 옛 자리는 감시하지 않는다
+    p.write_text(json.dumps({"asof": "20260910", "rows": rows}), "utf-8")
+    assert w.load_pullback(p) == 1 and set(w.codes) == {"M"}
