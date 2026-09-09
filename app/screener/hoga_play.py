@@ -45,10 +45,17 @@ class Setup:
     low: int = 0                             # 자리 날 저가 (손절 기준가)
     fwd: dict[int, float] = field(default_factory=dict)      # 보유일 → 종가 매수 수익률%
     confirm: dict[int, float] = field(default_factory=dict)  # 다음 날 자리 날 고가 돌파 매수 → 보유일 → 수익률%
+    gap: float | None = None                                 # 종가 매수 → 다음 날 시가 매도 수익률% (종가배팅)
 
     @property
     def strict(self) -> bool:
         return not self.reasons
+
+    @property
+    def close_bet(self) -> bool:
+        """종가배팅 적합: 엄선 통과 + 횡보 1일째. 시장 전체 1년 검증에서 이 자리를 종가에 사서 다음 날 시가에 팔면
+        갭 승률 60.8%, 평균 +1.31% (전반 +1.08 / 후반 +1.53). 횡보 2~3일째는 +0.41% 로 약했다."""
+        return self.strict and self.hold_days == 1
 
     def as_dict(self) -> dict:
         return {"date": self.date, "code": self.code, "name": self.name, "theme": self.theme, "spikeDate": self.spike_date,
@@ -56,6 +63,7 @@ class Setup:
                 "vsHighPct": round(self.vs_high_pct, 1), "close": self.close, "amountEok": round(self.amount_eok),
                 "trendDays": self.trend_days, "entryPrice": self.high, "stopPrice": self.low,
                 "riskPct": round((self.high / self.low - 1) * 100, 1) if self.low else None,
+                "closeBet": self.close_bet, "gapPct": None if self.gap is None else round(self.gap, 2),
                 "reasons": self.reasons, "strict": self.strict}
 
 
@@ -121,11 +129,12 @@ def find_setups(
                 entry = max(candles[j + 1].open, last.high)
                 confirm = {h: (candles[j + 1 + h].close / entry - 1) * 100 for h in (1, 3, 5, 10) if j + 1 + h < len(candles)}
             vol_ratio = (sum(w.volume for w in window) / len(window)) / spike.volume if spike.volume else 1.0
+            gap = (candles[j + 1].open / last.close - 1) * 100 if j + 1 < len(candles) and candles[j + 1].open > 0 else None
             out.append(Setup(date=last.date, code=code, name=name, theme=theme, spike_date=spike.date, spike_pct=spike_pct,
                              hold_days=k, box_pct=box, vs_high_pct=vs_high, close=last.close, amount_eok=last.amount / 1e8,
                              reasons=reasons, fwd_ret=fwd, low_up=last.low >= first_low, macd_pos=macd_line[j] > 0,
                              vol_ratio=vol_ratio, trend_days=trend_days, high=last.high, low=last.low,
-                             fwd=fwds, confirm=confirm))
+                             fwd=fwds, confirm=confirm, gap=gap))
     return out
 
 

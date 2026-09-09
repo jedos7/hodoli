@@ -872,11 +872,11 @@ function hgFromServer(d){
   const rows=d.rows.map(r=>{const s=liveStock(r.code);
     return {date:r.date.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3'),name:r.name,theme:r.theme,spikeDate:r.spikeDate.slice(4,6)+'/'+r.spikeDate.slice(6),
       spikePct:r.spikePct,holdDays:r.holdDays,boxPct:r.boxPct,vsHighPct:r.vsHighPct,close:r.close,now:s?s.price:null,todayPct:s?s.chg:null,
-      amountEok:r.amountEok,mktPct:null,themePct:null,stopPrice:r.stopPrice,trendDays:r.trendDays,drop:r.reasons.join(' · ')}});
+      amountEok:r.amountEok,mktPct:null,themePct:null,stopPrice:r.stopPrice,trendDays:r.trendDays,closeBet:r.closeBet,drop:r.reasons.join(' · ')}});
   const n=d.stats.strict.n||1,m=d.stats.all.n||1,days=Math.max(1,Math.round(n/2));
   const src={mock:'합성 일봉',naver:'네이버 일봉',kis:'KIS 일봉'}[d.source]||(d.env==='mock'?'합성 일봉':'서버');
   return {asof:d.asof,recentDays:d.recentDays,source:`${src} · ${d.universe==='market'?'시장 전체':'테마 종목'}${d.stocks?' '+d.stocks+'종목':''}`,
-    stats:{strict:{...d.stats.strict,perDay:+(d.stats.strict.n/250).toFixed(1)},all:{...d.stats.all,perDay:+(d.stats.all.n/250).toFixed(1)}},rows};
+    stats:{strict:{...d.stats.strict,perDay:+(d.stats.strict.n/250).toFixed(1)},all:{...d.stats.all,perDay:+(d.stats.all.n/250).toFixed(1)}},closeBet:d.stats.closeBet||null,rows};
 }
 let hgData=null;
 async function loadHG(){
@@ -891,7 +891,8 @@ function renderHG(){
   $('#hgNotice').innerHTML=`<b>이 창을 믿는 만큼만 믿으십시오.</b><br>${mode==='strict'?'엄선':'전체'} 실측 ${st.n}자리(하루 ${st.perDay}개) — 3일 보유 승률 <span class="stat">${st.win}%</span> · 건당 <span class="stat">${pct(st.avg)}</span> · 기준선 대비 <span class="stat">${st.vsBase>=0?'+':''}${st.vsBase}%p</span> <span style="color:var(--ink-2)">(전반 ${pct(st.h1)} / 후반 ${pct(st.h2)})</span><br>
     · 승률이 절반 근처면 상위 몇 건이 합계를 만듭니다 — 대박 몇 건이 전부인 자리입니다.<br>&nbsp; 그러니 작게 여러 번, 안 되면 바로 자르기가 아니면 이 자리는 오히려 독입니다.<br>
     · 엄선 조건은 횡보 폭 6% 미만 · 급등봉 고가 대비 -3% 이내(고가 밀착) · 저점 상승 · MACD 0선 위 · 추세 짧음(20일 중 20일선 위 10일 미만)입니다. 시장 전체 1년치 조합 비교 결과이며, 처음 값(폭 10%, 고가 대비 -15%)은 기준선을 거의 못 이겼습니다.<br>
-    · 매수는 자리 날 종가나 다음 날 시가입니다. 눌림목과 달리 다음 날 고가 돌파를 기다리면 오히려 성적이 나빴습니다. 손절 기준은 자리 날 저가.<br>· 판정은 <b>완성된 일봉</b>으로만 합니다.`;
+    · 매수는 자리 날 종가나 다음 날 시가입니다. 눌림목과 달리 다음 날 고가 돌파를 기다리면 오히려 성적이 나빴습니다. 손절 기준은 자리 날 저가.<br>
+    ${d.closeBet&&d.closeBet.n?`· <b>종가배팅 적합</b> 표시(엄선 + 횡보 1일째) 자리를 종가에 사서 다음 날 시가에 팔면 ${d.closeBet.n}자리 갭 승률 <span class="stat">${d.closeBet.win}%</span> · 평균 <span class="stat">${pct(d.closeBet.avg)}</span> · 아무 날 대비 +${d.closeBet.vsBase}%p (전반 ${pct(d.closeBet.h1)} / 후반 ${pct(d.closeBet.h2)}). 왕복 비용 약 0.25% 는 빼고 보세요.<br>`:''}· 판정은 <b>완성된 일봉</b>으로만 합니다.`;
   const reasons={};dropped.forEach(r=>r.drop.split(' · ').forEach(x=>{const k=x.replace(/\(.*\)/,'');reasons[k]=(reasons[k]||0)+1}));
   $('#hgExcl').innerHTML=`🔍 <b>${dropped.length}자리를 뺐습니다</b> — ${Object.entries(reasons).map(([k,v])=>k+' '+v+'건').join(' · ')||'없음'}<br>
     가장 최근 ${lastDay?lastDay.slice(5).replace('-','/'):'-'} 에 빠진 ${droppedLast.length}자리 — ${droppedLast.map(r=>`${r.name}(${r.drop})`).join(' · ')||'없음'}<br>
@@ -901,7 +902,7 @@ function renderHG(){
     if(r.date!==day){day=r.date;html+=`<tr class="day"><td colspan="10">${r.date}</td></tr>`}
     const nowChg=r.now?(r.now/r.close-1)*100:null;
     html+=`<tr class="${r.drop?'drop':''}"><td class="n">${r.date.slice(5).replace('-','/')}</td>
-      <td><span class="nm">${r.name}</span><span class="sub">${r.theme}${r.drop?' · '+r.drop:''}</span></td>
+      <td><span class="nm">${r.name}${r.closeBet?' <span class="badge" style="background:var(--good-soft);color:var(--good);font-size:10px;font-weight:700;padding:0 5px;border-radius:3px" title="엄선 + 횡보 1일째: 종가에 사서 다음 날 시가에 팔 때 갭 승률 61%, 평균 +1.3% (1년 검증)">종가배팅 적합</span>':''}</span><span class="sub">${r.theme}${r.drop?' · '+r.drop:''}</span></td>
       <td><span class="n up">${r.spikeDate}</span><span class="sub n up">${pct(r.spikePct,1)}</span></td>
       <td><span class="n">${r.holdDays}일</span><span class="sub n ${r.boxPct<10?'good':''}">${Math.round(r.boxPct)}%</span></td>
       <td class="n">${r.vsHighPct.toFixed(1)}%</td>

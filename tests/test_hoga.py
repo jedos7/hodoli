@@ -27,6 +27,17 @@ def test_spike_then_tight_consolidation_passes():
     assert s1.fwd_ret is not None and s1.fwd_ret > 0
 
 
+def test_close_bet_flag_and_gap():
+    cs = _flat(40) + [_c(1, 10000, 11300, 9950, 11200), _c(2, 11150, 11350, 11000, 11250), _c(3, 11400, 11450, 11100, 11300)]
+    cs += _flat(5, 11500, start_day=10)
+    setups = find_setups(cs, "000001", "테스트", "테마")
+    d1 = next(s for s in setups if s.hold_days == 1)
+    assert d1.strict and d1.close_bet and round(d1.gap, 2) == round((11400 / 11250 - 1) * 100, 2)   # 다음 날 시가 11400
+    d2 = next(s for s in setups if s.hold_days == 2)
+    assert d2.strict and not d2.close_bet
+    assert d1.as_dict()["closeBet"] is True and d1.as_dict()["gapPct"] == round(d1.gap, 2)
+
+
 def test_wide_box_and_falling_low_are_reasons():
     cs = _flat(40)
     cs += [_c(1, 10000, 11300, 9950, 11200)]

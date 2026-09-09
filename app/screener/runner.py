@@ -209,6 +209,8 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
             log.info("장중이라 오늘 봉 %d종목 제외 (완성된 일봉만 판정)", dropped)
 
     base = baseline(candles)
+    gap_rets = [(cs[i + 1].open / cs[i].close - 1) * 100 for cs in candles.values() for i in range(len(cs) - 1) if cs[i].close > 0 and cs[i + 1].open > 0]
+    gap_base = sum(gap_rets) / len(gap_rets) if gap_rets else 0.0   # 아무 날 종가 매수 → 다음 날 시가 (종가배팅 기준선)
     asof = max((cs[-1].date for cs in candles.values() if cs), default=None)
     dates = sorted({c.date for cs in candles.values() for c in cs})
     recent_days = set(dates[-recent:])
@@ -228,9 +230,13 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
         strict = [s for s in setups if s.strict]
         rows = sorted((s for s in setups if s.date in recent_days), key=lambda s: (s.date, -s.amount_eok), reverse=True)
         stats = {"strict": backtest(strict, base), "all": backtest(setups, base), "baseline": round(base, 2)}
-        if setups and hasattr(setups[0], "confirm"):  # 눌림목: 다음 날 고가 돌파 매수 성적도 같이
+        if setups and hasattr(setups[0], "confirm"):  # 다음 날 고가 돌파 매수 성적도 같이
             conf = sorted((s for s in strict if 3 in s.confirm), key=lambda s: s.date)
             stats["strictConfirm"] = backtest([], base, rets=[s.confirm[3] for s in conf])
+        if setups and hasattr(setups[0], "close_bet"):  # 고가놀이: 종가배팅(종가 매수 → 다음 날 시가) 성적
+            cb = sorted((s for s in setups if s.close_bet and s.gap is not None), key=lambda s: s.date)
+            stats["closeBet"] = backtest([], gap_base, rets=[s.gap for s in cb])
+            stats["gapBaseline"] = round(gap_base, 2)
         return meta | {
             "stats": stats,
             "rows": [s.as_dict() for s in rows],
