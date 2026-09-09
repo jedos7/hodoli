@@ -728,7 +728,8 @@ async function loadFoot(){
       const last=j.lastDate?` · 마지막 ${j.lastDate.slice(5).replace('-','/')} ${j.ok===false?'실패':j.ok?'완료':''}`:' · 아직 안 돔';return `${label} ${j.at}${last}`};
     $('#foot').innerHTML=`<span>시세: <b>${h.feed==='KiwoomFeed'?'키움 REST API':h.feed==='KisFeed'?'한국투자증권':'모의'}</b> (${h.env}) · 종목 ${h.stocks}개 · 체결 ${h.tick.toLocaleString('ko-KR')}건</span>
       <span>자동 실행 (평일): ${job('screener','장 마감 후 고가놀이')} · ${job('collect','장 전 테마 수집')}</span>
-      <span>야간 지표 ${h.overnight?.every_minutes||0}분 · 리포트·뉴스 갱신은 서버 설정 주기</span>`;
+      <span>야간 지표 ${h.overnight?.every_minutes||0}분 · 리포트·뉴스 갱신은 서버 설정 주기</span>
+      <span>텔레그램 ${h.telegram?.enabled?`<b style="color:var(--good)">연결됨</b> · 보낸 알림 ${h.telegram.sent}건${h.telegram.lastError?' · <span style="color:var(--up)">오류: '+h.telegram.lastError.slice(0,40)+'</span>':''}`:h.telegram?.hasToken?'채팅 ID 없음 (/api/notify/chatid)':'미설정 (.env TELEGRAM_BOT_TOKEN)'}</span>`;
   }catch(e){}
 }
 if(USE_SERVER){loadFoot();setInterval(loadFoot,60000)}

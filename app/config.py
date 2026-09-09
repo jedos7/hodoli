@@ -53,6 +53,12 @@ class Settings:
     schedule_calendar: str = field(default_factory=lambda: os.getenv("SCHEDULE_CALENDAR", "16:10").strip())  # 일별 테마 달력 (전 종목 일봉, 5분)
     schedule_nxt: str = field(default_factory=lambda: os.getenv("SCHEDULE_NXT", "19:50").strip())            # NXT 하락 마감 종가배팅 후보 알림
 
+    # 텔레그램 알림 (app/notify.py)
+    telegram_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", "").strip())
+    telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", "").strip())
+    notify_kinds: str = field(default_factory=lambda: os.getenv("NOTIFY_KINDS", "brk,stop,nxt"))
+    notify_daily: bool = field(default_factory=lambda: os.getenv("NOTIFY_DAILY", "1").strip() not in ("0", "false", "no", ""))
+
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))
 

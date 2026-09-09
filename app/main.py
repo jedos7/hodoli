@@ -16,6 +16,7 @@
   GET  /api/research          리서치 브리핑 (최근 7일 산업·경제·시황 리포트 요약 + 테마별 목표가 방향). POST /api/research/refresh
   GET  /api/calendar          일별 테마 달력 (거래일별 테마 상위4·중앙값·대표·상위 종목). POST /api/calendar/run, GET /api/calendar/status
   GET  /api/nxtclose          19:50 NXT 하락 마감 종가배팅 후보 (KRX 종가 대비 NXT 가격). POST /api/nxtclose/run 즉시 점검
+  GET  /api/notify            텔레그램 알림 상태 · GET /api/notify/chatid 채팅 ID 찾기 · POST /api/notify/test 테스트 전송
   GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집, 16:10 달력, 19:50 NXT) 상태
   POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
@@ -43,6 +44,7 @@ from app.collectors import overnight as overnight_collector
 from app.collectors.naver_research import briefing as research_briefing
 from app import nxt_close
 from app.events import Events
+from app.notify import notifier
 from app.screener.theme_calendar import build_calendar
 from app.collectors.naver_theme import collect
 from app.config import settings
@@ -113,6 +115,7 @@ async def broadcaster() -> None:
             del alert_log[:-200]
             log.info("알림 %s: %s", a["kind"], a["text"])
             await broadcast({"type": "alert", **a})
+            await notifier.send_alert(a)
         await asyncio.sleep(1.0)
 
 
@@ -286,6 +289,14 @@ async def job_screener() -> dict:
         r = await run_screener("auto", settings.schedule_screener_universe, progress=progress)
         screener_job.update(error=None, rows=r["totalRecent"])
         await load_watch("스케줄 스크리너")
+        if notifier.daily:
+            hs = [x for x in r["rows"] if x["strict"] and x["date"] == r["asof"]]
+            cb = [x for x in hs if x.get("closeBet")]
+            pb = [x for x in r["pullback"]["rows"] if x["strict"] and x["date"] == r["asof"]]
+            lines = [f"📋 스크리너 {r['asof'][4:6]}/{r['asof'][6:]} 확정 · {r['stocks']}종목",
+                     f"고가놀이 엄선 {len(hs)}개" + (f" (종가배팅 적합 {len(cb)}: " + ", ".join(x["name"] for x in cb[:6]) + ")" if cb else ""),
+                     f"눌림목 엄선 {len(pb)}개 → 내일 돌파 감시" + (": " + ", ".join(f"{x['name']} 기준 {x['entryPrice']:,}" for x in pb[:6]) if pb else "")]
+            await notifier.send("\n".join(lines))
         return {"source": r["source"], "universe": r["universe"], "stocks": r["stocks"], "asof": r["asof"], "rows": r["totalRecent"]}
     except Exception as e:
         screener_job.update(error=str(e))
@@ -301,6 +312,8 @@ async def job_collect() -> dict:
         await refresh_research()
     except Exception as e:
         log.warning("리서치 브리핑 갱신 실패: %s", e)
+    if notifier.daily:
+        await notifier.send(f"🌅 테마 수집 완료 · {r['themes']}테마 {r['stocks']}종목\n" + ", ".join(r["names"][:8]) + (" 외" if len(r["names"]) > 8 else ""))
     return {"themes": r["themes"], "stocks": r["stocks"]}
 
 
@@ -392,7 +405,8 @@ def health():
             "feed": type(feed).__name__ if feed else None, "tick": state.tick, "themes": len(state.themes), "stocks": len(state.stocks),
             "clients": len(clients), "collect": last_collect | {"every_minutes": settings.collect_minutes},
             "overnight": {"asof": overnight_data.get("asof"), "base_at": overnight_data.get("base_at"), "every_minutes": settings.overnight_minutes},
-            "schedule": {j.name: {"at": j.at or None, "lastDate": j.last_date, "ok": j.last_result.get("ok")} for j in scheduler.jobs}}
+            "schedule": {j.name: {"at": j.at or None, "lastDate": j.last_date, "ok": j.last_result.get("ok")} for j in scheduler.jobs},
+            "telegram": notifier.status()}
 
 
 @app.get("/api/themes")
@@ -548,6 +562,28 @@ async def api_calendar_run():
 @app.get("/api/calendar/status")
 def api_calendar_status():
     return calendar_job
+
+
+# ── 텔레그램 ──
+@app.get("/api/notify")
+def api_notify_status():
+    return notifier.status()
+
+
+@app.get("/api/notify/chatid")
+async def api_notify_chatid():
+    """봇에게 아무 메시지나 보낸 뒤 호출하면 그 채팅 ID 를 알려 준다 → .env 의 TELEGRAM_CHAT_ID"""
+    return await notifier.find_chat_id()
+
+
+@app.post("/api/notify/test")
+async def api_notify_test():
+    if not notifier.enabled:
+        raise HTTPException(400, "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID 가 비어 있습니다 (.env, 재시작 필요)")
+    ok = await notifier.send("✅ 테마 레이더 텔레그램 연결 확인 " + datetime.now().strftime("%H:%M:%S"))
+    if not ok:
+        raise HTTPException(502, f"전송 실패: {notifier.last_error}")
+    return {"ok": True, "sent": notifier.sent}
 
 
 @app.get("/api/nxtclose")
