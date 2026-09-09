@@ -92,20 +92,70 @@ def is_fresh(at: str, days: int = FRESH_DAYS, now: datetime | None = None) -> bo
     return (now or datetime.now()) - t <= timedelta(days=days)
 
 
-def pick_news(items: list[News], name: str) -> News | None:
-    """종목명이 제목에 있는 기사 우선, 시황성 기사는 뒤로. 점수가 같으면 최신 순(입력 순서)."""
+_STOP = {"등", "관련", "대표주", "생산", "테마", "기타", "및", "국내", "해외", "사업", "업체", "기업", "전문", "제조", "개발", "판매",
+         "주요", "통해", "위한", "대한", "있는", "하는", "으로", "에서", "부문", "분야", "제품", "서비스", "시장", "영위", "보유", "기술",
+         "최초", "글로벌", "확대", "공급", "계열", "종속회사", "종속회사로", "전문업체", "제조업체", "부품업체", "친환경", "고효율", "소자", "장비",
+         "등을", "등의", "등이", "등과", "각종", "주요제품", "체결", "부품", "패키지", "세계"}
+_PARTICLES = ("으로", "에서", "에는", "이며", "하며", "에", "을", "를", "의", "와", "과")  # 로·이·가·도·은·는 은 낱말 끝에도 흔해 뗴지 않는다
+_HANGUL = re.compile(r"[가-힣]")
+
+
+def kw_hit(title: str, kw: str) -> bool:
+    """핵심어가 제목에 '낱말로' 들어 있는가. 양쪽이 모두 한글이면 다른 낱말의 일부로 본다
+    (한국'마이크로'소프트 ✗, AI'반도체'소부장 ✓, '원전'주 ✓)."""
+    start = 0
+    while (i := title.find(kw, start)) != -1:
+        before = title[i - 1] if i > 0 else ""
+        after = title[i + len(kw)] if i + len(kw) < len(title) else ""
+        if not (_HANGUL.match(before) and _HANGUL.match(after)):
+            return True
+        start = i + 1
+    return False
+_TOKEN = re.compile(r"[가-힣A-Za-z0-9]{2,}")
+
+
+def _stem(t: str) -> str:
+    """끝에 붙은 조사를 뗀다 (루멘텀에 → 루멘텀, 공급을 → 공급). 두 글자 이하가 되면 그대로 둔다."""
+    for p in _PARTICLES:
+        if t.endswith(p) and len(t) - len(p) >= 2:
+            return t[: -len(p)]
+    return t
+
+
+def theme_keywords(theme_name: str, whys: list[str] | None = None, max_from_why: int = 6) -> list[str]:
+    """테마명 토큰 + 편입 사유에서 2종목 이상 겹치는 낱말. 뉴스 제목 가점에 쓴다."""
+    kws: list[str] = []
+    for t in _TOKEN.findall(theme_name):
+        if t not in _STOP and t not in kws:
+            kws.append(t)
+    if whys:
+        count: dict[str, int] = {}
+        for w in whys:
+            for t in {_stem(x) for x in _TOKEN.findall(w)}:
+                if len(t) >= 2 and t not in _STOP and not t.isdigit():
+                    count[t] = count.get(t, 0) + 1
+        common = sorted((t for t, c in count.items() if c >= 2 and t not in kws), key=lambda t: (-count[t], -len(t)))
+        kws += common[:max_from_why]
+    return kws
+
+
+def news_score(n: News, name: str, keywords: list[str] | tuple[str, ...] = ()) -> int:
+    """종목명 +2, 테마 핵심어 하나당 +2 (최대 +4), 시황성 -3."""
+    s = 0
+    if name and name in n.title:
+        s += 2
+    hits = sum(1 for k in keywords if kw_hit(n.title, k))
+    s += min(2, hits) * 2
+    if MARKET_WRAP.search(n.title):
+        s -= 3
+    return s
+
+
+def pick_news(items: list[News], name: str, keywords: list[str] | tuple[str, ...] = ()) -> News | None:
+    """점수 높은 기사, 같으면 최신 순(입력 순서)."""
     if not items:
         return None
-
-    def score(n: News) -> int:
-        s = 0
-        if name and name in n.title:
-            s += 2
-        if MARKET_WRAP.search(n.title):
-            s -= 3
-        return s
-
-    return max(items, key=lambda n: (score(n), -items.index(n)))
+    return max(items, key=lambda n: (news_score(n, name, keywords), -items.index(n)))
 
 
 def report_line(reports: list[Report], days: int) -> str:
@@ -137,8 +187,11 @@ class NaverNews:
         await asyncio.sleep(DELAY)
         return parse_news(r.json())
 
-    async def enrich(self, stocks: list[tuple[str, str]], leader_code: str, days: int = 7) -> dict:
-        """stocks = [(code, name)]. 테마 하나의 리포트 줄·뉴스 줄을 만든다. 실패한 종목은 건너뛴다."""
+    async def enrich(self, stocks: list[tuple[str, str]], leader_code: str, days: int = 7,
+                     keywords: list[str] | tuple[str, ...] = ()) -> dict:
+        """stocks = [(code, name)]. 테마 하나의 리포트 줄·뉴스 줄을 만든다. 실패한 종목은 건너뛴다.
+        뉴스는 모든 종목의 최근 기사 중 (테마 핵심어·종목명 가점, 시황 감점) 점수가 가장 높은 것을 고른다.
+        점수가 같으면 대장주 → 다음 종목 순, 그다음 최신 순."""
         reports: list[Report] = []
         for code, _ in stocks:
             try:
@@ -148,9 +201,9 @@ class NaverNews:
         out = {"report": report_line(reports, days), "reportCount": len(reports), "brokers": sorted({r.broker for r in reports}),
                "news": "", "newsUrl": "", "newsAt": ""}
         names = dict(stocks)
-        chosen: tuple[str, News] | None = None   # 최근 FRESH_DAYS 안의 종목 고유 기사
-        latest: tuple[str, News] | None = None   # 대장주 최신 기사 (시황이어도) — 최후 대안
-        for code in [leader_code] + [c for c, _ in stocks if c != leader_code]:
+        cands: list[tuple[int, int, int, str, News]] = []  # (점수, -종목순서, -기사순서, 코드, 기사)
+        latest: tuple[str, News] | None = None             # 대장주 최신 기사 (시황이어도) — 최후 대안
+        for order, code in enumerate([leader_code] + [c for c, _ in stocks if c != leader_code]):
             try:
                 items = await self.news(code, 6)
             except Exception as e:
@@ -159,13 +212,18 @@ class NaverNews:
             if not items:
                 continue
             latest = latest or (code, items[0])
-            best = pick_news(items, names.get(code, ""))
-            if best and not MARKET_WRAP.search(best.title) and is_fresh(best.at):
-                chosen = (code, best)
-                break
-        pick = chosen or latest
-        if pick:
-            code, best = pick
-            out.update(news=f"{names.get(code, '')} — {best.title}", newsUrl=best.url, newsAt=best.at, newsPress=best.press)
+            for idx, n in enumerate(items):
+                if MARKET_WRAP.search(n.title) or not is_fresh(n.at):
+                    continue
+                cands.append((news_score(n, names.get(code, ""), keywords), -order, -idx, code, n))
+        if cands:
+            _, _, _, code, best = max(cands)
+        elif latest:
+            code, best = latest
+        else:
+            code, best = "", None
+        if best:
+            out.update(news=f"{names.get(code, '')} — {best.title}", newsUrl=best.url, newsAt=best.at, newsPress=best.press,
+                       newsScore=max(cands)[0] if cands else None)
         out["updatedAt"] = datetime.now().isoformat(timespec="seconds")
         return out

@@ -149,7 +149,7 @@ news_lock = asyncio.Lock()
 
 async def refresh_news() -> dict:
     """테마마다 리포트 줄·뉴스 줄을 새로 만들고 themes.json 에도 써 둔다 (재시작해도 유지)."""
-    from app.collectors.naver_news import NaverNews
+    from app.collectors.naver_news import NaverNews, theme_keywords
 
     if news_lock.locked():
         raise HTTPException(409, "이미 갱신 중입니다.")
@@ -159,8 +159,9 @@ async def refresh_news() -> dict:
         try:
             for t in state.themes:
                 leader = t.leader or t.stocks[0]
+                kws = theme_keywords(t.name, [s.why for s in t.stocks])
                 try:
-                    x = await nn.enrich([(s.code, s.name) for s in t.stocks], leader.code, settings.report_days)
+                    x = await nn.enrich([(s.code, s.name) for s in t.stocks], leader.code, settings.report_days, keywords=kws)
                 except Exception as e:
                     log.warning("뉴스 갱신 실패 %s: %s", t.name, e)
                     continue

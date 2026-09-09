@@ -192,8 +192,12 @@ async def collect(top: int = 12, per: int = 6, min_stocks: int = 3, min_amount_e
                 "stocks": [{"code": s.code, "name": s.name, "ref": s.prev_close, "why": s.why[:140]} for s in picked],
             }
             if news:
+                from app.collectors.naver_news import theme_keywords
+
                 leader = max(picked, key=lambda s: s.chg)  # 뉴스는 등락률 1위 종목부터
-                theme.update(await news.enrich([(s.code, s.name) for s in picked], leader.code))
+                kws = theme_keywords(row.name, [s.why for s in picked])
+                theme["keywords"] = kws
+                theme.update(await news.enrich([(s.code, s.name) for s in picked], leader.code, keywords=kws))
             themes.append(theme)
         return {"_comment": "네이버 금융 테마에서 자동 수집. ref = 수집 시점 현재가로 역산한 전일 종가.",
                 "source": "naver", "collected_at": datetime.now().isoformat(timespec="seconds"),

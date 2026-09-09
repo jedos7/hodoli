@@ -23,6 +23,33 @@ def test_is_fresh():
     assert not is_fresh("", now=now)
 
 
+def test_theme_keywords():
+    from app.collectors.naver_news import theme_keywords
+
+    kws = theme_keywords("광통신(광케이블/광섬유 등)", ["광케이블 및 광통신 장비 생산업체", "광섬유 기반 광케이블 제조", "통신장비 개발업체"])
+    assert kws[:3] == ["광통신", "광케이블", "광섬유"]   # 테마명 토큰, '등' 은 제외
+    assert "생산" not in kws and "및" not in kws           # 불용어 제외
+
+
+def test_keyword_bonus_beats_unrelated_stock_article():
+    from app.collectors.naver_news import news_score
+
+    kws = ["마이크로", "LED"]
+    unrelated = _n("LG전자 라이프굿 봉사단, 미얀마서 봉사활동")
+    related = _n("LG전자, 마이크로 LED 사이니지 신제품 공개")
+    assert news_score(related, "LG전자", kws) > news_score(unrelated, "LG전자", kws)
+    assert pick_news([unrelated, related], "LG전자", kws) is related
+
+
+def test_kw_hit_word_boundary():
+    from app.collectors.naver_news import kw_hit
+
+    assert not kw_hit("한국마이크로소프트, 30일 코엑스서 인더스트리 서밋 개최", "마이크로")
+    assert kw_hit("LG전자, 마이크로 LED 사이니지 공개", "마이크로")
+    assert kw_hit("신한운용, SOL AI반도체소부장 ETF 순자산 1조", "반도체")
+    assert kw_hit("미 원전 건설 기대에 원전주 급등", "원전")
+
+
 def test_pick_news_falls_back_to_latest_when_all_wrap():
     items = [_n("[마감시황] 코스피 상승"), _n("[개장시황] 코스닥 강세")]
     assert pick_news(items, "심텍").title == "[마감시황] 코스피 상승"
