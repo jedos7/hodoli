@@ -12,6 +12,7 @@ theme-radar/
 │  ├─ config.py          .env → Settings (mock / vts / real 전환, 서버 주소)
 │  ├─ state.py           장중 상태: 종목 시세 → 테마 지표(활동도·5분 유입·대장주·집중도)
 │  ├─ supply.py          수급 점수: 체결강도 + 외인·기관 순매수 + 대금 가속
+│  ├─ scheduler.py       하루 한 번 자동 실행 (장 마감 후 스크리너, 장 전 테마 수집)
 │  ├─ collectors/
 │  │  ├─ naver_theme.py  네이버 금융 테마 목록·구성 종목·편입 사유 수집
 │  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
@@ -126,6 +127,20 @@ py scripts\fetch_daily.py --universe market     # 시장 전체
 서버가 떠 있으면 고가놀이 창 오른쪽 위 **다시 찾기** 버튼(범위 선택 가능)으로 같은 일을 백그라운드로 돌리고, 진행률이 표시된 뒤 표가 갱신됩니다.
 API 로는 `POST /api/screener/run?source=naver&universe=market`, 진행은 `GET /api/screener/status`.
 장 마감 후 하루 한 번 돌리는 것이 맞고, 장중에 돌리면 오늘 봉이 미완성인 채로 들어가므로 '자리 잡은 날' 판정에 오늘은 쓰지 않는 게 안전합니다.
+
+## 하루 한 번 자동 실행 (app/scheduler.py)
+
+서버가 떠 있는 동안 평일에 정해진 시각에 돌립니다. 시각은 `.env` 로 바꾸고, 비우면 끕니다.
+
+| 작업 | 기본 | 하는 일 |
+|---|---|---|
+| `SCHEDULE_SCREENER` | 15:45 | 장 마감 후 확정 일봉으로 고가놀이 다시 찾기. 범위는 `SCHEDULE_SCREENER_UNIVERSE` (기본 market) |
+| `SCHEDULE_COLLECT` | 08:50 | 장 시작 전 네이버 테마 재수집 + 리포트·뉴스 갱신 → 화면 즉시 반영 |
+
+- 서버를 시각 뒤에 켜도 그날 아직 안 돌았으면 바로 따라잡습니다. 마지막 실행일은 `data/schedule.json` 에 남아 같은 날 두 번 돌지 않습니다.
+- 상태는 `GET /api/schedule`, 화면 맨 아래 줄에도 "마지막 09/09 완료" 식으로 보입니다. 지금 바로 돌리려면 `POST /api/schedule/run/screener` 또는 `.../collect`.
+- 서버를 켜 두지 않는 날은 돌지 않습니다. PC 를 켜 둘 수 없다면 Windows 작업 스케줄러에 `py scripts\fetch_daily.py --source kiwoom --universe market` 을 등록하는 방법도 있습니다.
+- 공휴일에는 일봉이 새로 생기지 않으니 스크리너 결과가 전날과 같게 나옵니다. 오류는 아닙니다.
 
 ## 수급 점수 (app/supply.py)
 

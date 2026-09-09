@@ -46,6 +46,11 @@ class Settings:
     news_minutes: int = field(default_factory=lambda: int(os.getenv("NEWS_MINUTES", "10")))
     report_days: int = field(default_factory=lambda: int(os.getenv("REPORT_DAYS", "7")))
 
+    # 하루 한 번 자동 실행 (HH:MM, 비우면 끔). screener = 장 마감 후 고가놀이, collect = 장 전 테마 재수집+뉴스
+    schedule_screener: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER", "15:45").strip())
+    schedule_screener_universe: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER_UNIVERSE", "market").strip())
+    schedule_collect: str = field(default_factory=lambda: os.getenv("SCHEDULE_COLLECT", "08:50").strip())
+
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))
 

@@ -272,7 +272,7 @@ table.hg tr.drop td{opacity:.55}
     <div class="ft">'고가대비'는 급등봉 고가에서 얼마나 내려와 있나입니다 (0%에 가까울수록 고가에 붙어 있음). '횡보 폭'은 급등 후 봉들의 고저 범위이며, 좁을수록 매물 소화가 잘 된 자리입니다. 판정은 <b>완성된 일봉</b>으로만 합니다 — 장중 값으로는 자리를 새로 잡지 않습니다. 통계는 <b>모의 백테스트</b>이며 실제 성과가 아닙니다.</div>
   </div>
 </div>
-<div class="foot"><span>가격·대금·수급은 모두 <b>모의 데이터</b>이며 실제 시세가 아닙니다.</span><span>1틱 = 1초, 5분 유입은 60틱 기준으로 가속 계산.</span><span>실데이터 연결 지점: <code>Feed</code> 클래스 (한국투자증권 Open API WebSocket 등으로 교체).</span></div>
+<div class="foot" id="foot"><span>가격·대금·수급은 모두 <b>모의 데이터</b>이며 실제 시세가 아닙니다.</span><span>1틱 = 1초, 5분 유입은 60틱 기준으로 가속 계산.</span><span>실데이터 연결 지점: <code>Feed</code> 클래스 (키움 REST API · 한국투자증권 Open API).</span></div>
 
 <script>
 /* ───────────────────────── 데이터 정의 (모의) ───────────────────────── */
@@ -561,6 +561,17 @@ async function loadOvn(){
   }catch(e){}
 }
 if(USE_SERVER){loadOvn();setInterval(loadOvn,60000)}
+// 하단: 서버 모드면 증권사·자동 실행 상태를 보여준다
+async function loadFoot(){
+  try{const h=await (await fetch('/api/health')).json();const s=h.schedule||{};
+    const job=(k,label)=>{const j=s[k];if(!j)return '';if(!j.at)return `${label} 꺼짐`;
+      const last=j.lastDate?` · 마지막 ${j.lastDate.slice(5).replace('-','/')} ${j.ok===false?'실패':j.ok?'완료':''}`:' · 아직 안 돔';return `${label} ${j.at}${last}`};
+    $('#foot').innerHTML=`<span>시세: <b>${h.feed==='KiwoomFeed'?'키움 REST API':h.feed==='KisFeed'?'한국투자증권':'모의'}</b> (${h.env}) · 종목 ${h.stocks}개 · 체결 ${h.tick.toLocaleString('ko-KR')}건</span>
+      <span>자동 실행 (평일): ${job('screener','장 마감 후 고가놀이')} · ${job('collect','장 전 테마 수집')}</span>
+      <span>야간 지표 ${h.overnight?.every_minutes||0}분 · 리포트·뉴스 갱신은 서버 설정 주기</span>`;
+  }catch(e){}
+}
+if(USE_SERVER){loadFoot();setInterval(loadFoot,60000)}
 function renderTicker(){
   const all=themes.flatMap(t=>t.stocks).sort((a,b)=>b.vol-a.vol).slice(0,20);
   const html=all.map(s=>`<span><b>${s.name}</b><span class="num ${cls(s.chg)}">${pct(s.chg)}</span><span class="num" style="color:var(--ink-3)">${eok(s.vol)}</span></span>`).join('');

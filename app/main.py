@@ -8,6 +8,8 @@
   GET  /api/screener/hoga     고가놀이 결과 (data/hoga.json)
   POST /api/screener/run      일봉을 받아 고가놀이 다시 찾기 (?source=naver|kis|mock&universe=themes|market), 백그라운드
   GET  /api/screener/status   다시 찾기 진행 상황
+  GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집) 상태
+  POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
   POST /api/overnight/refresh 야간 지표 즉시 갱신
   POST /api/collect           네이버 테마 수집 → themes.json 갱신 → 즉시 반영
@@ -33,6 +35,7 @@ from app.collectors.naver_theme import collect
 from app.config import settings
 from app.feeds import KisFeed, KiwoomFeed, MockFeed
 from app.kis.futures import KisFutures
+from app.scheduler import Job, Scheduler
 from app.screener.runner import run_screener
 from app.state import MarketState
 
@@ -234,11 +237,43 @@ async def overnight_loop() -> None:
         await asyncio.sleep(minutes * 60)
 
 
+async def job_screener() -> dict:
+    """스케줄용: 증권사 일봉(auto)으로 고가놀이 다시 찾기. /api/screener/status 에도 진행이 보인다."""
+    if screener_job["running"]:
+        raise RuntimeError("스크리너가 이미 실행 중")
+    screener_job.update(running=True, done=0, total=0, current="스케줄 실행", startedAt=datetime.now().isoformat(timespec="seconds"),
+                        finishedAt=None, error=None, source="auto", universe=settings.schedule_screener_universe)
+    try:
+        def progress(i, n, name):
+            screener_job.update(done=i, total=n, current=name)
+
+        r = await run_screener("auto", settings.schedule_screener_universe, progress=progress)
+        screener_job.update(error=None, rows=r["totalRecent"])
+        return {"source": r["source"], "universe": r["universe"], "stocks": r["stocks"], "asof": r["asof"], "rows": r["totalRecent"]}
+    except Exception as e:
+        screener_job.update(error=str(e))
+        raise
+    finally:
+        screener_job.update(running=False, finishedAt=datetime.now().isoformat(timespec="seconds"))
+
+
+async def job_collect() -> dict:
+    """스케줄용: 테마 재수집(리포트·뉴스 포함) → 반영."""
+    r = await run_collect()
+    return {"themes": r["themes"], "stocks": r["stocks"]}
+
+
+scheduler = Scheduler(
+    [Job("screener", settings.schedule_screener, job_screener), Job("collect", settings.schedule_collect, job_collect)],
+    settings.data_dir / "schedule.json",
+)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.validate()
     await start_feed()
-    tasks = [asyncio.create_task(broadcaster(), name="broadcaster")]
+    tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
     if settings.collect_minutes > 0:
         tasks.append(asyncio.create_task(autocollect(), name="autocollect"))
     if settings.overnight_minutes > 0:
@@ -262,7 +297,8 @@ def health():
     return {"ok": True, "broker": settings.broker, "env": settings.kiwoom_env if settings.broker == "kiwoom" else settings.env,
             "feed": type(feed).__name__ if feed else None, "tick": state.tick, "themes": len(state.themes), "stocks": len(state.stocks),
             "clients": len(clients), "collect": last_collect | {"every_minutes": settings.collect_minutes},
-            "overnight": {"asof": overnight_data.get("asof"), "base_at": overnight_data.get("base_at"), "every_minutes": settings.overnight_minutes}}
+            "overnight": {"asof": overnight_data.get("asof"), "base_at": overnight_data.get("base_at"), "every_minutes": settings.overnight_minutes},
+            "schedule": {j.name: {"at": j.at or None, "lastDate": j.last_date, "ok": j.last_result.get("ok")} for j in scheduler.jobs}}
 
 
 @app.get("/api/themes")
@@ -328,6 +364,24 @@ async def api_screener_run(source: str = "naver", universe: str = "themes", min_
 @app.get("/api/screener/status")
 def api_screener_status():
     return screener_job
+
+
+# ── 스케줄 ─────────────────────────────────────────────────────
+@app.get("/api/schedule")
+def api_schedule():
+    return scheduler.status()
+
+
+@app.post("/api/schedule/run/{name}")
+async def api_schedule_run(name: str):
+    """스케줄 작업을 지금 바로 실행 (백그라운드). 결과는 /api/schedule 의 lastResult 에."""
+    job = next((j for j in scheduler.jobs if j.name == name), None)
+    if not job:
+        raise HTTPException(404, f"모르는 작업: {name} (screener | collect)")
+    if job.running:
+        raise HTTPException(409, "이미 실행 중입니다.")
+    asyncio.create_task(scheduler.run_job(job, force=True), name=f"schedule-{name}")
+    return {"ok": True, "started": name}
 
 
 @app.get("/api/overnight")
