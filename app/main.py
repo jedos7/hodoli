@@ -166,8 +166,7 @@ async def refresh_news() -> dict:
                     log.warning("뉴스 갱신 실패 %s: %s", t.name, e)
                     continue
                 t.report, t.news_updated = x["report"], x["updatedAt"]
-                if x["news"]:
-                    t.news, t.news_url, t.news_at = x["news"], x["newsUrl"], x["newsAt"]
+                t.news, t.news_url, t.news_at = x["news"], x["newsUrl"], x["newsAt"]
                 updated += 1
         finally:
             await nn.close()

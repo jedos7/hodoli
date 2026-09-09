@@ -50,6 +50,16 @@ def test_kw_hit_word_boundary():
     assert kw_hit("미 원전 건설 기대에 원전주 급등", "원전")
 
 
+def test_is_related():
+    from app.collectors.naver_news import is_related
+
+    kws = ["마이크로", "LED"]
+    assert not is_related(_n("LG전자 라이프굿 봉사단, 미얀마서 봉사활동"), "LG전자", kws)   # 종목명만, 재료 단서 없음
+    assert is_related(_n("LG전자, 마이크로 LED 사이니지 공개"), "LG전자", kws)             # 핵심어
+    assert is_related(_n("가온전선, 캐나다 전력시장 진출 17%↑[특징주]"), "가온전선", ["전선"])  # 핵심어(낱말 경계) + 단서
+    assert is_related(_n("두산퓨얼셀, 주가 13% 급등…데이터센터 기대감"), "두산퓨얼셀", ["연료전지", "SOFC"])  # 종목명 + 급등
+
+
 def test_pick_news_falls_back_to_latest_when_all_wrap():
     items = [_n("[마감시황] 코스피 상승"), _n("[개장시황] 코스닥 강세")]
     assert pick_news(items, "심텍").title == "[마감시황] 코스피 상승"

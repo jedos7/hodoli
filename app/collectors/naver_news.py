@@ -1,5 +1,11 @@
 """종목별 증권사 리포트 · 뉴스 (네이버 금융). 테마 카드의 '리포트 줄' 과 '뉴스 줄' 을 채운다.
 
+뉴스 줄 규칙 요약
+  후보  = 테마 종목들의 최근 6건씩 중, 시황·마감 기사가 아니고, 3일 안이며, '관련' 인 것
+  관련  = 테마 핵심어가 제목에 낱말로 들어 있거나, 종목명 + 재료 단서(급등·수주·계약·목표가…)가 같이 있는 것
+  선택  = 점수(종목명 +2, 핵심어당 +2 최대 +4) 최고 → 대장주 순 → 최신 순
+  없음  = "테마 관련 기사 없음" (링크 없음)
+
 리포트: https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemCode=005930
         표 = 종목명 · 제목 · 증권사 · 첨부 · 작성일(YY.MM.DD). 최근 N일만 센다.
 뉴스:   https://m.stock.naver.com/api/news/stock/005930?pageSize=3&page=1
@@ -139,6 +145,17 @@ def theme_keywords(theme_name: str, whys: list[str] | None = None, max_from_why:
     return kws
 
 
+NO_NEWS = "테마 관련 기사 없음"
+# 종목명만 있는 기사도 '재료' 냄새가 나면 관련 기사로 친다 (봉사활동·인사 같은 기사는 걸러진다)
+CUE = re.compile(r"급등|급락|상한가|특징주|수주|계약|공급|목표가|실적|상향|하향|진출|투자|양산|승인|허가|인수|합병|유증|증자")  # 출시·신제품은 셋톱박스 출시 같은 일상 기사가 걸려 뺐다
+
+
+def is_related(n: News, name: str, keywords: list[str] | tuple[str, ...]) -> bool:
+    if any(kw_hit(n.title, k) for k in keywords):
+        return True
+    return bool(name and name in n.title and CUE.search(n.title))
+
+
 def news_score(n: News, name: str, keywords: list[str] | tuple[str, ...] = ()) -> int:
     """종목명 +2, 테마 핵심어 하나당 +2 (최대 +4), 시황성 -3."""
     s = 0
@@ -202,28 +219,21 @@ class NaverNews:
                "news": "", "newsUrl": "", "newsAt": ""}
         names = dict(stocks)
         cands: list[tuple[int, int, int, str, News]] = []  # (점수, -종목순서, -기사순서, 코드, 기사)
-        latest: tuple[str, News] | None = None             # 대장주 최신 기사 (시황이어도) — 최후 대안
         for order, code in enumerate([leader_code] + [c for c, _ in stocks if c != leader_code]):
             try:
                 items = await self.news(code, 6)
             except Exception as e:
                 log.debug("뉴스 실패 %s: %s", code, e)
                 continue
-            if not items:
-                continue
-            latest = latest or (code, items[0])
+            nm = names.get(code, "")
             for idx, n in enumerate(items):
-                if MARKET_WRAP.search(n.title) or not is_fresh(n.at):
+                if MARKET_WRAP.search(n.title) or not is_fresh(n.at) or not is_related(n, nm, keywords):
                     continue
-                cands.append((news_score(n, names.get(code, ""), keywords), -order, -idx, code, n))
+                cands.append((news_score(n, nm, keywords), -order, -idx, code, n))
         if cands:
-            _, _, _, code, best = max(cands)
-        elif latest:
-            code, best = latest
+            score, _, _, code, best = max(cands)
+            out.update(news=f"{names.get(code, '')} — {best.title}", newsUrl=best.url, newsAt=best.at, newsPress=best.press, newsScore=score)
         else:
-            code, best = "", None
-        if best:
-            out.update(news=f"{names.get(code, '')} — {best.title}", newsUrl=best.url, newsAt=best.at, newsPress=best.press,
-                       newsScore=max(cands)[0] if cands else None)
+            out.update(news=NO_NEWS, newsUrl="", newsAt="", newsPress="", newsScore=None)
         out["updatedAt"] = datetime.now().isoformat(timespec="seconds")
         return out
