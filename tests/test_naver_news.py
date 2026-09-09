@@ -1,4 +1,21 @@
-from app.collectors.naver_news import Report, parse_news, parse_reports, report_line
+from app.collectors.naver_news import News, Report, parse_news, parse_reports, pick_news, report_line
+
+
+def _n(title, at="2026-09-09 12:00"):
+    return News(title, "언론", at, "https://x")
+
+
+def test_pick_news_prefers_stock_specific_over_market_wrap():
+    items = [_n("[이 시각 시황] 코스피 7000 재돌파…전력주 강세"),            # 최신이지만 시황
+             _n("개인 팔자, 기관 사자…코스피 7100 공방전[장중시황]"),
+             _n("심텍, 유리기판 시제품 공급 개시…목표가 상향", "2026-09-09 09:00")]
+    assert pick_news(items, "심텍").title.startswith("심텍, 유리기판")
+
+
+def test_pick_news_falls_back_to_latest_when_all_wrap():
+    items = [_n("[마감시황] 코스피 상승"), _n("[개장시황] 코스닥 강세")]
+    assert pick_news(items, "심텍").title == "[마감시황] 코스피 상승"
+    assert pick_news([], "심텍") is None
 
 RESEARCH = """
 <tr>
