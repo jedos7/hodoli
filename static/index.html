@@ -666,7 +666,8 @@ if(USE_SERVER){$('#hgRunBox').hidden=false;
     $('#hgStatus').textContent=s.finishedAt?'완료 '+s.finishedAt.slice(11,16):'';hgData=await loadHG();renderHG()};
   $('#hgRun').addEventListener('click',async()=>{
     $('#hgRun').disabled=true;$('#hgStatus').textContent='시작…';
-    const r=await fetch(`/api/screener/run?source=naver&universe=${$('#hgUniverse').value}`,{method:'POST'});
+    // source=auto: 서버가 증권사 일봉(kiwoom/kis)을 쓰고, 모의 모드면 네이버 일봉을 쓴다
+    const r=await fetch(`/api/screener/run?source=auto&universe=${$('#hgUniverse').value}`,{method:'POST'});
     if(!r.ok){$('#hgStatus').textContent=(await r.json()).detail||('오류 '+r.status);$('#hgRun').disabled=false;return}
     poll()});
   fetch('/api/screener/status').then(r=>r.json()).then(s=>{if(s.running){$('#hgRun').disabled=true;poll()}}).catch(()=>{});
