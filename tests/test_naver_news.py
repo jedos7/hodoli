@@ -12,6 +12,17 @@ def test_pick_news_prefers_stock_specific_over_market_wrap():
     assert pick_news(items, "심텍").title.startswith("심텍, 유리기판")
 
 
+def test_is_fresh():
+    from datetime import datetime
+
+    from app.collectors.naver_news import is_fresh
+
+    now = datetime(2026, 9, 9, 13, 0)
+    assert is_fresh("2026-09-08 10:00", now=now)
+    assert not is_fresh("2026-08-14 08:37", now=now)
+    assert not is_fresh("", now=now)
+
+
 def test_pick_news_falls_back_to_latest_when_all_wrap():
     items = [_n("[마감시황] 코스피 상승"), _n("[개장시황] 코스닥 강세")]
     assert pick_news(items, "심텍").title == "[마감시황] 코스피 상승"

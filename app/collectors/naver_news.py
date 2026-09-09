@@ -81,6 +81,17 @@ def parse_news(payload: list | dict) -> list[News]:
 MARKET_WRAP = re.compile(r"시황|코스피|코스닥|증시|양대\s*지수|마감|개장|외국인.*순매[수도]|데이터랩|거래\s*상위|주말머니|주간\s*전망|오늘의\s*증권|이 시각")
 
 
+FRESH_DAYS = 3  # 이보다 오래된 종목 기사라면 차라리 최신 시황 기사를 쓴다
+
+
+def is_fresh(at: str, days: int = FRESH_DAYS, now: datetime | None = None) -> bool:
+    try:
+        t = datetime.strptime(at[:16], "%Y-%m-%d %H:%M")
+    except ValueError:
+        return False
+    return (now or datetime.now()) - t <= timedelta(days=days)
+
+
 def pick_news(items: list[News], name: str) -> News | None:
     """종목명이 제목에 있는 기사 우선, 시황성 기사는 뒤로. 점수가 같으면 최신 순(입력 순서)."""
     if not items:
@@ -137,22 +148,24 @@ class NaverNews:
         out = {"report": report_line(reports, days), "reportCount": len(reports), "brokers": sorted({r.broker for r in reports}),
                "news": "", "newsUrl": "", "newsAt": ""}
         names = dict(stocks)
-        fallback: tuple[str, News] | None = None
+        chosen: tuple[str, News] | None = None   # 최근 FRESH_DAYS 안의 종목 고유 기사
+        latest: tuple[str, News] | None = None   # 대장주 최신 기사 (시황이어도) — 최후 대안
         for code in [leader_code] + [c for c, _ in stocks if c != leader_code]:
             try:
                 items = await self.news(code, 6)
             except Exception as e:
                 log.debug("뉴스 실패 %s: %s", code, e)
                 continue
-            best = pick_news(items, names.get(code, ""))
-            if not best:
+            if not items:
                 continue
-            if not MARKET_WRAP.search(best.title):  # 종목 고유 기사를 찾으면 확정
-                fallback = (code, best)
+            latest = latest or (code, items[0])
+            best = pick_news(items, names.get(code, ""))
+            if best and not MARKET_WRAP.search(best.title) and is_fresh(best.at):
+                chosen = (code, best)
                 break
-            fallback = fallback or (code, best)  # 시황 기사뿐이면 일단 기억하고 다음 종목도 본다
-        if fallback:
-            code, best = fallback
+        pick = chosen or latest
+        if pick:
+            code, best = pick
             out.update(news=f"{names.get(code, '')} — {best.title}", newsUrl=best.url, newsAt=best.at, newsPress=best.press)
         out["updatedAt"] = datetime.now().isoformat(timespec="seconds")
         return out
