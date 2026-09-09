@@ -260,7 +260,10 @@ table.hg tr.drop td{opacity:.55}
 <div class="modal" id="hgModal" hidden>
   <div class="dlg" role="dialog" aria-labelledby="hgTitle">
     <div class="hd"><h2 id="hgTitle">▶ 고가놀이 <span>— 터뜨리고 버티며 저점을 높이는 자리</span></h2><button class="x" id="hgClose">닫기</button></div>
-    <div class="bar"><label>고르기 <select id="hgFilter"><option value="strict">엄선 — 횡보 좁음 + 저점 상승 + MACD</option><option value="all">전체</option></select></label><span id="hgCount"></span></div>
+    <div class="bar"><label>고르기 <select id="hgFilter"><option value="strict">엄선 — 횡보 좁음 + 저점 상승 + MACD</option><option value="all">전체</option></select></label><span id="hgCount"></span>
+      <span id="hgRunBox" hidden style="margin-left:auto;display:inline-flex;gap:6px;align-items:center"><span id="hgStatus" style="color:var(--ink-3)"></span>
+        <select id="hgUniverse" title="찾을 범위"><option value="themes">테마 종목</option><option value="market">시장 전체 (거래대금 30억↑)</option></select>
+        <button class="btn primary" id="hgRun" style="border:0;background:var(--down);color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:600">다시 찾기</button></span></div>
     <div class="notice" id="hgNotice"></div>
     <div class="excl" id="hgExcl"></div>
     <div class="tblwrap"><table class="hg"><thead><tr><th>자리 잡은 날</th><th>종목</th><th>급등일</th><th>횡보 일·폭</th><th>고가대비</th><th>일봉 종가</th><th>지금</th><th>오늘</th><th>대금</th><th>시장·테마</th></tr></thead><tbody id="hgBody"></tbody></table></div>
@@ -609,7 +612,8 @@ function hgFromServer(d){
       spikePct:r.spikePct,holdDays:r.holdDays,boxPct:r.boxPct,vsHighPct:r.vsHighPct,close:r.close,now:s?s.price:null,todayPct:s?s.chg:null,
       amountEok:r.amountEok,mktPct:null,themePct:null,drop:r.reasons.join(' · ')}});
   const n=d.stats.strict.n||1,m=d.stats.all.n||1,days=Math.max(1,Math.round(n/2));
-  return {asof:d.asof,recentDays:d.recentDays,source:d.env==='mock'?'서버(합성 일봉)':'서버',
+  const src={mock:'합성 일봉',naver:'네이버 일봉',kis:'KIS 일봉'}[d.source]||(d.env==='mock'?'합성 일봉':'서버');
+  return {asof:d.asof,recentDays:d.recentDays,source:`${src} · ${d.universe==='market'?'시장 전체':'테마 종목'}${d.stocks?' '+d.stocks+'종목':''}`,
     stats:{strict:{...d.stats.strict,perDay:+(d.stats.strict.n/250).toFixed(1)},all:{...d.stats.all,perDay:+(d.stats.all.n/250).toFixed(1)}},rows};
 }
 let hgData=null;
@@ -647,6 +651,22 @@ function renderHG(){
   $('#hgBody').innerHTML=html||'<tr><td colspan="10" style="text-align:center;color:var(--ink-3)">최근 거래일에 자리가 없습니다.</td></tr>';
 }
 $('#hgBtn').addEventListener('click',async()=>{$('#hgModal').hidden=false;$('#hgClose').focus();hgData=await loadHG();renderHG()});
+// 다시 찾기: 서버가 일봉을 새로 받아 스크리너를 돌린다 (백그라운드). 진행률을 폴링하다 끝나면 표를 다시 읽는다.
+if(USE_SERVER){$('#hgRunBox').hidden=false;
+  try{const u=localStorage.getItem('hgUniverse');if(u)$('#hgUniverse').value=u}catch(e){}
+  $('#hgUniverse').addEventListener('change',()=>{try{localStorage.setItem('hgUniverse',$('#hgUniverse').value)}catch(e){}});
+  const poll=async()=>{const s=await (await fetch('/api/screener/status')).json();
+    if(s.running){$('#hgStatus').textContent=s.total?`${s.done}/${s.total} ${s.current}`:s.current;setTimeout(poll,1500);return}
+    $('#hgRun').disabled=false;
+    if(s.error){$('#hgStatus').textContent='실패: '+s.error;return}
+    $('#hgStatus').textContent=s.finishedAt?'완료 '+s.finishedAt.slice(11,16):'';hgData=await loadHG();renderHG()};
+  $('#hgRun').addEventListener('click',async()=>{
+    $('#hgRun').disabled=true;$('#hgStatus').textContent='시작…';
+    const r=await fetch(`/api/screener/run?source=naver&universe=${$('#hgUniverse').value}`,{method:'POST'});
+    if(!r.ok){$('#hgStatus').textContent=(await r.json()).detail||('오류 '+r.status);$('#hgRun').disabled=false;return}
+    poll()});
+  fetch('/api/screener/status').then(r=>r.json()).then(s=>{if(s.running){$('#hgRun').disabled=true;poll()}}).catch(()=>{});
+}
 $('#hgClose').addEventListener('click',()=>{$('#hgModal').hidden=true;$('#hgBtn').focus()});
 // 테마 수집 (서버 피드일 때만). 서버가 themes.json 을 갱신하고 snapshot 을 다시 보내 화면이 통째로 바뀐다.
 if(USE_SERVER){const b=$('#collectBtn');b.hidden=false;b.addEventListener('click',async()=>{

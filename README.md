@@ -14,6 +14,7 @@ theme-radar/
 │  ├─ supply.py          수급 점수: 체결강도 + 외인·기관 순매수 + 대금 가속
 │  ├─ collectors/
 │  │  ├─ naver_theme.py  네이버 금융 테마 목록·구성 종목·편입 사유 수집
+│  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
 │  │  └─ overnight.py    야간 지표: 전일 20:05 대비 해외 지수·유가·환율 (야후 파이낸스)
 │  ├─ feeds.py           MockFeed(랜덤워크) / KisFeed(REST 초기값 + WebSocket 체결)
 │  ├─ main.py            FastAPI: /api/*, /ws/stream, 정적 파일
@@ -25,7 +26,8 @@ theme-radar/
 │  │  └─ parse.py        '0|H0STCNT0|n|a^b^c…' 텍스트 → Trade
 │  └─ screener/
 │     ├─ indicators.py   EMA · MACD
-│     └─ hoga_play.py    고가놀이 판정 + 3일 보유 백테스트
+│     ├─ hoga_play.py    고가놀이 판정 + 3일 보유 백테스트
+│     └─ runner.py       소스(naver/kis/mock)·범위(themes/market) 골라 실행 → data/hoga.json
 ├─ scripts/fetch_daily.py  장 마감 후 일봉 수집 → 스크리너 → data/hoga.json
 ├─ scripts/collect_themes.py  네이버 테마 수집 → themes.json
 ├─ scripts/fetch_overnight.py 야간 지표 1회 수집 → data/overnight.json
@@ -43,7 +45,7 @@ py -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env          # 기본 KIS_ENV=mock
 py -m pytest -q
-py scripts\fetch_daily.py       # 고가놀이 결과 생성 (mock 이면 합성 일봉)
+py scripts\fetch_daily.py       # 고가놀이 결과 생성 (네이버 실제 일봉, 테마 종목)
 uvicorn app.main:app --reload   # http://127.0.0.1:8000
 ```
 
@@ -64,6 +66,34 @@ uvicorn app.main:app --reload   # http://127.0.0.1:8000
 | 실시간 구독 | 접속당 약 41건 | 동일 |
 
 접근토큰은 하루 1개가 원칙이라 `data/kis_token_*.json` 에 캐시합니다. 지우면 재발급합니다.
+
+## 고가놀이 스크리너 (app/screener/)
+
+"터뜨리고 버티며 저점을 높이는 자리". 완성된 일봉으로만 판정합니다 (`hoga_play.py`).
+
+1. 급등봉: 종가 기준 +8% 이상, 거래대금 50억 이상.
+2. 이후 1~3일 횡보: 종가가 급등봉 시가 아래로 무너지지 않고, 급등봉 고가 대비 -15% 이내.
+3. 엄선 조건 (하나라도 어기면 탈락 사유로 기록): 횡보 폭 10% 미만, 저점 상승, MACD(12,26,9) 0선 위.
+4. 3일 보유 수익률로 승률·건당 수익·기준선 대비를 냅니다.
+
+**실제 일봉 소스와 범위** (`runner.py`)
+
+| 옵션 | 값 | 설명 |
+|---|---|---|
+| `--source` | `naver` (기본) | 네이버 일봉. 키 불필요. 거래대금은 거래량×종가 근사 |
+| | `kis` | 한국투자증권 REST 일봉 (`KIS_ENV=vts/real`) |
+| | `mock` | 합성 일봉 (UI 확인용) |
+| `--universe` | `themes` (기본) | themes.json 의 종목만. 수 초 |
+| | `market` | 코스피+코스닥 중 오늘 거래대금 30억 이상 전 종목 (우선주·스팩·ETF 제외). 1~3분 |
+
+```powershell
+py scripts\fetch_daily.py                       # 네이버 일봉, 테마 종목
+py scripts\fetch_daily.py --universe market     # 시장 전체
+```
+
+서버가 떠 있으면 고가놀이 창 오른쪽 위 **다시 찾기** 버튼(범위 선택 가능)으로 같은 일을 백그라운드로 돌리고, 진행률이 표시된 뒤 표가 갱신됩니다.
+API 로는 `POST /api/screener/run?source=naver&universe=market`, 진행은 `GET /api/screener/status`.
+장 마감 후 하루 한 번 돌리는 것이 맞고, 장중에 돌리면 오늘 봉이 미완성인 채로 들어가므로 '자리 잡은 날' 판정에 오늘은 쓰지 않는 게 안전합니다.
 
 ## 수급 점수 (app/supply.py)
 

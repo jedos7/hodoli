@@ -5,7 +5,9 @@
   GET  /api/health            상태
   GET  /api/themes            테마·종목 현재 스냅샷
   GET  /api/stocks/{code}     종목 하나
-  GET  /api/screener/hoga     고가놀이 결과 (scripts/fetch_daily.py 가 만든 data/hoga.json)
+  GET  /api/screener/hoga     고가놀이 결과 (data/hoga.json)
+  POST /api/screener/run      일봉을 받아 고가놀이 다시 찾기 (?source=naver|kis|mock&universe=themes|market), 백그라운드
+  GET  /api/screener/status   다시 찾기 진행 상황
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
   POST /api/overnight/refresh 야간 지표 즉시 갱신
   POST /api/collect           네이버 테마 수집 → themes.json 갱신 → 즉시 반영
@@ -29,6 +31,7 @@ from app.collectors.naver_theme import collect
 from app.config import settings
 from app.feeds import KisFeed, MockFeed
 from app.kis.futures import KisFutures
+from app.screener.runner import run_screener
 from app.state import MarketState
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -219,6 +222,42 @@ def hoga():
     if not d:
         raise HTTPException(404, "data/hoga.json 이 없습니다. scripts/fetch_daily.py 를 먼저 실행하세요.")
     return d
+
+
+screener_job: dict = {"running": False, "done": 0, "total": 0, "current": "", "startedAt": None, "finishedAt": None, "error": None, "source": None, "universe": None}
+
+
+async def _screener_task(source: str, universe: str, min_amount: float) -> None:
+    def progress(i, n, name):
+        screener_job.update(done=i, total=n, current=name)
+
+    try:
+        r = await run_screener(source, universe, min_amount_eok=min_amount, progress=progress)
+        screener_job.update(error=None, rows=r["totalRecent"])
+        log.info("스크리너 완료: %s/%s %d종목 → 최근 %d자리", r["source"], r["universe"], r["stocks"], r["totalRecent"])
+    except Exception as e:
+        screener_job.update(error=str(e))
+        log.exception("스크리너 실패")
+    finally:
+        screener_job.update(running=False, finishedAt=datetime.now().isoformat(timespec="seconds"))
+
+
+@app.post("/api/screener/run")
+async def api_screener_run(source: str = "naver", universe: str = "themes", min_amount: float = 30.0):
+    """일봉을 받아 고가놀이를 다시 찾는다. 백그라운드로 돌고 /api/screener/status 로 진행을 본다."""
+    if screener_job["running"]:
+        raise HTTPException(409, "이미 찾는 중입니다.")
+    if source not in ("auto", "naver", "kis", "mock") or universe not in ("themes", "market"):
+        raise HTTPException(400, "source 는 auto|naver|kis|mock, universe 는 themes|market")
+    screener_job.update(running=True, done=0, total=0, current="종목 목록 준비", startedAt=datetime.now().isoformat(timespec="seconds"),
+                        finishedAt=None, error=None, source=source, universe=universe)
+    asyncio.create_task(_screener_task(source, universe, min_amount), name="screener")
+    return {"ok": True, "started": True}
+
+
+@app.get("/api/screener/status")
+def api_screener_status():
+    return screener_job
 
 
 @app.get("/api/overnight")
