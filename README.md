@@ -202,7 +202,7 @@ py scripts\fetch_daily.py --use-cache          # 저장된 일봉으로 스크�
 ## 리서치 브리핑 (app/collectors/naver_research.py)
 
 상단 "📚 리서치" 버튼. 네이버 리서치 게시판의 최근 7일 산업·경제·시황·투자정보 리포트 요약을 **애널리스트 원문 그대로** 문장 단위로 보여주고,
-테마별 **추정치 방향**(같은 증권사의 직전 리포트 대비 목표가 상향/하향 건수)을 셉니다. 08:50 테마 수집 때 함께 갱신되며 "새로 받기"로 즉시 갱신합니다 (`POST /api/research/refresh`).
+테마별 **추정치 방향**(같은 증권사의 직전 리포트 대비 목표가 상향/하향 건수)을 셉니다. 15:35 테마 수집 때 함께 갱신되며 "새로 받기"로 즉시 갱신합니다 (`POST /api/research/refresh`).
 
 ## 일별 테마 달력 (app/screener/theme_calendar.py)
 
@@ -239,7 +239,7 @@ NXT 시세는 키움 종목코드 `_NX` 로 조회하며 키움 피드일 때만
 | 작업 | 기본 | 하는 일 |
 |---|---|---|
 | `SCHEDULE_SCREENER` | 15:45 | 장 마감 후 확정 일봉으로 고가놀이 다시 찾기. 범위는 `SCHEDULE_SCREENER_UNIVERSE` (기본 market) |
-| `SCHEDULE_COLLECT` | 08:50 | 장 시작 전 네이버 테마 재수집 + 리포트·뉴스 갱신 + 리서치 브리핑 → 화면 즉시 반영 |
+| `SCHEDULE_COLLECT` | 15:35 | 장 마감 직후 네이버 테마 재수집(당일 거래대금 기준) + 리포트·뉴스 + 리서치 브리핑 → 화면 즉시 반영. 장 시작 전에는 거래대금이 없어 수집이 비므로 아침에는 돌리지 않는다 |
 | `SCHEDULE_CALENDAR` | 16:10 | 일별 테마 달력 재계산 (전체 테마 매핑 + 전 종목 일봉, 5분쯤) |
 | `SCHEDULE_NXT` | 19:50 | NXT 야간장 마감 직전 종가배팅 후보 알림 (KRX 종가보다 내려온 종목) |
 
@@ -280,7 +280,7 @@ py scripts\collect_themes.py --merge            # 손으로 넣은 테마(id 가
 ```
 
 서버가 떠 있으면 화면의 **테마 수집** 버튼이나 `POST /api/collect` 로 같은 일을 하고, 피드를 다시 붙여 곧바로 화면에 반영됩니다.
-`.env` 의 `THEME_COLLECT_MINUTES` 를 0 보다 크게 두면 평일 08:50~15:30 사이에 그 주기로 자동 수집합니다.
+`.env` 의 `THEME_COLLECT_MINUTES` 를 0 보다 크게 두면 평일 09:10~15:30 사이에 그 주기로 자동 수집합니다.
 손으로 `themes.json` 을 고쳤을 때는 `POST /api/themes/reload` 로 다시 읽습니다.
 
 비공식 페이지를 읽는 것이라 구조가 바뀌면 `parse_theme_list` / `parse_theme_detail` 만 고치면 됩니다. 실패하면 이전 `themes.json` 이 그대로 유지됩니다.

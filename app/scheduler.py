@@ -31,10 +31,15 @@ class Job:
     last_date: str = ""                      # YYYY-MM-DD
     last_result: dict = field(default_factory=dict)
     running: bool = False
+    attempts: int = 0                        # 오늘 시도 횟수 (실패 시 RETRY_MINUTES 뒤 최대 MAX_ATTEMPTS 까지 재시도)
 
     @property
     def enabled(self) -> bool:
         return bool(self.at)
+
+
+RETRY_MINUTES = 10
+MAX_ATTEMPTS = 3
 
 
 def is_due(job: Job, now: datetime) -> bool:
@@ -43,9 +48,18 @@ def is_due(job: Job, now: datetime) -> bool:
     if job.weekdays_only and now.weekday() >= 5:
         return False
     today = now.strftime("%Y-%m-%d")
-    if job.last_date == today:
+    if now.strftime("%H:%M") < job.at:
         return False
-    return now.strftime("%H:%M") >= job.at
+    if job.last_date != today:
+        return True
+    # 오늘 이미 돌았음: 실패했으면 10분 뒤 재시도 (최대 3번)
+    if job.last_result.get("ok") or job.attempts >= MAX_ATTEMPTS:
+        return False
+    try:
+        last_at = datetime.fromisoformat(job.last_result.get("at", ""))
+    except ValueError:
+        return False
+    return (now - last_at).total_seconds() >= RETRY_MINUTES * 60
 
 
 class Scheduler:
@@ -77,6 +91,7 @@ class Scheduler:
             return {"ok": False, "error": "이미 실행 중"}
         job.running = True
         started = datetime.now()
+        job.attempts = job.attempts + 1 if job.last_date == started.strftime("%Y-%m-%d") else 1
         try:
             r = await job.run()
             job.last_result = {"ok": True, "at": started.isoformat(timespec="seconds"), "took": round((datetime.now() - started).total_seconds()), **r}
@@ -103,4 +118,4 @@ class Scheduler:
     def status(self) -> dict:
         now = datetime.now()
         return {j.name: {"at": j.at or None, "enabled": j.enabled, "running": j.running, "lastDate": j.last_date,
-                         "lastResult": j.last_result, "dueToday": is_due(j, now)} for j in self.jobs}
+                         "lastResult": j.last_result, "attempts": j.attempts, "dueToday": is_due(j, now)} for j in self.jobs}

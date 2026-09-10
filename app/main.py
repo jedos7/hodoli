@@ -152,7 +152,7 @@ async def run_collect() -> dict:
         try:
             data = await collect(top=settings.collect_top, per=settings.collect_per)
             if not data["themes"]:
-                raise RuntimeError("수집된 테마가 없습니다 (페이지 구조 변경?)")
+                raise RuntimeError("수집된 테마가 없습니다 — 장 시작 전(거래대금 없음)이거나 네이버 페이지 구조가 바뀐 경우. 기존 테마를 유지합니다")
             p = settings.themes_file
             if p.exists():
                 p.with_suffix(".json.bak").write_text(p.read_text("utf-8"), "utf-8")

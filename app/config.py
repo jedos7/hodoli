@@ -49,7 +49,8 @@ class Settings:
     # 하루 한 번 자동 실행 (HH:MM, 비우면 끔). screener = 장 마감 후 고가놀이, collect = 장 전 테마 재수집+뉴스
     schedule_screener: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER", "15:45").strip())
     schedule_screener_universe: str = field(default_factory=lambda: os.getenv("SCHEDULE_SCREENER_UNIVERSE", "market").strip())
-    schedule_collect: str = field(default_factory=lambda: os.getenv("SCHEDULE_COLLECT", "08:50").strip())
+    # 테마 재수집은 장 마감 직후(당일 거래대금이 다 찬 뒤). 장 시작 전에는 네이버 테마에 거래대금이 없어 수집이 비어 버린다.
+    schedule_collect: str = field(default_factory=lambda: os.getenv("SCHEDULE_COLLECT", "15:35").strip())
     schedule_calendar: str = field(default_factory=lambda: os.getenv("SCHEDULE_CALENDAR", "16:10").strip())  # 일별 테마 달력 (전 종목 일봉, 5분)
     schedule_nxt: str = field(default_factory=lambda: os.getenv("SCHEDULE_NXT", "19:50").strip())            # NXT 하락 마감 종가배팅 후보 알림
 
