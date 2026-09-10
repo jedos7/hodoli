@@ -180,7 +180,8 @@ class MarketState:
             t.conc = (t.top.acc_amount / t.total * 100) if t.top and t.total else 0.0
             t.width = sum(1 for s in ss if s.change_rate > 0)
             ratio = (t.five / t.total) if t.total else 0.0
-            heat = 28 + t.avg * 4.5 + ratio * 180 + (t.width / len(ss) if ss else 0) * 10
+            # 5분 유입/전체 비율은 0.2 에서 자른다. 장 시작 직후에는 전체 = 5분 유입이라 모든 테마가 99 로 몰리는 것을 막는다
+            heat = 28 + t.avg * 4.5 + min(ratio, 0.2) * 180 + (t.width / len(ss) if ss else 0) * 10
             t.heat = int(max(3, min(99, round(heat))))
             for s in ss:
                 s.score, s.flow = supply_score(SupplyInputs(

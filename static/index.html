@@ -129,14 +129,15 @@ button,select{font:inherit;color:inherit}
 .card .news div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .news .src{color:var(--ink-3)}
 .card .rows{border-top:1px solid var(--line-2)}
-.row{display:grid;grid-template-columns:minmax(0,1fr) 88px 72px 38px 16px;align-items:center;gap:0 8px;padding:5px 10px 0;position:relative}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 108px 66px 36px 14px;align-items:center;gap:0 6px;padding:5px 10px 0;position:relative}
 .row+.row{border-top:1px solid var(--line-2)}
 .row.leader{background:linear-gradient(90deg,var(--accent-soft),transparent 60%)}
 .row .nm{font-weight:600;display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap;overflow:hidden}
 .row .nm span{font-weight:400;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis}
 .row .nm .badge{font-size:10px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);padding:0 5px;border-radius:3px;font-family:var(--sans)}
-.row .px{text-align:right;font-family:var(--mono);font-size:12.5px}
-.row .px .nxpx{display:block;font-size:10.5px;font-weight:600;opacity:.9}
+.row .px{text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.row .px .nxpx{display:block;font-size:10.5px;font-weight:600;opacity:.9;height:13px;line-height:13px;white-space:nowrap}
+.row .chg{white-space:nowrap}
 .row .chg{text-align:right;font-family:var(--mono);font-weight:600;font-size:13px}
 .row .vol{text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink-2);grid-column:2;padding-bottom:5px}
 .row .sc{font-family:var(--mono);font-size:11px;text-align:center;border-radius:3px;padding:1px 0;background:var(--surface-2);color:var(--ink-2)}
@@ -631,7 +632,8 @@ function update(){
       const r=n=>row.querySelector(`[data-f="${n}"]`);
       row.classList.toggle('leader',s===th.leader);
       // NXT(프리·애프터장) 체결이 있고 정규장 가격과 다르면 아래 줄에 작게 표시
-      const nxLine=(s.nx&&s.nx!==s.price)?`<span class="nxpx ${cls(s.nxChg||0)}" title="NXT 마지막 체결 ${s.nxAt==='조회'?'(조회값)':s.nxAt||''} · 정규장 가격 대비">NXT ${s.nx.toLocaleString('ko-KR')} ${s.nxChg!=null?pct(s.nxChg,1):''}</span>`:'';
+      // NXT 줄은 항상 같은 높이로 자리를 잡아 두어(없으면 빈 줄) 행 높이가 들쭉날쭉하지 않게 한다
+      const nxLine=(s.nx&&s.nx!==s.price)?`<span class="nxpx ${cls(s.nxChg||0)}" title="NXT 마지막 체결 ${s.nxAt==='조회'?'(조회값)':s.nxAt||''} · 정규장 가격 대비">NXT ${s.nx.toLocaleString('ko-KR')} ${s.nxChg!=null?pct(s.nxChg,1):''}</span>`:'<span class="nxpx"></span>';
       r('px').innerHTML=won(s.price)+' <span class="'+cls(s.chg)+'">'+arrow(s.chg)+'</span>'+nxLine;
       r('chg').textContent=pct(s.chg);r('chg').className='chg num '+cls(s.chg);
       r('vol').textContent=eok(s.vol);
