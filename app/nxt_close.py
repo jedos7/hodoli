@@ -2,9 +2,14 @@
 
 검증(scripts/sweep_close_nxt.py) 결과: 종가배팅은 15:30 KRX 종가보다 20:00 NXT 종가가 낫고,
 그중에서도 NXT 에서 KRX 종가보다 '내려' 마감한 날이 좋았다 (급등주 +8%↑ 갭 승률 53.6%, 평균 +1.5% / 고가놀이 자리 70.6%, +2.1%).
+다만 눌림 깊이별로 나누면 (급등주 890건, 2026-03~09) 얕은 눌림은 동전 던지기였다:
+  0~-1%  승률 49.3% 평균 +0.5% (후반부 0.00%)  ·  -1~-3%  52.9% +0.9%  ·  -3% 이하  77.4% +9.2%
+  -2% 이하 + 낮에 고가에서 밀림  65.9% +6.1%
+2026-09-10 에 얕은 눌림(-0.2~-1.1%) 3종목을 보냈다가 다음 날 2종목이 갭 하락한 뒤, 후보를 -2% 이하(MIN_DIP)로 좁혔다.
+눌린 종목이 없거나 얕기만 하면 "후보 없음" 으로 보낸다.
 
 그래서 매일 19:50(설정 SCHEDULE_NXT)에 후보 종목의 NXT 현재가를 키움에서 읽어 KRX 종가와 비교하고,
-내려 있는 종목을 "종가배팅 후보" 알림으로 낸다. 후보:
+MIN_DIP 이상 내려 있는 종목을 "종가배팅 후보" 알림으로 낸다. 후보:
   1) 오늘 고가놀이 엄선 자리 (data/hoga.json 의 asof 날짜 행)
   2) 오늘 +8% 이상 급등, 거래대금 50억 이상, 상한가(+29%) 제외 (일봉 캐시 data/candles_kiwoom_market.json)
 주문은 하지 않는다. 결과는 data/nxt_close.json 에 남고 /api/nxtclose 로 본다.
@@ -20,6 +25,8 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 
+MIN_DIP = -2.0   # NXT 가격이 KRX 종가보다 이만큼(%) 이상 내려야 후보. 얕은 눌림(0~-1%)은 승률 49% 로 정보가 없었다
+
 
 @dataclass
 class Candidate:
@@ -31,7 +38,7 @@ class Candidate:
     amount_eok: float
     nx_price: int = 0
     nx_move: float = 0.0   # NXT 현재가 / KRX 종가 - 1 (%)
-    pick: bool = False     # NXT 하락 → 후보
+    pick: bool = False     # NXT 에서 MIN_DIP 이상 눌림 → 후보
     nx_traded: bool = False  # NXT 에서 거래(가격)가 있었는가
     near_high: float | None = None  # 낮 종가가 당일 고가 대비 몇 % (0 = 고가 마감, 음수 = 밀려 마감)
 
@@ -91,7 +98,7 @@ async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
                 cnd.nx_price = b.price
                 cnd.nx_traded = True
                 cnd.nx_move = (b.price / cnd.krx_close - 1) * 100
-                cnd.pick = cnd.nx_move < 0
+                cnd.pick = cnd.nx_move <= MIN_DIP
         except Exception as e:
             log.debug("NXT 조회 실패 %s: %s", cnd.code, e)
     picks = sorted((c for c in candidates if c.pick), key=lambda c: c.nx_move)
@@ -103,16 +110,17 @@ async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
 
 
 def score(c: dict) -> tuple[float, list[str]]:
-    """후보 점수와 근거. 2026-09 NXT 하락 마감 급등주 922건 검증:
-    NXT 눌림 -3% 이하 승률 77%/+7.9% · 거래대금 1,000억↑ 63%/+2.7% · 낮에 고가 대비 3% 넘게 밀려 마감 61%/+3.0% · 고가놀이 자리 71%/+2.1%"""
+    """후보 점수와 근거. 2026-09 NXT 하락 마감 급등주 890건 검증:
+    NXT 눌림 -3% 이하 승률 77%/+9.2% · 거래대금 1,000억↑ 63%/+3.0% · 낮에 고가 대비 3% 넘게 밀려 마감 63%/+3.3% · 고가놀이 자리 71%/+2.1%
+    (-2% 이하만 후보이므로 '얕음' 은 화면의 후보 아닌 종목에서만 나온다)"""
     s, why = 0.0, []
     m = c.get("nx_move", 0.0)
     if m <= -3:
         s += 3; why.append(f"NXT 눌림 {m:.1f}% (검증 최상)")
-    elif m <= -1:
+    elif m <= MIN_DIP:
         s += 1; why.append(f"NXT 눌림 {m:.1f}%")
     else:
-        why.append(f"NXT 눌림 {m:.1f}% (얕음)")
+        why.append(f"NXT 눌림 {m:.1f}% (얕음, 승률 49%)")
     amt = c.get("amount_eok", 0.0)
     if amt >= 1000:
         s += 2; why.append(f"대금 {amt:,.0f}억 (큰 종목)")
@@ -136,11 +144,14 @@ def alerts_for(result: dict, top: int = 3) -> list[dict]:
     when = "NXT 마감" if result["closing"] else "NXT 현재"
     at = result["at"][11:19]
     if not picks:
-        n = len(result["candidates"])
+        cands = result["candidates"]
+        shallow = [c for c in cands if c.get("nx_traded") and MIN_DIP < c.get("nx_move", 0.0) < 0]
+        tail = (f"저녁에 살짝 내린 종목 {len(shallow)}개는 있지만 {MIN_DIP:.0f}% 넘게 눌린 종목이 없습니다 (얕은 눌림은 승률 49%, 동전 던지기)"
+                if shallow else f"저녁에 {MIN_DIP:.0f}% 넘게 눌린 종목이 없습니다")
         return [{"kind": "nxt", "code": "", "name": "", "at": at,
-                 "text": f"종가배팅 후보 없음 — {when} 기준 급등주 {n}종목 중 저녁에 눌린 종목이 없습니다"}]
+                 "text": f"종가배팅 후보 없음 — {when} 기준 급등주 {len(cands)}종목 중 {tail}. 오늘은 쉬는 날."}]
     ranked = sorted(((score(c), c) for c in picks), key=lambda x: x[0][0], reverse=True)
-    lines = [f"🌙 종가배팅 후보 (저녁에 눌린 급등주) · {when} 기준 · 눌린 {len(picks)}종목 중 상위 {min(top, len(ranked))}"]
+    lines = [f"🌙 종가배팅 후보 (저녁에 {MIN_DIP:.0f}% 넘게 눌린 급등주) · {when} 기준 · {len(picks)}종목 중 상위 {min(top, len(ranked))}"]
     out = []
     for i, ((s, why), c) in enumerate(ranked[:top], 1):
         lines.append(f"{i}. {c['name']} ({c['why']}) {c['krx_close']:,}→{c['nx_price']:,}원 ({c['nx_move']:+.1f}%) · {' · '.join(why)}")

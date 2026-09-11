@@ -1,4 +1,4 @@
-from app.nxt_close import Candidate, alerts_for, score
+from app.nxt_close import MIN_DIP, Candidate, alerts_for, score
 
 
 def _c(code, name, why, close, amt, nx, move, near):
@@ -14,7 +14,7 @@ def test_score_prefers_deep_dip_big_amount_and_hoga():
 
 
 def test_alerts_top3_single_message():
-    picks = [_c(str(i), f"종목{i}", "급등 +9.0%", 10000, 100 + i * 300, 9900 - i * 50, -(i + 1) * 0.6, -1.0) for i in range(5)]
+    picks = [_c(str(i), f"종목{i}", "급등 +9.0%", 10000, 100 + i * 300, 9800 - i * 50, -2 - i * 0.3, -1.0) for i in range(5)]
     res = {"at": "2026-09-09T19:50:00", "closing": True, "candidates": picks, "picks": picks}
     a = alerts_for(res)
     assert len(a) == 1 and a[0]["kind"] == "nxt"
@@ -22,3 +22,14 @@ def test_alerts_top3_single_message():
     assert a[0]["top"][0]["name"] == "종목4"        # 가장 많이 눌리고 대금이 큰 것이 1위
     none = alerts_for({"at": "2026-09-09T19:50:00", "closing": True, "candidates": [{}], "picks": []})
     assert "후보 없음" in none[0]["text"]
+
+
+def test_shallow_dip_is_not_a_pick_and_message_says_so():
+    # 2026-09-10 사례: -0.2~-1.1% 얕은 눌림만 있던 날 → 후보 없음 + 얕은 눌림 개수 안내
+    shallow = [_c(str(i), f"종목{i}", "급등 +10.0%", 10000, 500, 9950, -0.5, -3.0) for i in range(3)]
+    for c in shallow:
+        c["pick"] = c["nx_move"] <= MIN_DIP
+    assert not any(c["pick"] for c in shallow)
+    res = {"at": "2026-09-10T19:50:00", "closing": True, "candidates": shallow, "picks": []}
+    txt = alerts_for(res)[0]["text"]
+    assert "후보 없음" in txt and "살짝 내린 종목 3개" in txt and "-2%" in txt
