@@ -6,8 +6,9 @@
   선택  = 점수(종목명 +2, 핵심어당 +2 최대 +4) 최고 → 대장주 순 → 최신 순
   없음  = "테마 관련 기사 없음" (링크 없음)
 
-리포트: https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemCode=005930
-        표 = 종목명 · 제목 · 증권사 · 첨부 · 작성일(YY.MM.DD). 최근 N일만 센다.
+리포트: https://m.stock.naver.com/api/research/company?page=1&pageSize=500   (JSON 종목분석 목록, 최근 수백 건)
+        종목별 검색이 새 API 에 없어 목록을 한 번 받아 두고 itemCode 로 거른다. 최근 N일만 센다.
+        (옛 finance.naver.com/research/company_list.naver 는 2026-09-11 부터 302 로 넘어갔다)
 뉴스:   https://m.stock.naver.com/api/news/stock/005930?pageSize=3&page=1
         JSON. 비슷한 기사끼리 묶음(cluster) 으로 오고, 묶음의 첫 기사가 대표 기사.
 
@@ -29,7 +30,8 @@ log = logging.getLogger(__name__)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-    "Referer": "https://finance.naver.com/",
+    "Referer": "https://m.stock.naver.com/",
+    "Accept": "application/json",
     "Accept-Language": "ko-KR,ko;q=0.9",
 }
 DELAY = 0.12
@@ -41,6 +43,7 @@ class Report:
     broker: str
     date: str   # YYYY-MM-DD
     url: str
+    code: str = ""
 
 
 @dataclass(slots=True)
@@ -51,18 +54,18 @@ class News:
     url: str
 
 
-_REPORT_ROW = re.compile(
-    r'<a href="(company_read\.naver\?nid=\d+[^"]*)">([^<]+)</a></td>\s*<td>([^<]+)</td>.*?<td class="date"[^>]*>\s*(\d{2}\.\d{2}\.\d{2})\s*</td>',
-    re.S,
-)
-
-
-def parse_reports(page_html: str) -> list[Report]:
+def parse_reports(rows: list | dict) -> list[Report]:
+    """종목분석 목록 JSON → Report. dict 로 오면 그 안의 목록을 찾는다."""
+    if isinstance(rows, dict):
+        rows = rows.get("researchSummaries") or rows.get("items") or []
     out = []
-    for href, title, broker, d in _REPORT_ROW.findall(page_html):
-        yy, mm, dd = d.split(".")
-        out.append(Report(html.unescape(title).strip(), html.unescape(broker).strip(), f"20{yy}-{mm}-{dd}",
-                          "https://finance.naver.com/research/" + html.unescape(href)))
+    for r in rows or []:
+        title = html.unescape(str(r.get("title", ""))).strip()
+        if not title:
+            continue
+        out.append(Report(title, html.unescape(str(r.get("brokerName", ""))).strip(), str(r.get("writeDate", ""))[:10],
+                          str(r.get("endUrl") or f"https://m.stock.naver.com/research/company/{r.get('researchId', '')}"),
+                          str(r.get("itemCode") or "")))
     return out
 
 
@@ -186,17 +189,22 @@ def report_line(reports: list[Report], days: int) -> str:
 class NaverNews:
     def __init__(self, client: httpx.AsyncClient | None = None):
         self.client = client or httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True)
+        self._company: list[Report] | None = None   # 종목분석 목록 (한 번만 받는다)
 
     async def close(self) -> None:
         await self.client.aclose()
 
+    async def company_reports(self) -> list[Report]:
+        if self._company is None:
+            r = await self.client.get("https://m.stock.naver.com/api/research/company", params={"page": 1, "pageSize": 500})
+            r.raise_for_status()
+            await asyncio.sleep(DELAY)
+            self._company = parse_reports(r.json())
+        return self._company
+
     async def reports(self, code: str, days: int = 7) -> list[Report]:
-        r = await self.client.get("https://finance.naver.com/research/company_list.naver",
-                                  params={"searchType": "itemCode", "itemCode": code})
-        r.raise_for_status()
-        await asyncio.sleep(DELAY)
         since = (date.today() - timedelta(days=days)).isoformat()
-        return [x for x in parse_reports(r.content.decode("euc-kr", "replace")) if x.date >= since]
+        return [x for x in await self.company_reports() if x.code == code and x.date >= since]
 
     async def news(self, code: str, n: int = 3) -> list[News]:
         r = await self.client.get(f"https://m.stock.naver.com/api/news/stock/{code}", params={"pageSize": n, "page": 1})

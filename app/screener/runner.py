@@ -193,8 +193,14 @@ async def get_candles(source: str, universe: str, days: int, min_amount_eok: flo
         log.info("일봉 캐시 없음 → 새로 받음")
     uni = await load_universe(universe, source, min_amount_eok)
     log.info("스크리너: 소스 %s · 범위 %s · %d종목", source, universe, len(uni))
+    if not uni:
+        # 2026-09-11 네이버 목록 페이지가 바뀌어 0종목이 왔고, 그대로 진행해 일봉 캐시·결과 파일을 빈 것으로 덮어쓴 적이 있다
+        raise RuntimeError("종목 목록이 비었습니다 — 종목 목록 소스(네이버 시가총액 API)를 못 읽었습니다. 기존 일봉 캐시와 결과는 그대로 둡니다")
     candles = await fetch_candles(source, uni, days, progress)
     if source != "mock":
+        got = sum(1 for cs in candles.values() if cs)
+        if got < max(10, len(uni) // 10):
+            raise RuntimeError(f"일봉을 거의 못 받았습니다 ({got}/{len(uni)}종목) — 증권사 API 상태를 확인하세요. 기존 일봉 캐시는 그대로 둡니다")
         save_cache(source, universe, uni, candles)
     return source, uni, candles
 

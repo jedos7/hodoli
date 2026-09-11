@@ -1,94 +1,40 @@
-from app.collectors.naver_theme import grade_of, parse_last_page, parse_theme_detail, parse_theme_list
+from app.collectors.naver_theme import grade_of, parse_theme_detail, parse_theme_list
 
-LIST_HTML = """
-<tr>
-  <td class="col_type1"><a href="/sise/sise_group_detail.naver?type=theme&no=586">통신장비(케이블/광섬유 등)</a></td>
-  <td class="number col_type2">
-    <span class="tah p11 red01">
-    +9.46%
-    </span>
-  </td>
-  <td class="number col_type3">
-    <span class="tah p11 red01">
-    +2.09%
-    </span>
-  </td>
-  <td class="number col_type4">14</td>
-  <td class="number col_type4">0</td>
-  <td class="number col_type4">1</td>
-  <td class="ls col_type5"><img src='x' alt='상승'><a href="/item/main.naver?code=100590">머큐리</a></td>
-  <td class="ls col_type6"><img src='x' alt='상승'><a href="/item/main.naver?code=327260">RF시스템..</a></td>
-</tr>
-<tr>
-  <td class="col_type1"><a href="/sise/sise_group_detail.naver?type=theme&no=12">조선</a></td>
-  <td class="number col_type2"><span class="tah p11 nv01">-1.20%</span></td>
-  <td class="number col_type3"><span class="tah p11">0.00%</span></td>
-  <td class="number col_type4">2</td>
-  <td class="number col_type4">1</td>
-  <td class="number col_type4">9</td>
-  <td class="ls col_type5"><a href="/item/main.naver?code=042660">한화오션</a></td>
-</tr>
-<td class="pgRR"><a href="/sise/theme.naver?page=7">맨뒤</a></td>
-"""
+LIST_JSON = {"stockListSortType": "THEME", "totalCount": 266, "page": 1, "pageSize": 100,
+             "groups": [{"no": 405, "name": "MLCC(적층세라믹콘덴서)", "totalCount": 11, "changeRate": "7.69", "riseCount": 8, "fallCount": 2, "steadyCount": 1},
+                        {"no": 12, "name": "조선", "totalCount": 12, "changeRate": "-1.20", "riseCount": 2, "fallCount": 9, "steadyCount": 1}]}
 
-DETAIL_HTML = """
-<tbody>
-<tr onMouseOver="mouseOver(this)" onMouseOut="mouseOut(this)" >
-  <td class="name"><div class="name_area"><a href="/item/main.naver?code=100590">머큐리</a> <span class="dot">*</span></div></td>
-  <td><div class="theme_info_area"><a href="javascript:;" class="btn_history"><span class="blind">테마 편입 사유</span></a>
-    <div class="info_layer_wrap"><strong class="info_title">머큐리</strong>
-    <p class="info_txt">정보통신장비 개발, 생산, 판매업체. 광케이블을 직접 생산.</p></div></div></td>
-  <td class="number" style="padding-right:15px;">4,315</td>
-  <td class="number" style="padding-right:15px;"><em class="bu_p bu_pup"><span class="blind">상승</span></em><span class="tah p11 red02">
-    965
-    </span></td>
-  <td class="number" style="padding-right:20px;"> <span class="tah p11 red01">
-    +28.81%
-    </span></td>
-  <td class="number" style="padding-right:20px;">4,355</td>
-  <td class="number" style="padding-right:20px;">0</td>
-  <td class="number" style="padding-right:20px;">3,643,249</td>
-  <td class="number" style="padding-right:20px;">15,350</td>
-  <td class="number" style="padding-right:20px;">101,640</td>
-  <td class="center"><a href="/item/board.naver?code=100590">토론</a></td>
-</tr>
-<tr onMouseOver="mouseOver(this)" onMouseOut="mouseOut(this)" >
-  <td class="name"><div class="name_area"><a href="/item/main.naver?code=327260">RF시스템즈</a></div></td>
-  <td></td>
-  <td class="number">12,000</td>
-  <td class="number"><em class="bu_p bu_pdn"><span class="blind">하락</span></em><span class="tah p11 nv01">100</span></td>
-  <td class="number"><span class="tah p11 nv01">-0.83%</span></td>
-  <td class="number">11,990</td>
-  <td class="number">12,000</td>
-  <td class="number">50,000</td>
-  <td class="number">600</td>
-  <td class="number">40,000</td>
-</tr>
-</tbody>
-"""
+DETAIL_JSON = {
+    "stocks": [
+        {"itemCode": "052710", "stockName": "아모텍", "sosok": "1", "closePrice": "15,130", "fluctuationsRatio": "29.98",
+         "accumulatedTradingVolume": "3,396,316", "accumulatedTradingValue": "49,791", "accumulatedTradingValueRaw": "49791000000", "stockEndType": "stock"},
+        {"itemCode": "009150", "stockName": "삼성전기", "sosok": "0", "closePrice": "412,000", "fluctuationsRatio": "-0.83",
+         "accumulatedTradingVolume": "50,000", "accumulatedTradingValue": "600", "stockEndType": "stock"},
+    ],
+    "groupInfo": {"no": 405, "name": "MLCC(적층세라믹콘덴서)"},
+    "themeItemInfoMap": {"052710": "신소재를 바탕으로 한 종합부품소재기업. MLCC를 새로운 사업 아이템으로 양산중."},
+}
 
 
 def test_parse_theme_list():
-    rows = parse_theme_list(LIST_HTML)
-    assert [r.no for r in rows] == [586, 12]
+    rows = parse_theme_list(LIST_JSON)
+    assert [r.no for r in rows] == [405, 12]
     a = rows[0]
-    assert a.name == "통신장비(케이블/광섬유 등)" and a.chg == 9.46 and a.chg3d == 2.09
-    assert (a.up, a.flat, a.down) == (14, 0, 1)
-    assert a.leaders == [("100590", "머큐리"), ("327260", "RF시스템..")]
-    assert rows[1].chg == -1.2 and rows[1].chg3d == 0.0 and rows[1].leaders == [("042660", "한화오션")]
-    assert parse_last_page(LIST_HTML) == 7
+    assert a.name == "MLCC(적층세라믹콘덴서)" and a.chg == 7.69 and a.chg3d == 0.0
+    assert (a.up, a.flat, a.down) == (8, 1, 2) and a.leaders == []
+    assert rows[1].chg == -1.2
 
 
 def test_parse_theme_detail():
-    rows = parse_theme_detail(DETAIL_HTML)
+    rows = parse_theme_detail(DETAIL_JSON)
     assert len(rows) == 2
     m = rows[0]
-    assert m.code == "100590" and m.name == "머큐리" and m.price == 4315 and m.chg == 28.81
-    assert m.volume == 3_643_249 and m.amount_million == 15_350 and m.amount_eok == 153.5
-    assert m.why.startswith("정보통신장비")
-    assert m.prev_close == 3350  # 4315 / 1.2881
+    assert m.code == "052710" and m.name == "아모텍" and m.price == 15130 and m.chg == 29.98
+    assert m.volume == 3_396_316 and m.amount_million == 49_791 and m.amount_eok == 497.91
+    assert m.why.startswith("신소재")
+    assert m.prev_close == 11640  # 15130 / 1.2998
     r = rows[1]
-    assert r.chg == -0.83 and r.amount_million == 600 and r.why == ""
+    assert r.chg == -0.83 and r.amount_million == 600 and r.why == ""   # Raw 없으면 '백만' 표시값
 
 
 def test_grade():

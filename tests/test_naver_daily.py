@@ -1,4 +1,4 @@
-from app.collectors.naver_daily import parse_fchart, parse_last_page, parse_market_page
+from app.collectors.naver_daily import parse_fchart, parse_market_list
 
 XML = """<?xml version="1.0" encoding="EUC-KR" ?>
 <protocol><chartdata symbol="005930" name="삼성전자" count="3" timeframe="day">
@@ -7,29 +7,15 @@ XML = """<?xml version="1.0" encoding="EUC-KR" ?>
 <item data="20260907|||||" />
 </chartdata></protocol>"""
 
-PAGE = """
-<tr  onMouseOver="mouseOver(this)" onMouseOut="mouseOut(this)">
-  <td class="no">1</td>
-  <td><a href="/item/main.naver?code=196170" class="tltle">알테오젠</a></td>
-  <td class="number">276,500</td>
-  <td class="number"><em class="bu_p bu_pdn"><span class="blind">하락</span></em><span class="tah p11 nv01">500</span></td>
-  <td class="number"><span class="tah p11 nv01">-0.18%</span></td>
-  <td class="number">500</td>
-  <td class="number">192,596</td>
-  <td class="number">69,655</td>
-  <td class="number">14.69</td>
-  <td class="number">419,213</td>
-  <td class="number">101.13</td>
-  <td class="number">39.42</td>
-</tr>
-<tr  onMouseOver="mouseOver(this)" onMouseOut="mouseOut(this)">
-  <td class="no">2</td>
-  <td><a href="/item/main.naver?code=000001" class="tltle">삼성스팩9호</a></td>
-  <td class="number">2,000</td><td class="number">0</td><td class="number">0.00%</td><td class="number">100</td>
-  <td class="number">100</td><td class="number">100</td><td class="number">N/A</td><td class="number">1,000</td>
-</tr>
-<td class="pgRR"><a href="/sise/sise_market_sum.naver?sosok=1&page=37">맨뒤</a></td>
-"""
+PAGE = {"stockListSortType": "MARKET_VALUE", "stockListCategoryType": "KOSDAQ", "totalCount": 1800, "page": 1, "pageSize": 100,
+        "stocks": [
+            {"itemCode": "196170", "stockName": "알테오젠", "sosok": "1", "closePrice": "276,500", "accumulatedTradingVolume": "419,213",
+             "accumulatedTradingValue": "115,913", "accumulatedTradingValueRaw": "115913000000", "stockEndType": "stock", "tradeStopType": {"name": "TRADING"}},
+            {"itemCode": "000001", "stockName": "삼성스팩9호", "sosok": "1", "closePrice": "2,000", "accumulatedTradingVolume": "100",
+             "accumulatedTradingValue": "0", "stockEndType": "stock"},
+            {"itemCode": "999999", "stockName": "정지종목", "closePrice": "1,000", "accumulatedTradingVolume": "0", "stockEndType": "stock", "tradeStopType": {"name": "STOP"}},
+            {"itemCode": "KOSDAQ", "stockName": "지수", "closePrice": "820", "stockEndType": "index"},
+        ]}
 
 
 def test_parse_fchart_skips_empty_bars():
@@ -39,10 +25,10 @@ def test_parse_fchart_skips_empty_bars():
     assert cs[0].volume == 13756022 and cs[0].amount == 13756022 * 250000
 
 
-def test_parse_market_page():
-    rows = parse_market_page(PAGE, "코스닥")
-    assert len(rows) == 2
+def test_parse_market_list():
+    rows = parse_market_list(PAGE, "코스닥")
+    assert [r.code for r in rows] == ["196170", "000001"]      # 거래정지·지수 행은 뺀다
     a = rows[0]
-    assert a.code == "196170" and a.name == "알테오젠" and a.price == 276500 and a.volume == 419213 and a.market == "코스닥"
-    assert round(a.amount_eok, 1) == round(276500 * 419213 / 1e8, 1)
-    assert parse_last_page(PAGE) == 37
+    assert a.name == "알테오젠" and a.price == 276500 and a.volume == 419213 and a.market == "코스닥"
+    assert a.amount_million == 115_913 and a.amount_eok == 1159.13      # API 거래대금(백만) 우선
+    assert rows[1].amount_eok == 2000 * 100 / 1e8                        # 거래대금 없으면 현재가×거래량

@@ -2,8 +2,9 @@
 
 일봉:  https://fchart.stock.naver.com/sise.nhn?symbol=005930&timeframe=day&count=250&requestType=0
        XML 한 번에 최대 수백 봉. 항목 = 날짜|시가|고가|저가|종가|거래량 (수정주가). 거래대금은 없어서 거래량×종가로 근사한다.
-목록:  https://finance.naver.com/sise/sise_market_sum.naver?sosok=0|1&page=N   (0 코스피, 1 코스닥)
-       현재가·거래량이 같이 있어 '오늘 거래대금 ≥ N억' 으로 미리 걸러 요청 수를 줄인다.
+목록:  https://m.stock.naver.com/api/stocks/marketValue/{KOSPI|KOSDAQ}?page=N&pageSize=100   (JSON, 시가총액 순)
+       현재가·거래량·거래대금이 같이 있어 '오늘 거래대금 ≥ N억' 으로 미리 걸러 요청 수를 줄인다.
+       (옛 finance.naver.com/sise/sise_market_sum.naver 는 2026-09-11 부터 302 로 넘어가 표가 없다)
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from app.collectors.naver_api import NaverApi, num
 from app.kis.rest import Candle
 
 log = logging.getLogger(__name__)
@@ -26,9 +28,6 @@ HEADERS = {
 }
 DELAY = 0.08
 _ITEM = re.compile(r'<item data="(\d{8})\|(\d+)\|(\d+)\|(\d+)\|(\d+)\|(\d+)"')
-_ROW_NAME = re.compile(r'<a href="/item/main\.naver\?code=(\d{6})" class="tltle">([^<]+)</a>')
-_ROW_NUMS = re.compile(r'<td class="number"[^>]*>\s*(?:<em[^>]*>.*?</em>)?\s*(?:<span[^>]*>)?\s*([-+\d,.]+%?|N/A)', re.S)
-_LAST_PAGE = re.compile(r'class="pgRR"[^>]*>\s*<a href="[^"]*page=(\d+)"')
 _SKIP_NAME = re.compile(r"스팩|\d+호$|우$|우[A-C]$|\(전환\)|ETN|KODEX|TIGER|KBSTAR|ACE |SOL |PLUS |HANARO|ARIRANG|KOSEF")
 
 
@@ -39,10 +38,11 @@ class Listed:
     market: str        # 코스피 | 코스닥
     price: int
     volume: int
+    amount_million: int = 0   # 오늘 거래대금(백만원). 0 이면 현재가×거래량으로 근사
 
     @property
     def amount_eok(self) -> float:
-        return self.price * self.volume / 1e8
+        return self.amount_million / 100 if self.amount_million else self.price * self.volume / 1e8
 
 
 def parse_fchart(xml: str) -> list[Candle]:
@@ -55,38 +55,24 @@ def parse_fchart(xml: str) -> list[Candle]:
     return out
 
 
-def parse_market_page(page_html: str, market: str) -> list[Listed]:
+def parse_market_list(d: dict, market: str) -> list[Listed]:
+    """/api/stocks/marketValue/{KOSPI|KOSDAQ} 한 쪽 → Listed. 거래정지 종목은 뺀다."""
     out = []
-    for chunk in re.split(r"<tr\s+onMouseOver", page_html)[1:]:
-        chunk = chunk.split("</tr>", 1)[0]
-        m = _ROW_NAME.search(chunk)
-        if not m:
+    for r in d.get("stocks") or []:
+        code = str(r.get("itemCode") or "")
+        if len(code) != 6 or r.get("stockEndType", "stock") != "stock":
             continue
-        nums = _ROW_NUMS.findall(chunk)  # [현재가, 전일비, 등락률, 액면가, 시총, 상장주식수, 외국인비율, 거래량, PER, ROE]
-        if len(nums) < 8:
+        stop = (r.get("tradeStopType") or {}).get("name")
+        if stop and stop != "TRADING":
             continue
-        try:
-            price = int(nums[0].replace(",", ""))
-            volume = int(nums[7].replace(",", ""))
-        except ValueError:
-            continue
-        name = html.unescape(m.group(2)).strip()
-        out.append(Listed(m.group(1), name, market, price, volume))
+        raw = r.get("accumulatedTradingValueRaw")
+        amount_m = int(num(raw) // 1_000_000) if raw not in (None, "") else int(num(r.get("accumulatedTradingValue")))
+        out.append(Listed(code, html.unescape(str(r.get("stockName", ""))).strip(), market, int(num(r.get("closePrice"))),
+                          int(num(r.get("accumulatedTradingVolume"))), amount_m))
     return out
 
 
-def parse_last_page(page_html: str) -> int:
-    m = _LAST_PAGE.search(page_html)
-    return int(m.group(1)) if m else 1
-
-
-class NaverDaily:
-    def __init__(self, client: httpx.AsyncClient | None = None):
-        self.client = client or httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True)
-
-    async def close(self) -> None:
-        await self.client.aclose()
-
+class NaverDaily(NaverApi):
     async def candles(self, code: str, count: int = 250) -> list[Candle]:
         r = await self.client.get("https://fchart.stock.naver.com/sise.nhn",
                                   params={"symbol": code, "timeframe": "day", "count": count, "requestType": "0"})
@@ -95,22 +81,18 @@ class NaverDaily:
         return parse_fchart(r.content.decode("euc-kr", "replace"))
 
     async def market_list(self, min_amount_eok: float = 30.0, skip_special: bool = True) -> list[Listed]:
-        """코스피+코스닥 전 종목 중 오늘 거래대금(현재가×거래량) 이 min_amount_eok 억 이상인 것."""
+        """코스피+코스닥 전 종목 중 오늘 거래대금이 min_amount_eok 억 이상인 것 (거래대금 순)."""
         out: list[Listed] = []
-        for sosok, market in (("0", "코스피"), ("1", "코스닥")):
-            first = await self._market_page(sosok, 1)
-            last = parse_last_page(first)
-            rows = parse_market_page(first, market)
-            for p in range(2, last + 1):
-                rows += parse_market_page(await self._market_page(sosok, p), market)
-            log.info("%s 목록 %d쪽 %d종목", market, last, len(rows))
+        for key, market in (("KOSPI", "코스피"), ("KOSDAQ", "코스닥")):
+            rows: list[Listed] = []
+            for page in range(1, 60):
+                d = await self.json(f"/stocks/marketValue/{key}", {"page": page, "pageSize": 100})
+                rows += parse_market_list(d, market)
+                got = len(d.get("stocks") or [])
+                if got < 100 or (d.get("totalCount") and page * 100 >= int(d["totalCount"])):
+                    break
+            log.info("%s 목록 %d종목", market, len(rows))
             out += rows
         picked = [r for r in out if r.amount_eok >= min_amount_eok and not (skip_special and _SKIP_NAME.search(r.name))]
         picked.sort(key=lambda r: r.amount_eok, reverse=True)
         return picked
-
-    async def _market_page(self, sosok: str, page: int) -> str:
-        r = await self.client.get("https://finance.naver.com/sise/sise_market_sum.naver", params={"sosok": sosok, "page": page})
-        r.raise_for_status()
-        await asyncio.sleep(DELAY)
-        return r.content.decode("euc-kr", "replace")

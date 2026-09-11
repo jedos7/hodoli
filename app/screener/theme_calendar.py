@@ -48,6 +48,8 @@ async def collect_theme_map(progress: Progress | None = None) -> dict:
                 progress(i, len(rows), row.name)
     finally:
         await c.close()
+    if len(themes) < 10:
+        raise RuntimeError(f"테마 매핑이 비었습니다 ({len(themes)}개) — 네이버 테마 API 를 못 읽었습니다. 기존 theme_map.json 을 유지합니다")
     data = {"savedAt": datetime.now().isoformat(timespec="seconds"), "themes": themes}
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     (settings.data_dir / "theme_map.json").write_text(json.dumps(data, ensure_ascii=False), "utf-8")
@@ -164,6 +166,8 @@ async def build_calendar(progress: Progress | None = None, refresh_map: bool = F
         candles = await collect_all_candles(codes, progress=progress)
     kospi, kosdaq = await index_daily("KOSPI"), await index_daily("KOSDAQ")
     days = compute_days(tm, candles)
+    if not days:
+        raise RuntimeError("달력을 만들 일봉이 없습니다 — 기존 theme_calendar.json 을 유지합니다")
     for d, v in days.items():
         v["kospi"] = round(kospi.get(d, 0.0), 2)
         v["kosdaq"] = round(kosdaq.get(d, 0.0), 2)

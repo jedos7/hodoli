@@ -1,32 +1,30 @@
-"""리서치 브리핑 — 네이버 금융 리서치 게시판.
+"""리서치 브리핑 — 네이버 증권 리서치 (JSON API).
 
-  산업분석 industry_list (분류 열 있음) · 경제분석 economy_list · 시황정보 market_info_list · 투자정보 invest_list
-  상세 페이지(*_read.naver?nid=) 의 view_cnt 블록에 리포트 요약 원문이 있다. 종목분석 상세에는 목표가·투자의견도 있다.
+  목록: https://m.stock.naver.com/api/research/{industry|economy|market|invest|company}?page=N&pageSize=M
+        [{researchId, title, brokerName, writeDate(YYYY-MM-DD), category, itemCode·itemName(종목분석만), endUrl}]
+  상세: https://m.stock.naver.com/api/research/{kind}/{researchId}  → researchContent.content (HTML 요약 원문, 종목분석은 목표주가·투자의견 문장 포함)
 
-브리핑 = 최근 N일 산업·경제·시황 리포트의 요약 문장(원문 그대로) + 테마별 목표가 추정치 방향
+2026-09-11 까지 쓰던 finance.naver.com/research 의 HTML 게시판은 그날부터 stock.naver.com 으로 302 넘어갔다.
+종목별 리포트 검색(searchType=itemCode)은 새 API 에 없어서, 종목분석 목록을 통째로(최근 수백 건) 받아 종목코드로 거른다.
+
+브리핑 = 최근 N일 산업·경제·시황·투자정보 리포트의 요약 문장(원문 그대로) + 테마별 목표가 추정치 방향
   추정치 방향: 테마 종목의 최근 N일 종목 리포트마다, 같은 증권사의 직전 리포트 목표가와 비교해 상향/하향을 센다.
 """
 from __future__ import annotations
 
-import asyncio
 import html
 import logging
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
 
-import httpx
+from app.collectors.naver_api import NaverApi
 
 log = logging.getLogger(__name__)
 
-BASE = "https://finance.naver.com/research/"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-    "Referer": "https://finance.naver.com/research/",
-    "Accept-Language": "ko-KR,ko;q=0.9",
-}
-DELAY = 0.15
-LISTS = [("industry", "산업", True), ("economy", "경제", False), ("market_info", "시황", False), ("invest", "투자정보", False)]
+LISTS = [("industry", "산업"), ("economy", "경제"), ("market", "시황"), ("invest", "투자정보")]
+COMPANY_PAGES = 3          # 종목분석 목록을 500건씩 몇 쪽 (3쪽 ≈ 최근 6~8주)
+COMPANY_PAGE_SIZE = 500
 
 
 @dataclass(slots=True)
@@ -41,72 +39,66 @@ class Report:
     bullets: list[str] = field(default_factory=list)
     target: int | None = None
     opinion: str = ""
+    code: str = ""   # 종목분석이면 종목코드
 
 
-_ROW_CAT = re.compile(r'<td style="padding-left:10">(?:<a[^>]*>)?([^<]+)(?:</a>)?\s*</td>\s*<td><a href="([a-z_]+_read\.naver\?nid=(\d+)[^"]*)">([^<]+)</a>.*?</td>\s*<td>([^<]+)</td>.*?<td class="date"[^>]*>\s*(\d{2}\.\d{2}\.\d{2})', re.S)
-_ROW_NOCAT = re.compile(r'<td><a href="([a-z_]+_read\.naver\?nid=(\d+)[^"]*)">([^<]+)</a>.*?</td>\s*<td>([^<]+)</td>.*?<td class="date"[^>]*>\s*(\d{2}\.\d{2}\.\d{2})', re.S)
-
-
-def _d(s: str) -> str:
-    yy, mm, dd = s.split(".")
-    return f"20{yy}-{mm}-{dd}"
-
-
-def parse_list(page_html: str, kind: str, has_category: bool) -> list[Report]:
+def parse_list(rows: list[dict], kind: str) -> list[Report]:
     out = []
-    if has_category:
-        for cat, href, nid, title, broker, d in _ROW_CAT.findall(page_html):
-            out.append(Report(kind, html.unescape(cat).strip(), html.unescape(title).strip(), html.unescape(broker).strip(), _d(d), int(nid), BASE + html.unescape(href)))
-    else:
-        for href, nid, title, broker, d in _ROW_NOCAT.findall(page_html):
-            out.append(Report(kind, "", html.unescape(title).strip(), html.unescape(broker).strip(), _d(d), int(nid), BASE + html.unescape(href)))
+    for r in rows or []:
+        try:
+            nid = int(r["researchId"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        cat = r.get("itemName") if kind == "종목" else r.get("category")
+        out.append(Report(kind, html.unescape(str(cat or "")).strip(), html.unescape(str(r.get("title", ""))).strip(),
+                          html.unescape(str(r.get("brokerName", ""))).strip(), str(r.get("writeDate", ""))[:10], nid,
+                          str(r.get("endUrl", "")), code=str(r.get("itemCode") or "")))
     return out
 
 
-_VIEW = re.compile(r'class="view_cnt">(.*?)</td>', re.S)
-_TARGET = re.compile(r'목표가\s*<em class="money"><strong>([\d,]+)</strong>')
-_OPINION = re.compile(r'투자의견\s*<em class="coment">([^<]+)</em>')
+_TARGET = re.compile(r"목표(?:주가|가)\s*(?:은|는|를|을)?\s*([\d,]{4,})\s*원")
+_OPINION = re.compile(r"투자의견\s*(?:은|는|을|를)?\s*[\"'“”]?\s*(매수|중립|보유|매도|비중확대|비중축소|시장수익률|BUY|HOLD|SELL|Buy|Hold|Sell|Outperform|Neutral|Underperform)")
 
 
-def parse_detail(page_html: str, max_bullets: int = 4) -> dict:
-    """요약 원문을 문장 단위로 잘라 bullets 로. 목표가·투자의견도 뽑는다."""
-    m = _VIEW.search(page_html)
+def parse_detail(d: dict, max_bullets: int = 4) -> dict:
+    """researchContent.content(HTML) 를 문장 단위로 잘라 bullets 로. 목표가·투자의견도 뽑는다."""
+    body = ((d or {}).get("researchContent") or {}).get("content") or ""
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+    body = re.sub(r"</?(p|br|div|li|h\d)[^>]*>", "\n", body)
+    text = html.unescape(re.sub(r"<[^>]+>", "", body))
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in text.split("\n")]
+    lines = [ln for ln in lines if len(ln) >= 8]
     bullets: list[str] = []
-    if m:
-        body = m.group(1)
-        body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
-        body = body.split('<div style="TEXT-ALIGN: left">')[0]
-        body = re.sub(r"</?(p|br|div)[^>]*>", "\n", body)
-        text = html.unescape(re.sub(r"<[^>]+>", "", body))
-        lines = [re.sub(r"\s+", " ", ln).strip() for ln in text.split("\n")]
-        lines = [ln for ln in lines if len(ln) >= 8]
-        if lines:
-            head = lines[0]
-            rest = " ".join(lines[1:])
-            sents = [s.strip() for s in re.split(r"(?<=[.다요음됨함])\s+", rest) if len(s.strip()) >= 10]
-            bullets = [head] + sents[: max_bullets - 1]
-    t = _TARGET.search(page_html)
-    o = _OPINION.search(page_html)
-    return {"bullets": bullets, "target": int(t.group(1).replace(",", "")) if t else None, "opinion": html.unescape(o.group(1)).strip() if o else ""}
+    if lines:
+        head = lines[0]
+        rest = " ".join(lines[1:]) if len(lines) > 1 else ""
+        if not rest and len(head) > 120:      # 새 API 는 요약이 한 문단으로 오는 일이 많다 → 첫 줄도 문장으로 자른다
+            parts = [s.strip() for s in re.split(r"(?<=[.다요음됨함])\s+", head) if s.strip()]
+            head, rest = parts[0], " ".join(parts[1:])
+        sents = [s.strip() for s in re.split(r"(?<=[.다요음됨함])\s+", rest) if len(s.strip()) >= 10]
+        bullets = [head] + sents[: max_bullets - 1]
+    flat = re.sub(r"\s+", " ", text)
+    t = _TARGET.search(flat)
+    o = _OPINION.search(flat)
+    return {"bullets": bullets, "target": int(t.group(1).replace(",", "")) if t else None, "opinion": o.group(1) if o else ""}
 
 
-class NaverResearch:
-    def __init__(self, client: httpx.AsyncClient | None = None):
-        self.client = client or httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True)
+def _api_path(r: Report) -> str:
+    """endUrl https://m.stock.naver.com/research/company/96103 → /research/company/96103"""
+    if "/research/" in r.url:
+        return "/research/" + r.url.split("/research/", 1)[1].split("?")[0]
+    return f"/research/company/{r.nid}"
 
-    async def close(self) -> None:
-        await self.client.aclose()
 
-    async def _get(self, path: str, params: dict | None = None) -> str:
-        r = await self.client.get(BASE + path, params=params)
-        r.raise_for_status()
-        await asyncio.sleep(DELAY)
-        return r.content.decode("euc-kr", "replace")
+class NaverResearch(NaverApi):
+    def __init__(self, client=None):
+        super().__init__(client)
+        self._company: list[Report] | None = None
 
-    async def list_reports(self, list_key: str, kind: str, has_cat: bool, since: str, pages: int = 2) -> list[Report]:
+    async def list_reports(self, list_key: str, kind: str, since: str, pages: int = 2, page_size: int = 100) -> list[Report]:
         out: list[Report] = []
         for p in range(1, pages + 1):
-            rows = parse_list(await self._get(f"{list_key}_list.naver", {"page": p}), kind, has_cat)
+            rows = parse_list(await self.json(f"/research/{list_key}", {"page": p, "pageSize": page_size}), kind)
             out += [r for r in rows if r.date >= since]
             if not rows or rows[-1].date < since:
                 break
@@ -114,18 +106,26 @@ class NaverResearch:
 
     async def fill_detail(self, r: Report) -> Report:
         try:
-            d = parse_detail(await self._get(r.url.replace(BASE, "")))
+            d = parse_detail(await self.json(_api_path(r)))
             r.bullets, r.target, r.opinion = d["bullets"], d["target"], d["opinion"]
         except Exception as e:
             log.debug("리포트 상세 실패 %s: %s", r.nid, e)
         return r
 
-    async def company_reports(self, code: str, pages: int = 1) -> list[Report]:
-        out: list[Report] = []
-        for p in range(1, pages + 1):
-            page = await self._get("company_list.naver", {"searchType": "itemCode", "itemCode": code, "page": p})
-            out += parse_list(page, "종목", True)
-        return out
+    async def company_all(self) -> list[Report]:
+        """종목분석 목록 최근 수백 건 (한 번만 받아 둔다)."""
+        if self._company is None:
+            out: list[Report] = []
+            for p in range(1, COMPANY_PAGES + 1):
+                rows = parse_list(await self.json("/research/company", {"page": p, "pageSize": COMPANY_PAGE_SIZE}), "종목")
+                out += rows
+                if len(rows) < COMPANY_PAGE_SIZE:
+                    break
+            self._company = out
+        return self._company
+
+    async def company_reports(self, code: str) -> list[Report]:
+        return [r for r in await self.company_all() if r.code == code]
 
     async def target_direction(self, stocks: list[tuple[str, str]], since: str, max_reports: int = 8) -> dict:
         """테마 종목들의 최근 리포트 목표가를 같은 증권사 직전 리포트와 비교 → {"up": n, "down": m, "items": [...]}"""
@@ -159,9 +159,9 @@ async def briefing(themes: list[tuple[str, list[tuple[str, str]]]], days: int = 
     nr = NaverResearch()
     try:
         reports: list[Report] = []
-        for key, kind, has_cat in LISTS:
+        for key, kind in LISTS:
             try:
-                reports += await nr.list_reports(key, kind, has_cat, since)
+                reports += await nr.list_reports(key, kind, since)
             except Exception as e:
                 log.warning("리서치 목록 실패 %s: %s", key, e)
         reports.sort(key=lambda r: (r.date, r.nid), reverse=True)

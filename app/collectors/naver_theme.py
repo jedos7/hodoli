@@ -1,32 +1,23 @@
-"""네이버 금융 테마 수집기.
+"""네이버 증권 테마 수집기 (JSON API).
 
-  목록: https://finance.naver.com/sise/theme.naver?page=N            (7쪽 안팎, 기본 정렬 = 전일대비 등락률 내림차순)
-  상세: https://finance.naver.com/sise/sise_group_detail.naver?type=theme&no=NNN
-        종목명(코드) · 현재가 · 전일비 · 등락률 · 매수호가 · 매도호가 · 거래량 · 거래대금(백만) · 전일거래량 · 테마 편입 사유
+  목록: https://m.stock.naver.com/api/stocks/theme?page=N&pageSize=100      groups[]: no · name · changeRate · riseCount · fallCount · steadyCount (266개)
+  상세: https://m.stock.naver.com/api/stocks/theme/{no}?page=1&pageSize=100  stocks[] (현재가·등락률·거래량·거래대금) + themeItemInfoMap{코드: 편입 사유}
 
-페이지는 EUC-KR 이고 표 구조가 단순해서 정규식으로 읽는다. 구조가 바뀌면 parse_* 함수만 고치면 된다.
+2026-09-11 까지 쓰던 finance.naver.com 의 theme.naver / sise_group_detail.naver 는 그날부터 stock.naver.com 으로 302 넘어가 표가 없다.
+옛 목록에 있던 '최근 3일 등락률'과 대장주 2종목은 새 API 에 없다 (chg3d=0, leaders=[]).
 비공식 소스이므로 요청 간격(DELAY)을 두고, 실패해도 서버가 죽지 않게 예외는 호출자가 처리한다.
 """
 from __future__ import annotations
 
-import asyncio
-import html
 import logging
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
 import httpx
 
-log = logging.getLogger(__name__)
+from app.collectors.naver_api import NaverApi, num
 
-BASE = "https://finance.naver.com"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-    "Accept-Language": "ko-KR,ko;q=0.9",
-    "Referer": BASE + "/sise/theme.naver",
-}
-DELAY = 0.25  # 요청 간격(초)
+log = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -34,11 +25,11 @@ class ThemeRow:
     no: int
     name: str
     chg: float        # 전일대비 등락률 %
-    chg3d: float      # 최근 3일 등락률 %
+    chg3d: float      # 최근 3일 등락률 % (새 API 에 없음 → 0)
     up: int
     flat: int
     down: int
-    leaders: list[tuple[str, str]] = field(default_factory=list)  # (코드, 이름)
+    leaders: list[tuple[str, str]] = field(default_factory=list)  # (코드, 이름) — 새 API 에 없음
 
 
 @dataclass(slots=True)
@@ -60,83 +51,35 @@ class StockRow:
         return int(round(self.price / (1 + self.chg / 100))) if self.chg > -100 else self.price
 
 
-# ── 파서 ──────────────────────────────────────────────────────────
-_NUM = lambda s: float(s.replace(",", "").replace("%", "").replace("+", "") or 0)  # noqa: E731
-
-_LIST_ROW = re.compile(
-    r'col_type1"><a href="[^"]*no=(\d+)">([^<]+)</a></td>\s*'
-    r'<td class="number col_type2">\s*<span[^>]*>\s*([-+\d.,]+)%\s*</span>\s*</td>\s*'
-    r'<td class="number col_type3">\s*<span[^>]*>\s*([-+\d.,]+)%\s*</span>\s*</td>\s*'
-    r'<td class="number col_type4">(\d+)</td>\s*<td class="number col_type4">(\d+)</td>\s*<td class="number col_type4">(\d+)</td>(.*?)</tr>',
-    re.S,
-)
-_LEADER = re.compile(r'code=(\d+)">([^<]+)</a>')
-_LAST_PAGE = re.compile(r'class="pgRR"[^>]*>\s*<a href="[^"]*page=(\d+)"')
+# ── 파서 (JSON) ────────────────────────────────────────────────
+def parse_theme_list(d: dict) -> list[ThemeRow]:
+    return [ThemeRow(no=int(g["no"]), name=str(g.get("name", "")).strip(), chg=num(g.get("changeRate")), chg3d=0.0,
+                     up=int(num(g.get("riseCount"))), flat=int(num(g.get("steadyCount"))), down=int(num(g.get("fallCount"))))
+            for g in (d.get("groups") or []) if g.get("no") is not None]
 
 
-def parse_theme_list(page_html: str) -> list[ThemeRow]:
-    out = []
-    for m in _LIST_ROW.finditer(page_html):
-        no, name, chg, chg3d, up, flat, down, rest = m.groups()
-        out.append(ThemeRow(int(no), html.unescape(name).strip(), _NUM(chg), _NUM(chg3d), int(up), int(flat), int(down),
-                            [(c, html.unescape(n).strip()) for c, n in _LEADER.findall(rest)]))
+def parse_theme_detail(d: dict) -> list[StockRow]:
+    why = d.get("themeItemInfoMap") or {}
+    out: list[StockRow] = []
+    for s in d.get("stocks") or []:
+        code = s.get("itemCode")
+        if not code:
+            continue
+        raw = s.get("accumulatedTradingValueRaw")
+        amount_m = int(num(raw) // 1_000_000) if raw not in (None, "") else int(num(s.get("accumulatedTradingValue")))
+        out.append(StockRow(code=str(code), name=str(s.get("stockName", "")).strip(), price=int(num(s.get("closePrice"))),
+                            chg=num(s.get("fluctuationsRatio")), volume=int(num(s.get("accumulatedTradingVolume"))),
+                            amount_million=amount_m, why=str(why.get(code) or "").strip()))
     return out
 
 
-def parse_last_page(page_html: str) -> int:
-    m = _LAST_PAGE.search(page_html)
-    return int(m.group(1)) if m else 1
-
-
-_DETAIL_NAME = re.compile(r'<td class="name">.*?<a href="/item/main\.naver\?code=(\d+)">([^<]+)</a>', re.S)
-_DETAIL_WHY = re.compile(r'<p class="info_txt">(.*?)</p>', re.S)
-_DETAIL_NUMS = re.compile(r'<td class="number"[^>]*>\s*(?:<em[^>]*>.*?</em>)?\s*(?:<span[^>]*>)?\s*([-+\d,.]+%?)', re.S)
-
-
-def parse_theme_detail(page_html: str) -> list[StockRow]:
-    out = []
-    for chunk in re.split(r"<tr onMouseOver", page_html)[1:]:
-        chunk = chunk.split("</tr>", 1)[0]
-        nm = _DETAIL_NAME.search(chunk)
-        if not nm:
-            continue
-        nums = _DETAIL_NUMS.findall(chunk)
-        # [현재가, 전일비, 등락률, 매수호가, 매도호가, 거래량, 거래대금, 전일거래량]
-        if len(nums) < 7:
-            continue
-        why = _DETAIL_WHY.search(chunk)
-        out.append(StockRow(
-            code=nm.group(1), name=html.unescape(nm.group(2)).strip(),
-            price=int(_NUM(nums[0])), chg=_NUM(nums[2]), volume=int(_NUM(nums[5])), amount_million=int(_NUM(nums[6])),
-            why=html.unescape(re.sub(r"<[^>]+>", "", why.group(1))).strip() if why else "",
-        ))
-    return out
-
-
-# ── 수집 ──────────────────────────────────────────────────────────
-class NaverThemeCollector:
-    def __init__(self, client: httpx.AsyncClient | None = None):
-        self.client = client or httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True)
-
-    async def close(self) -> None:
-        await self.client.aclose()
-
-    async def _get(self, path: str) -> str:
-        r = await self.client.get(BASE + path)
-        r.raise_for_status()
-        await asyncio.sleep(DELAY)
-        return r.content.decode("euc-kr", "replace")
-
+class NaverThemeCollector(NaverApi):
     async def theme_list(self, max_pages: int = 10) -> list[ThemeRow]:
-        first = await self._get("/sise/theme.naver?page=1")
-        rows = parse_theme_list(first)
-        last = min(parse_last_page(first), max_pages)
-        for p in range(2, last + 1):
-            rows += parse_theme_list(await self._get(f"/sise/theme.naver?page={p}"))
-        return rows
+        groups = await self.pages("/stocks/theme", "groups", page_size=100, max_pages=max_pages)
+        return parse_theme_list({"groups": groups})
 
     async def theme_detail(self, no: int) -> list[StockRow]:
-        return parse_theme_detail(await self._get(f"/sise/sise_group_detail.naver?type=theme&no={no}"))
+        return parse_theme_detail(await self.json(f"/stocks/theme/{no}", {"page": 1, "pageSize": 100}))
 
 
 def grade_of(chg: float, width: float) -> str:
@@ -180,13 +123,12 @@ async def collect(top: int = 12, per: int = 6, min_stocks: int = 3, min_amount_e
             if len(picked) < min_stocks:
                 continue
             seen.update(s.code for s in picked)
-            total = len(row.leaders) and (row.up + row.flat + row.down) or 1
             width = row.up / max(1, row.up + row.flat + row.down)
             lead = picked[0]
             theme = {
                 "id": f"nv{row.no}", "no": row.no, "name": row.name,
                 "grade": grade_of(row.chg, width),
-                "report": f"상승 {row.up} · 보합 {row.flat} · 하락 {row.down} · 3일 {row.chg3d:+.2f}%",
+                "report": f"상승 {row.up} · 보합 {row.flat} · 하락 {row.down}" + (f" · 3일 {row.chg3d:+.2f}%" if row.chg3d else ""),
                 "news": (lead.name + " — " + lead.why)[:110] if lead.why else "",
                 "chg": row.chg, "chg3d": row.chg3d, "up": row.up, "flat": row.flat, "down": row.down,
                 "stocks": [{"code": s.code, "name": s.name, "ref": s.prev_close, "why": s.why[:140]} for s in picked],
@@ -199,7 +141,7 @@ async def collect(top: int = 12, per: int = 6, min_stocks: int = 3, min_amount_e
                 theme["keywords"] = kws
                 theme.update(await news.enrich([(s.code, s.name) for s in picked], leader.code, keywords=kws))
             themes.append(theme)
-        return {"_comment": "네이버 금융 테마에서 자동 수집. ref = 수집 시점 현재가로 역산한 전일 종가.",
+        return {"_comment": "네이버 증권 테마 API 에서 자동 수집. ref = 수집 시점 현재가로 역산한 전일 종가.",
                 "source": "naver", "collected_at": datetime.now().isoformat(timespec="seconds"),
                 "themes": themes}
     finally:
