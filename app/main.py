@@ -42,7 +42,7 @@ from fastapi.staticfiles import StaticFiles
 from app.collectors import naver_futures
 from app.collectors import overnight as overnight_collector
 from app.collectors.naver_research import briefing as research_briefing
-from app import nxt_close
+from app import market_risk, nxt_close
 from app.events import Events
 from app.notify import notifier
 from app.screener.theme_calendar import build_calendar
@@ -367,10 +367,15 @@ async def job_nxt_close(closing: bool = True) -> dict:
                              "text": "종가배팅 점검 건너뜀 — 오늘 확정 일봉이 없습니다 (휴장일이거나 15:45 스크리너가 아직 안 돌았음)"})
         return {"candidates": 0, "picks": 0, "skipped": "no candles today"}
     cands = nxt_close.load_candidates()
-    result = await nxt_close.check(feed.rest, cands, closing)
+    try:
+        market = await market_risk.check()      # 나스닥·S&P 선물의 15:30 이후 움직임 → 내일 갭다운 위험 표시
+    except Exception as e:
+        log.warning("시장 위험 점검 실패: %s", e)
+        market = None
+    result = await nxt_close.check(feed.rest, cands, closing, market)
     for a in nxt_close.alerts_for(result):
         state.alerts.append(a)
-    return {"candidates": len(result["candidates"]), "picks": len(result["picks"])}
+    return {"candidates": len(result["candidates"]), "picks": len(result["picks"]), "market": market["level"] if market else None}
 
 
 events = Events(settings.data_dir / "events.json")

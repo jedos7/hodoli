@@ -33,3 +33,12 @@ def test_shallow_dip_is_not_a_pick_and_message_says_so():
     res = {"at": "2026-09-10T19:50:00", "closing": True, "candidates": shallow, "picks": []}
     txt = alerts_for(res)[0]["text"]
     assert "후보 없음" in txt and "살짝 내린 종목 3개" in txt and "-2%" in txt
+
+
+def test_alert_includes_market_risk_line():
+    picks = [_c("A", "에이", "급등 +9.0%", 10000, 1500, 9600, -4.0, -4.0)]
+    res = {"at": "2026-09-10T19:50:00", "closing": True, "candidates": picks, "picks": picks,
+           "market": {"level": "주의", "note": "수량을 줄이세요", "moves": {"nq": -0.35, "es": -0.22, "cl": 1.79, "krw": 0.05}}}
+    txt = alerts_for(res)[0]["text"]
+    assert "🟠 시장 위험 [주의]" in txt and "나스닥선물 -0.35%" in txt
+    assert "시장 위험" not in alerts_for({**res, "market": None})[0]["text"]

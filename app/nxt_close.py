@@ -21,6 +21,7 @@ import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime
 
+from app import market_risk
 from app.config import settings
 
 log = logging.getLogger(__name__)
@@ -89,8 +90,8 @@ def load_candidates(min_spike: float = 8.0, min_amount_eok: float = 50.0) -> lis
     return list(out.values())
 
 
-async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
-    """키움 ka10001 을 NXT 코드(코드_NX)로 조회해 NXT 현재가를 얻는다."""
+async def check(rest, candidates: list[Candidate], closing: bool, market: dict | None = None) -> dict:
+    """키움 ka10001 을 NXT 코드(코드_NX)로 조회해 NXT 현재가를 얻는다. market 은 app/market_risk.check() 결과(없어도 됨)."""
     for cnd in candidates:
         try:
             b = await rest.basic(cnd.code + "_NX")
@@ -103,7 +104,7 @@ async def check(rest, candidates: list[Candidate], closing: bool) -> dict:
             log.debug("NXT 조회 실패 %s: %s", cnd.code, e)
     picks = sorted((c for c in candidates if c.pick), key=lambda c: c.nx_move)
     result = {"at": datetime.now().isoformat(timespec="seconds"), "closing": closing, "candidates": [asdict(c) for c in candidates],
-              "picks": [asdict(c) for c in picks]}
+              "picks": [asdict(c) for c in picks], "market": market}
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     (settings.data_dir / "nxt_close.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), "utf-8")
     return result
@@ -152,6 +153,10 @@ def alerts_for(result: dict, top: int = 3) -> list[dict]:
                  "text": f"종가배팅 후보 없음 — {when} 기준 급등주 {len(cands)}종목 중 {tail}. 오늘은 쉬는 날."}]
     ranked = sorted(((score(c), c) for c in picks), key=lambda x: x[0][0], reverse=True)
     lines = [f"🌙 종가배팅 후보 (저녁에 {MIN_DIP:.0f}% 넘게 눌린 급등주) · {when} 기준 · {len(picks)}종목 중 상위 {min(top, len(ranked))}"]
+    market = result.get("market")
+    if market:
+        mark = {"위험": "🔴", "주의": "🟠", "보통": "🟢"}.get(market["level"], "⚪")
+        lines.append(f"{mark} {market_risk.line(market)}")
     out = []
     for i, ((s, why), c) in enumerate(ranked[:top], 1):
         lines.append(f"{i}. {c['name']} ({c['why']}) {c['krx_close']:,}→{c['nx_price']:,}원 ({c['nx_move']:+.1f}%) · {' · '.join(why)}")
