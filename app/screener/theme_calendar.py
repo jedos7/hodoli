@@ -154,12 +154,12 @@ def compute_days(theme_map: dict, candles: dict[str, list[Candle]], days: int = 
 async def build_calendar(progress: Progress | None = None, refresh_map: bool = False, refresh_candles: bool = False) -> dict:
     today = datetime.now().strftime("%Y-%m-%d")
     tm = None if refresh_map else load_theme_map()
-    if not tm or not tm.get("savedAt", "").startswith(today):
+    if not tm or len(tm.get("themes") or {}) < 10 or not tm.get("savedAt", "").startswith(today):   # 비어 있으면(09-11 사고) 다시
         log.info("전체 테마 매핑 수집")
         tm = await collect_theme_map(progress)
     codes = sorted({s["code"] for t in tm["themes"].values() for s in t["stocks"]})
     cached = None if refresh_candles else load_all_candles()
-    if cached and cached[1].startswith(today):
+    if cached and cached[0] and cached[1].startswith(today):
         candles = cached[0]
     else:
         log.info("전 종목 일봉 수집 %d종목", len(codes))

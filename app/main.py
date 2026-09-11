@@ -19,6 +19,7 @@
   GET  /api/notify            텔레그램 알림 상태 · GET /api/notify/chatid 채팅 ID 찾기 · POST /api/notify/test 테스트 전송
   GET  /api/schedule          하루 한 번 자동 실행(장 마감 후 스크리너, 장 전 테마 수집, 16:10 달력, 19:50 NXT) 상태
   POST /api/schedule/run/{name}  자동 실행 작업을 지금 돌리기 (screener | collect)
+  GET  /api/market            시장 지수 패널 (코스피·코스닥 현재가·거래대금·상승/하락·투자자 순매수·베이시스·ADR, 1분 주기). POST /api/market/refresh
   GET  /api/overnight         야간 지표 (전일 20:05 대비, 야후 파이낸스에서 주기 수집)
   POST /api/overnight/refresh 야간 지표 즉시 갱신
   POST /api/collect           네이버 테마 수집 → themes.json 갱신 → 즉시 반영
@@ -39,7 +40,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from app.collectors import naver_futures
+from app.collectors import market_index, naver_futures
 from app.collectors import overnight as overnight_collector
 from app.collectors.naver_research import briefing as research_briefing
 from app import market_risk, nxt_close
@@ -65,6 +66,8 @@ collect_lock = asyncio.Lock()
 last_collect: dict = {"at": None, "themes": 0, "error": None}
 overnight_data: dict = {}
 overnight_lock = asyncio.Lock()
+market_data: dict = {}        # 시장 지수 패널 (app/collectors/market_index.py), 1분 주기
+market_lock = asyncio.Lock()
 
 
 # ── 피드 · 방송 ────────────────────────────────────────────────
@@ -243,6 +246,27 @@ async def refresh_news() -> dict:
         return {"ok": True, "updated": updated, "themes": len(state.themes)}
 
 
+async def refresh_market() -> dict:
+    """코스피·코스닥 현재가/거래대금/상승·하락/투자자 순매수 등을 새로 받아 메모리에 둔다. 실패하면 이전 값을 유지한다."""
+    async with market_lock:
+        rest = feed.rest if isinstance(feed, KiwoomFeed) else None
+        d = await market_index.collect(rest)
+        market_data.clear()
+        market_data.update(d)
+        return d
+
+
+async def market_loop() -> None:
+    """장 시간(08:30~20:30) 1분, 그 밖엔 10분 주기. 네이버 지수 API 는 키가 없고 가볍다."""
+    while True:
+        try:
+            await refresh_market()
+        except Exception as e:
+            log.warning("시장 지수 수집 실패: %s", e)
+        now = datetime.now()
+        await asyncio.sleep(60 if now.weekday() < 5 and (8, 30) <= (now.hour, now.minute) <= (20, 30) else 600)
+
+
 async def news_loop() -> None:
     minutes = settings.news_minutes
     log.info("리포트·뉴스: %d분 주기", minutes)
@@ -399,6 +423,7 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(overnight_loop(), name="overnight"))
     if settings.news_minutes > 0:
         tasks.append(asyncio.create_task(news_loop(), name="news"))
+    tasks.append(asyncio.create_task(market_loop(), name="market"))
     try:
         yield
     finally:
@@ -673,6 +698,20 @@ def api_watch_remove(code: str):
 @app.get("/api/alerts")
 def api_alerts():
     return {"alerts": alert_log[-50:]}
+
+
+@app.get("/api/market")
+def api_market():
+    """시장 지수 패널: 코스피·코스닥·코스피200·선물 현재가, 거래대금(조), 상승/하락 종목 수, 투자자별 순매수(억), 베이시스, ADR 20일."""
+    return market_data or {"asof": None}
+
+
+@app.post("/api/market/refresh")
+async def api_market_refresh():
+    try:
+        return await refresh_market()
+    except Exception as e:
+        raise HTTPException(502, f"시장 지수 수집 실패: {e}")
 
 
 @app.get("/api/overnight")

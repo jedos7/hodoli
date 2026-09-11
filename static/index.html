@@ -293,26 +293,20 @@ table.hg tr.drop td{opacity:.65}
   <!-- 좌측: 시장 매크로 -->
   <aside class="side">
     <div class="panel">
-      <div class="sec"><h3>시장 지수 <span id="mktState" class="pill good">안정</span></h3>
+      <div class="sec"><h3>시장 지수 <span id="mktState" class="pill good">–</span> <span id="mktMeta" style="text-transform:none;font-weight:400;font-size:11px;color:var(--ink-3)"></span></h3>
         <div class="idx"><div class="name"><span>코스피</span><span>대금 <b class="num" id="kpVol"></b></span></div>
           <div class="val"><span id="kp"></span><small id="kpChg"></small></div>
-          <div class="sub"><span>1D VWAP <span class="num" id="kpVwap"></span></span><span>ADR <span class="num">92.1%</span></span></div></div>
+          <div class="sub"><span>상승 <span class="num up" id="kpUp"></span> · 하락 <span class="num down" id="kpDn"></span></span><span>시가 대비 <span class="num" id="kpOpen"></span></span></div></div>
         <div class="idx"><div class="name"><span>코스닥</span><span>대금 <b class="num" id="kdVol"></b></span></div>
           <div class="val"><span id="kd"></span><small id="kdChg"></small></div>
-          <div class="sub"><span>1D VWAP <span class="num" id="kdVwap"></span></span><span>ADR <span class="num">116.1%</span></span></div></div>
+          <div class="sub"><span>상승 <span class="num up" id="kdUp"></span> · 하락 <span class="num down" id="kdDn"></span></span><span>시가 대비 <span class="num" id="kdOpen"></span></span></div></div>
+        <dl class="kv" style="margin-top:4px"><dt>코스피200 선물</dt><dd class="num" id="fut">–</dd><dt>베이시스 (선물−현물)</dt><dd class="num" id="basis">–</dd><dt>ADR 20일 <span title="최근 20거래일 상승 종목 수 ÷ 하락 종목 수. 120% 위 과열, 75% 아래 과매도">ⓘ</span></dt><dd class="num" id="adr">–</dd><dt>VIX (지금)</dt><dd class="num" id="vk">–</dd></dl>
       </div>
       <div class="sec"><h3>전일 20:05 (NXT 마감) 대비 <span style="text-transform:none;font-weight:400" id="ovnMeta">해외·야간</span></h3>
         <div class="ovn" id="ovn"></div>
         <div class="ovn-note" id="ovnNote"></div>
       </div>
-      <div class="sec"><h3>파생 · 심리</h3>
-        <dl class="kv"><dt>선물 베이시스</dt><dd class="num up">+8.16 콘탱고</dd><dt>VKOSPI</dt><dd class="num" id="vk">17.4</dd><dt>미국 옵션 PCR</dt><dd class="num">0.72 탐욕</dd><dt>국내 콜/풋</dt><dd class="num">85.07</dd><dt>선물 미결제</dt><dd class="num">80,743</dd></dl>
-      </div>
-      <div class="sec"><h3>자금 동향</h3>
-        <dl class="kv"><dt>환율 (USD/KRW)</dt><dd class="num" id="fx">1,338.3</dd><dt>예탁금</dt><dd class="num">93.9조</dd><dt>신용 / 비율</dt><dd class="num">32.8조 / 34.9%</dd></dl>
-        <div class="fx" style="margin-top:6px"><div>09/09</div><div class="num">1,339.3</div><div class="num down">▼0.3</div><div>09/08</div><div class="num">1,343.6</div><div class="num down">▼1.5</div><div>09/07</div><div class="num">1,345.1</div><div class="num down">▼10.3</div><div>09/04</div><div class="num">1,355.4</div><div class="num up">▲2.1</div></div>
-      </div>
-      <div class="sec"><h3>코스피 당일 수급 <span style="text-transform:none;font-weight:400">억원</span></h3><div id="kpFlow"></div></div>
+      <div class="sec"><h3>코스피 당일 수급 <span style="text-transform:none;font-weight:400">억원 · <span id="flowSrc">–</span></span></h3><div id="kpFlow"></div></div>
       <div class="sec"><h3>코스닥 당일 수급</h3><div id="kdFlow"></div></div>
     </div>
   </aside>
@@ -682,20 +676,49 @@ function renderDetail(){
   svg.innerHTML=`<path d="${line} L${W} ${H} L0 ${H} Z" fill="var(--accent-soft)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`;
 }
 
-/* ───────────────────────── 렌더: 좌측 매크로, 티커 ───────────────────────── */
+/* ───────────────────────── 렌더: 좌측 매크로, 티커 ─────────────────────────
+   서버 모드면 /api/market (네이버 지수 API + 키움 투자자 순매수) 실제 값을 1분마다 받아 그린다.
+   시제품 모드(서버 없음)에서만 아래 mkt 고정값을 흔들어 보여준다 — 2026-09-11 까지는 서버 모드에서도 이 가짜 값이 보였다. */
 const mkt={kp:7069.81,kpBase:6954.2,kd:825.53,kdBase:812.0,kpV:12.2,kdV:4.74,vk:17.4};
+let MKT=null;
 function renderMacro(){
+  const flows=(el,arr)=>{if(!arr||!arr.length){el.innerHTML='<div style="color:var(--ink-3);font-size:12px">수급 자료 없음</div>';return}
+    const m=Math.max(...arr.map(a=>Math.abs(a[1])))||1;el.innerHTML=arr.map(([k,v])=>`<div class="flowrow"><span>${k}</span><div class="bar"><i style="${v>=0?'left:50%':'right:50%'};width:${Math.abs(v)/m*50}%;background:var(--${v>=0?'up':'down'})"></i></div><span class="num ${cls(v)}">${v>0?'+':''}${Math.round(v).toLocaleString('ko-KR')}</span></div>`).join('')};
+  const put=(id,v,c)=>{const e=$(id);e.textContent=v;if(c!==undefined)e.className='num '+c};
+  const vixRow=OVN.find(o=>o.tag==='vix'),vix=vixRow&&vixRow.now!=null?vixRow.now:null;
+  const setState=(kpc)=>{const st=(vix!=null&&vix>25)||kpc<=-2?['불안','up']:(vix!=null&&vix>20)||kpc<=-1?['주의','accent']:['안정','good'];$('#mktState').textContent=st[0];$('#mktState').className='pill '+st[1]};
+  $('#vk').textContent=vix==null?'–':vix.toFixed(2);
+  if(MKT&&MKT.kospi){
+    const f2=v=>v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    for(const [p,x] of [['kp',MKT.kospi],['kd',MKT.kosdaq]]){
+      put('#'+p,f2(x.price),cls(x.chg));put('#'+p+'Chg',arrow(x.chg)+' '+pct(x.chg),cls(x.chg));
+      $('#'+p+'Vol').textContent=x.amountJo!=null?x.amountJo.toFixed(1)+'조':'–';
+      $('#'+p+'Up').textContent=x.rise!=null?x.rise+(x.upper?'('+x.upper+')':''):'–';$('#'+p+'Dn').textContent=x.fall!=null?x.fall+(x.lower?'('+x.lower+')':''):'–';
+      const vo=x.open?(x.price/x.open-1)*100:null;put('#'+p+'Open',vo==null?'–':pct(vo),vo==null?'':cls(vo));
+    }
+    const fu=MKT.futures;put('#fut',fu&&fu.price?f2(fu.price)+' '+pct(fu.chg):'–',fu?cls(fu.chg):'');
+    const b=MKT.basis;put('#basis',b==null?'–':(b>0?'+':'')+b.toFixed(2)+(b>=0?' 콘탱고':' 백워데이션'),b==null?'':cls(b));
+    const a=MKT.adr20;put('#adr',a==null?'–':a.toFixed(1)+'%'+(a>=120?' 과열':a<=75?' 과매도':''),a==null?'':a>=120?'up':a<=75?'down':'');
+    setState(MKT.kospi.chg);
+    $('#mktMeta').textContent=(MKT.kospi.status==='CLOSE'?'마감 ':'장중 ')+(MKT.kospi.at||'')+(MKT.adrDays&&MKT.adrDays<20?' · ADR '+MKT.adrDays+'일치':'');
+    $('#flowSrc').textContent=MKT.investorsSrc||'–';
+    flows($('#kpFlow'),MKT.kospi.investors);flows($('#kdFlow'),MKT.kosdaq.investors);
+    return;
+  }
+  // 시제품(서버 없음): 고정값 흔들기
   mkt.kp+=gauss()*1.2;mkt.kd+=gauss()*0.25;mkt.kpV+=0.004;mkt.kdV+=0.002;mkt.vk=clamp(mkt.vk+gauss()*0.05,10,40);
   const kpc=(mkt.kp/mkt.kpBase-1)*100,kdc=(mkt.kd/mkt.kdBase-1)*100;
-  $('#kp').textContent=mkt.kp.toFixed(2);$('#kp').className='num '+cls(kpc);$('#kpChg').textContent=arrow(kpc)+' '+pct(kpc);$('#kpChg').className='num '+cls(kpc);
-  $('#kd').textContent=mkt.kd.toFixed(2);$('#kd').className='num '+cls(kdc);$('#kdChg').textContent=arrow(kdc)+' '+pct(kdc);$('#kdChg').className='num '+cls(kdc);
+  put('#kp',mkt.kp.toFixed(2),cls(kpc));put('#kpChg',arrow(kpc)+' '+pct(kpc),cls(kpc));put('#kd',mkt.kd.toFixed(2),cls(kdc));put('#kdChg',arrow(kdc)+' '+pct(kdc),cls(kdc));
   $('#kpVol').textContent=mkt.kpV.toFixed(1)+'조';$('#kdVol').textContent=mkt.kdV.toFixed(1)+'조';
-  $('#kpVwap').textContent='7,055.5';$('#kdVwap').textContent='824.2';$('#vk').textContent=mkt.vk.toFixed(1);
-  const state=mkt.vk>25?['불안','up']:mkt.vk>20?['주의','accent']:['안정','good'];$('#mktState').textContent=state[0];$('#mktState').className='pill '+state[1];
-  const flows=(el,arr)=>{const m=Math.max(...arr.map(a=>Math.abs(a[1])));el.innerHTML=arr.map(([k,v])=>`<div class="flowrow"><span>${k}</span><div class="bar"><i style="${v>=0?'left:50%':'right:50%'};width:${Math.abs(v)/m*50}%;background:var(--${v>=0?'up':'down'})"></i></div><span class="num ${cls(v)}">${v>0?'+':''}${v.toLocaleString('ko-KR')}</span></div>`).join('')};
+  for(const id of ['#kpUp','#kpDn','#kdUp','#kdDn','#kpOpen','#kdOpen','#fut','#basis','#adr'])$(id).textContent='–';
+  setState(kpc);$('#mktMeta').textContent='모의';$('#flowSrc').textContent='모의';
   flows($('#kpFlow'),[['개인',-16907],['외인',1623],['기관',6760],['금투',3837],['연기금',2350]]);
   flows($('#kdFlow'),[['개인',-2422],['외인',2262],['기관',163],['투신',-1]]);
 }
+async function loadMarket(){
+  try{const r=await fetch('/api/market');if(!r.ok)return;const d=await r.json();if(!d||!d.kospi)return;MKT=d;renderMacro();}catch(e){}
+}
+if(USE_SERVER){loadMarket();setInterval(loadMarket,60000)}
 /* 해외·야간 지표: 전일 20:05(NXT 마감) 대비 지금.
    서버 피드면 /api/overnight (야후 파이낸스 15분봉에서 기준값을 뽑은 실제 값)를 1분마다 받고, 아니면 아래 모의 표를 흔들어 보여준다. */
 let OVN=[
