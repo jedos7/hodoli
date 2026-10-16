@@ -103,8 +103,10 @@ def evaluate(row, daily, hourly, threshold_eok, today):
     checks['macd'] = (crossed_up(m, other=s), f"MACD {m[-1]:.1f} / 시그널 {s[-1]:.1f} (어제 {m[-2]:.1f} / {s[-2]:.1f})")
     _, sk, _ = stoch([(c.high, c.low, c.close) for c in daily])
     checks['stoch'] = (crossed_up(sk, level=20), f"스토캐스틱 %K {sk[-1]:.1f} (어제 {sk[-2]:.1f}), 20 상향 돌파")
-    b240 = bars_240(hourly)
-    if len(b240) < 14:
+    b240 = bars_240(hourly or [])
+    if hourly is None:
+        checks['stoch240'] = (False, '일봉 조건을 먼저 통과해야 240분봉을 조회함')
+    elif len(b240) < 14:
         checks['stoch240'] = (False, f'240분봉 {len(b240)}개 (14개 필요)')
     else:
         f, k, d = stoch([(b[2], b[3], b[4]) for b in b240])
@@ -294,7 +296,7 @@ class CloseBet(AutoExit):
             for r in rows:
                 try:
                     daily = await broker.daily(r['code'])
-                    ev = evaluate(r, daily, [], self.settings['threshold_eok'], ymd)
+                    ev = evaluate(r, daily, None, self.settings['threshold_eok'], ymd)
                     core = [k for k in ('macd', 'stoch', 'prev', 'high') if k in ev['checks']]
                     if ev['checks'].get('data', (True,))[0] and all(ev['checks'][k][0] for k in core):
                         hourly = await broker.minutes(r['code'], '60')     # 일봉 조건을 다 넘은 종목만 240분봉을 받는다
