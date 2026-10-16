@@ -918,7 +918,7 @@ custom_exit_service = CustomExitService(settings, sell_service, exit_service)
 
 auto_buy_service = AutoBuyService(settings, sell_service, exit_service, custom_exit_service)
 
-app = FastAPI(title="테마 레이더 API", lifespan=lifespan)
+app = FastAPI(title="주식자동프로그램 API", lifespan=lifespan)
 
 app.include_router(create_router(sell_service))
 

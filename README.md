@@ -1,4 +1,4 @@
-# 테마 레이더 — 백엔드 뼈대
+# 주식자동프로그램 (구 테마 레이더)
 
 한국투자증권 Open API(REST + WebSocket)로 시세를 받아 테마 활동도·수급을 계산하고,
 `static/index.html` 프론트에 1초마다 방송하는 FastAPI 서버입니다.

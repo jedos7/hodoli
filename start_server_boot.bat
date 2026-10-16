@@ -3,7 +3,7 @@ rem Boot-time launcher with a watchdog. Started by the Startup-folder shortcut "
 rem - waits for the network, then runs the server. If the server exits, restarts it after 10s.
 rem - if a server already runs (listening on 8000 OR a uvicorn process still starting up), waits instead of fighting.
 rem - stop_server.bat creates data\autostart.stop which ends this loop.
-title Theme Radar server (auto)
+title Stock Auto Program server (auto)
 cd /d D:\theme_radar
 if exist data\autostart.stop del data\autostart.stop
 timeout /t 25 /nobreak >nul

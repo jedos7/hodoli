@@ -1,5 +1,5 @@
 @echo off
-title Theme Radar server
+title Stock Auto Program server
 cd /d D:\theme_radar
 echo [Theme Radar] stopping any old server (even one still starting up)...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*uvicorn app.main:app*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"

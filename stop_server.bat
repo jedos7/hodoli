@@ -1,5 +1,5 @@
 @echo off
-title Theme Radar stop
+title Stock Auto Program stop
 cd /d D:\theme_radar
 rem tell the boot watchdog (start_server_boot.bat) to stop looping, then kill the server
 echo stop > data\autostart.stop
