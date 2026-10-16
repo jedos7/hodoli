@@ -1,55 +1,54 @@
 # 주식자동프로그램 (구 테마 레이더)
 
-한국투자증권 Open API(REST + WebSocket)로 시세를 받아 테마 활동도·수급을 계산하고,
-`static/index.html` 프론트에 1초마다 방송하는 FastAPI 서버입니다.
-API 키 없이도 `KIS_ENV=mock` 으로 모의 시세가 돌아갑니다.
+키움 REST API 로 시세·계좌를 읽고, 조건에 맞는 종목을 찾아 알리고, 사용자가 켠 범위 안에서만 실제 주문을 내는 개인용 프로그램입니다.
+한 PC 에서 서버(FastAPI) 하나가 돌고, 화면은 브라우저로 `http://127.0.0.1:8000` 에 붙습니다. 외부에서 접속할 수 없습니다(127.0.0.1 에만 묶음).
+
+## 화면
+
+| 주소 | 화면 | 하는 일 |
+|---|---|---|
+| `/` → `/horizon.html` | **호라이즌 관제탑** (첫 화면) | 시장 지수·수급·해외 지표, 기준봉 뒤 D+1/D+2 조건 판정, 보유 종목 매도 상태 |
+| `/closebet.html` | **종가배팅 자동매매** | 15:15 후보 → 15:19:50 매수 → 다음 날 09:00 시초가 매도. 흉내/실전 모드 ([docs/CLOSEBET.md](docs/CLOSEBET.md)) |
+| `/auto-buy.html` | 내 조건 자동매수 | 종목·가격·수량을 정해 지정가 1회 매수, 체결 후 익절·손절 연결 ([docs/AUTO_BUY.md](docs/AUTO_BUY.md)) |
+| `/custom-exit.html` | 내 조건 자동매도 | 보유 종목의 익절·손절·이익보전·시간외 매도 티켓, 호라이즌 D+2 자동매도 ([docs/CUSTOM_EXIT.md](docs/CUSTOM_EXIT.md), [docs/AUTOEXIT.md](docs/AUTOEXIT.md)) |
+| `/theme-radar.html` | 테마 레이더 | 테마 카드(활동도·수급·대장주·5분 유입), 고가놀이·눌림목 스크리너, 돌파 감시, 리서치, 일별 테마 달력 |
+| `/reference.html` · `/swing-research.html` | 참고 연구 | CVD·시장 흐름, 실적·산업 리포트 |
+
+주문이 나가는 화면은 종가배팅·내 조건 자동매수·내 조건 자동매도 셋뿐이고, 모두 **사용자가 화면에서 직접 켠 계획만** 실행합니다. 서버를 재시작해도 자동매수·자동매도 계획은 다시 켜지지 않습니다(종가배팅의 보유 종목 매도만 예외).
 
 ## 구조
 
 ```
-theme-radar/
+theme_radar/
 ├─ app/
-│  ├─ config.py          .env → Settings (mock / vts / real 전환, 서버 주소)
-│  ├─ state.py           장중 상태: 종목 시세 → 테마 지표(활동도·5분 유입·대장주·집중도)
-│  ├─ supply.py          수급 점수: 체결강도 + 외인·기관 순매수 + 대금 가속
-│  ├─ scheduler.py       하루 한 번 자동 실행 (장 마감 후 스크리너, 장 전 테마 수집)
-│  ├─ watch.py           장중 돌파 감시: 눌림목 매수 기준가·손절가 대비 실시간 체결 판정 → 알림
-│  ├─ events.py          일정: 옵션만기·미국 지표·FOMC 규칙 계산 + 등록 일정
-│  ├─ collectors/naver_research.py  리서치 브리핑: 산업·경제 리포트 요약 원문, 목표가 방향
-│  ├─ screener/theme_calendar.py    일별 테마 달력: 전체 테마 매핑 × 전 종목 일봉
-│  ├─ collectors/
-│  │  ├─ naver_theme.py  네이버 금융 테마 목록·구성 종목·편입 사유 수집
-│  │  ├─ naver_daily.py  네이버 일봉 · 코스피/코스닥 종목 목록 (스크리너용)
-│  │  ├─ naver_news.py   종목별 증권사 리포트 건수 · 최신 뉴스 (카드의 리포트 줄·뉴스 줄)
-│  │  ├─ naver_futures.py 코스피200 선물 투자자별 매매동향 (외인 선물)
-│  │  └─ overnight.py    야간 지표: 전일 20:05 대비 해외 지수·유가·환율 (야후 파이낸스)
-│  ├─ feeds.py           MockFeed(랜덤워크) / KiwoomFeed / KisFeed (REST 초기값 + WebSocket 체결)
-│  ├─ kiwoom/
-│  │  ├─ auth.py         키움 접근토큰 (파일 캐시)
-│  │  ├─ rest.py         ka10001 기본정보 · ka10081 일봉 · ka10059 투자자(현재가·거래대금·순매수)
-│  │  ├─ ws.py           실시간 0B 체결 구독, LOGIN/REG/PING, 재접속
-│  │  └─ parse.py        부호 붙은 숫자, 실시간 FID → Trade, 일봉·투자자 응답 파서
-│  ├─ main.py            FastAPI: /api/*, /ws/stream, 정적 파일
-│  ├─ kis/
-│  │  ├─ auth.py         접근토큰(24h, 파일 캐시) · 웹소켓 접속키
-│  │  ├─ rest.py         현재가 · 일봉 · 지수 조회 (호출 간격 제한 포함)
-│  │  ├─ ws.py           실시간 체결 구독, PINGPONG, 재접속, 41종목 제한 분할
-│  │  ├─ futures.py      코스피200 선물 외국인 순매수 (설정으로 거래 ID·필드 조정)
-│  │  └─ parse.py        '0|H0STCNT0|n|a^b^c…' 텍스트 → Trade
-│  └─ screener/
-│     ├─ indicators.py   EMA · MACD
-│     ├─ hoga_play.py    고가놀이 판정 + 3일 보유 백테스트
-│     ├─ pullback.py     눌림목 판정 (눌림 폭·거래량 감소·20일선·저점 유지)
-│     └─ runner.py       소스(naver/kis/mock)·범위(themes/market) 골라 실행 → data/hoga.json
-├─ scripts/fetch_daily.py  장 마감 후 일봉 수집 → 스크리너 → data/hoga.json
-├─ scripts/collect_themes.py  네이버 테마 수집 → themes.json
-├─ scripts/fetch_overnight.py 야간 지표 1회 수집 → data/overnight.json
-├─ scripts/probe_kis.py       KIS 조회 API 원본 응답 확인 (필드·코드 맞출 때)
-├─ scripts/sweep_pullback.py  눌림목 조건 조합 비교 (저장된 일봉으로 승률·기준선 대비 표)
-├─ scripts/sweep_hoga.py      고가놀이 조건 조합 비교
-├─ static/index.html       프론트 (모의 피드 내장, 서버에서 열면 WebSocket 으로 전환)
-├─ themes.json             테마 → 종목 매핑
-└─ tests/                  파서 · 스크리너 단위 테스트
+│  ├─ main.py                  FastAPI: /api/*, /ws/stream, 정적 파일, 스케줄 작업, 각 서비스 연결
+│  ├─ config.py                .env → Settings (증권사, 스케줄 시각, 텔레그램)
+│  ├─ feeds.py                 KiwoomFeed (REST 초기값 + WebSocket 체결·계좌 이벤트) / KisFeed / MockFeed
+│  ├─ kiwoom/                  auth 토큰 · rest 조회 · ws 실시간(체결·계좌·장 상태) · parse
+│  │   ├─ orders.py            현금 매도 1회 전송 (kt10001) · 주문 상세 (kt00007) · 잔고 (kt00018)
+│  │   ├─ buy_orders.py        지정가 매수 (kt10000) · 잔량 취소 (kt10003) · 주문가능 (kt00011)
+│  │   ├─ extended_sell.py     시간외 매도 (NXT·KRX 16~20시)
+│  │   └─ closebet_orders.py   종가배팅용 조회(순위·일봉·분봉·호가)와 주문
+│  ├─ autoexit.py              자동 주문 공통 뼈대: 저널(전송 전 기록) · OS 잠금 · 전송 1회 · 체결 대조 · 실패 시 닫힘
+│  ├─ horizon*.py              호라이즌 판정(horizon.py) · 수집 서비스 · D+2 자동매도 계획 · 시간외
+│  ├─ auto_buy*.py             내 조건 자동매수
+│  ├─ custom_exit*.py, exit_tickets.py, after_hours_exit.py, exit_coordination.py   내 조건 자동매도와 엔진 간 충돌 방지
+│  ├─ closebet.py, closebet_service.py   종가배팅 자동매매
+│  ├─ autosell.py, autosell_service.py   계좌 잔고 읽기·매도조건 검증(주문 없음) — 다른 엔진이 계좌 이벤트를 여기서 받는다
+│  ├─ state.py, supply.py      테마 지표(활동도·5분 유입) · 수급 점수
+│  ├─ scheduler.py             하루 한 번 작업 (15:35 테마 수집, 15:45 스크리너, 16:10 달력, 19:50 NXT 종배 알림)
+│  ├─ watch.py, nxt_close.py, market_risk.py, events.py, notify.py   돌파 감시 · NXT 종배 알림 · 시장 위험 · 일정 · 텔레그램
+│  ├─ stock_flow.py, trade_tape.py, price_chart.py, pattern_service.py, swing_research.py, dart_research.py, reference_research.py   참고 패널
+│  ├─ collectors/              네이버(테마·일봉·뉴스·리서치·선물·지수) · 야후(야간 지표)
+│  └─ screener/                고가놀이 · 눌림목 · 일별 테마 달력 · runner
+├─ static/                     화면 (html + js + css, 라이브러리 없음)
+├─ scripts/                    일봉 수집, 조건 조합 비교(sweep_*), 검증 도구, DART 키 입력(setup_dart.py)
+├─ docs/                       기능별 문서 ([docs/INDEX.md](docs/INDEX.md))
+├─ tests/                      pytest 650여 개 (가짜 증권사로 주문 흐름까지) · *.cjs 는 화면 테스트 (node 필요)
+├─ data/                       실행 중 생기는 파일 (일봉 캐시, 결과, 주문 저널). git 에 올라가지 않음
+├─ themes.json                 테마 → 종목 (15:35 수집으로 매일 갱신)
+├─ start_server.bat            수동 실행 (창 닫으면 종료) · start_server_boot.bat 부팅 자동 실행+감시 · stop_server.bat
+└─ .env                        키움 키·텔레그램 토큰 (절대 커밋하지 않음)
 ```
 
 ## 매일 켜고 끄기 (가장 쉬운 방법)
@@ -67,17 +66,15 @@ py -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env          # 기본 KIS_ENV=mock
 py -m pytest -q
-py scripts\fetch_daily.py       # 고가놀이 결과 생성 (네이버 실제 일봉, 테마 종목)
-uvicorn app.main:app --reload   # http://127.0.0.1:8000
+uvicorn app.main:app            # http://127.0.0.1:8000  (평소에는 start_server.bat 더블클릭)
 ```
 
-브라우저에서 `http://127.0.0.1:8000` 을 열면 프론트가 `/ws/stream` 에 붙어 서버 계산값을 그립니다.
-연결이 안 되면 프론트는 자체 모의 피드로 돌아갑니다 (상단 배지에 표시).
+`--reload` 는 이 환경에서 불안정해 쓰지 않습니다. 코드를 고치면 껐다 켭니다. 화면(static/)만 고쳤을 때는 F5 로 충분합니다.
 
 ## 증권사 연결
 
 `.env` 의 `BROKER` 로 고릅니다. `mock` 은 키 없이 가짜 시세, `kiwoom` 은 키움 REST API, `kis` 는 한국투자증권입니다.
-시세를 읽기만 하며 주문 기능은 없습니다.
+주문은 키움(`kiwoom`)에서만 되고, 종가배팅·내 조건 자동매수·내 조건 자동매도 화면에서 사용자가 직접 켠 계획만 실행합니다. KIS 는 시세 조회만 됩니다.
 
 ### 키움 REST API (BROKER=kiwoom) — 실제 접속으로 검증됨
 
@@ -218,7 +215,7 @@ py scripts\fetch_daily.py --use-cache          # 저장된 일봉으로 스크�
 
 ## 종가배팅 자동매매 (변성환 규칙, 실제 주문)
 
-`/closebet.html`. 15:15 후보 선정(거래대금 300억↑ · 일봉 MACD·스토캐스틱 오늘 돌파 · 240분 스토캐스틱 상승 · 전날 급등·고가 근처 제외) → 15:19:50 매도1호가 지정가 매수 → 다음 거래일 08:40 시장가 매도(09:00 시초가). 흉내(dry) 모드가 기본, 실전(live)은 확인란을 선택해야 켜진다. 총 투입 999만 원 이하·5종목 이하. 자세한 규칙·안전장치·검증 결과는 [CLOSEBET.md](CLOSEBET.md).
+`/closebet.html`. 15:15 후보 선정(거래대금 300억↑ · 일봉 MACD·스토캐스틱 오늘 돌파 · 240분 스토캐스틱 상승 · 전날 급등·고가 근처 제외) → 15:19:50 매도1호가 지정가 매수 → 다음 거래일 08:40 시장가 매도(09:00 시초가). 흉내(dry) 모드가 기본, 실전(live)은 확인란을 선택해야 켜진다. 총 투입 999만 원 이하·5종목 이하. 자세한 규칙·안전장치·검증 결과는 [CLOSEBET.md](docs/CLOSEBET.md).
 
 ## 종가배팅 (고가놀이 표시 · NXT 하락 마감 알림)
 
@@ -365,10 +362,14 @@ py scripts\probe_kis.py                    # 현재 설정으로 외인 선물 �
 | 감시 목록이 비어 있음 | 오늘 눌림목 엄선 자리가 없거나 결과 파일이 4일 넘게 오래됨 | 정상. 15:45 결과로 다시 채워짐 |
 | 고가놀이·눌림목 결과가 어제 날짜 | 장중이라 오늘 봉 제외 | 정상. 15:45 이후 오늘 포함 |
 | 네이버 수집 실패 로그 | 페이지 구조 변경 또는 차단 | 이전 결과 유지. 파서(`app/collectors/*.py`) 수정 필요 |
+| 시작 직후 "키움 조회 실패 … ka10059 오류 7 [1631]" 가 몇 종목 | 키움 서버 쪽 일시 오류 (주말·새벽에 잦음) | 2분마다 다시 조회하므로 무시. 장중에도 계속되면 재시작 |
+| 부팅했는데 서버가 안 뜸 | 시작프로그램 바로가기 삭제됨 또는 `data\autostart.stop` 남음 | `shell:startup` 폴더에 "주식자동프로그램 (auto)" 확인 → 없으면 README 의 자동 시작 절 참고. stop 파일은 start_server_boot.bat 이 시작할 때 지움 |
 
 ## 아직 비어 있는 것
 
-- **주문**: 의도적으로 넣지 않았습니다. 필요하면 `app/kis/order.py` 로 분리하고 `KIS_ACCOUNT_NO` 를 씁니다.
+- **호라이즌존 자동매매**: 제작자(변성환)의 정확한 기준봉·핵심 자리·매수 시점 정의를 받은 뒤 붙입니다. 지금은 관제탑 판정과 D+2 자동매도까지만 있습니다.
+- **모의투자 서버 검증**: 자동 주문 코드는 가짜 증권사로만 테스트했습니다. 실전 첫 주문 날은 15:20 과 다음 날 09:00 에 키움 앱 주문내역과 대조하세요.
+- **화면 테스트(tests/*.cjs)** 는 node 가 설치되어 있어야 돕니다. 이 PC 에는 node 가 없어 파이썬 테스트만 돌립니다.
 
 ## 필드 참고 (H0STCNT0 실시간 체결)
 
