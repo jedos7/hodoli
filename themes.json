@@ -62,7 +62,7 @@
    "newsAt": "2026-10-14 09:57",
    "newsPress": "뉴스1",
    "newsScore": 4,
-   "updatedAt": "2026-10-17T07:46:28"
+   "updatedAt": "2026-10-17T07:57:43"
   },
   {
    "id": "nv520",
@@ -131,7 +131,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-10-17T07:46:29"
+   "updatedAt": "2026-10-17T07:57:45"
   },
   {
    "id": "nv166",
@@ -186,7 +186,7 @@
    "newsAt": "2026-10-17 07:00",
    "newsPress": "KBS",
    "newsScore": 4,
-   "updatedAt": "2026-10-17T07:46:30"
+   "updatedAt": "2026-10-17T07:57:45"
   },
   {
    "id": "nv36",
@@ -257,7 +257,7 @@
    "newsAt": "2026-10-16 13:18",
    "newsPress": "뉴스1",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:31"
+   "updatedAt": "2026-10-17T07:57:46"
   },
   {
    "id": "nv449",
@@ -308,7 +308,7 @@
    "newsAt": "",
    "newsPress": "매일신문",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:31"
+   "updatedAt": "2026-10-17T07:57:47"
   },
   {
    "id": "nv177",
@@ -364,7 +364,7 @@
    "newsAt": "2026-10-15 08:48",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:32"
+   "updatedAt": "2026-10-17T07:57:48"
   },
   {
    "id": "nv592",
@@ -435,7 +435,7 @@
    "newsAt": "2026-10-16 06:00",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-10-17T07:46:33"
+   "updatedAt": "2026-10-17T07:57:49"
   },
   {
    "id": "nv559",
@@ -504,7 +504,7 @@
    "newsAt": "2026-10-16 11:35",
    "newsPress": "디지털데일리",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:34"
+   "updatedAt": "2026-10-17T07:57:50"
   },
   {
    "id": "nv600",
@@ -547,7 +547,7 @@
    "newsAt": "",
    "newsPress": "헤럴드경제",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:35"
+   "updatedAt": "2026-10-17T07:57:51"
   },
   {
    "id": "nv79",
@@ -613,7 +613,7 @@
    "newsAt": "2026-10-16 16:26",
    "newsPress": "뉴스1",
    "newsScore": 2,
-   "updatedAt": "2026-10-17T07:46:36"
+   "updatedAt": "2026-10-17T07:57:51"
   },
   {
    "id": "nv488",
@@ -684,7 +684,7 @@
    "newsAt": "2026-10-16 17:55",
    "newsPress": "머니투데이",
    "newsScore": 4,
-   "updatedAt": "2026-10-17T07:46:37"
+   "updatedAt": "2026-10-17T07:57:53"
   },
   {
    "id": "nv329",
@@ -761,7 +761,7 @@
    "newsAt": "2026-10-15 08:44",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 4,
-   "updatedAt": "2026-10-17T07:46:38"
+   "updatedAt": "2026-10-17T07:57:54"
   }
  ]
 }
