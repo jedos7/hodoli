@@ -1,0 +1,22 @@
+/* Desktop: condition controls on the left, live chart on the right. */
+.reference-layout header{max-width:none;padding:12px 18px;min-height:49px}
+.reference-layout header h1{font-size:14px;font-weight:650}
+.reference-layout header nav{gap:8px 16px}
+.reference-layout main{max-width:none;padding:14px 18px 24px;display:grid;grid-template-columns:minmax(410px,35fr) minmax(0,65fr);gap:18px;align-items:start}
+.reference-layout .reference-ticket{grid-column:1;grid-row:1;min-width:0;max-width:none;width:100%;margin:0;padding:14px;border:1px solid #27323f;border-radius:8px;background:#0e141d}
+.reference-layout .exit-chart-panel{grid-column:2;grid-row:1;min-width:0;margin:0;padding:16px;position:sticky;top:12px;scroll-margin-top:12px}
+.reference-layout .order-history{grid-column:1/-1;min-width:0;margin:0}
+.reference-layout .exit-chart-panel #exitChartCanvas{height:clamp(320px,calc(100dvh - 335px),700px)}
+.reference-layout .exit-chart-panel .chart-metrics>div{min-width:105px;padding:8px 12px}
+.reference-layout .exit-chart-panel .chart-toolbar{gap:8px}
+.reference-layout .exit-chart-panel .chart-toolbar button{padding:6px 9px}
+.reference-layout .exit-chart-panel .chart-zoom{margin-left:0}
+.reference-layout .leg{padding:6px 10px 10px;margin:10px 0 12px}
+.reference-layout .leg label{font-size:11px;font-weight:400;margin:8px 0}
+.reference-layout .leg .help{font-size:10px;line-height:1.7}
+.reference-layout .leg select{font-size:11px;padding:8px;margin-bottom:0}
+.reference-layout #plans{max-height:240px}
+.reference-layout .stock-strip>a{display:none}
+@media(max-width:1500px){.reference-layout .step-heading>p>span,.reference-layout .list-heading h2>span{display:none}.reference-layout .quick-heading>span{font-size:10px}.reference-layout .statusbar>p{flex-basis:100%;justify-content:space-between;margin-left:0}}
+@media(max-width:1000px){.reference-layout main{grid-template-columns:minmax(0,1fr);padding:12px;gap:14px}.reference-layout .reference-ticket{grid-column:1;grid-row:auto}.reference-layout .exit-chart-panel{grid-column:1;grid-row:auto;position:static}.reference-layout .order-history{grid-column:1}.reference-layout .stock-strip>a{display:inline}.reference-layout .exit-chart-panel #exitChartCanvas{height:400px}}
+@media(max-width:600px){.reference-layout header{padding:10px}.reference-layout main{padding:8px;gap:12px}.reference-layout .reference-ticket,.reference-layout .exit-chart-panel{padding:10px}.reference-layout .exit-chart-panel #exitChartCanvas{height:350px}.reference-layout .quick-heading>span{display:none}}

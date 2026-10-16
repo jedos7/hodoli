@@ -1,4 +1,7 @@
 import json
+from datetime import datetime
+
+import app.watch as watch_module
 
 from app.watch import Watchlist
 
@@ -26,7 +29,13 @@ def test_stop_before_breakout_invalidates():
     assert w.on_trade("000002", 20500) == []                       # 무효가 된 자리는 돌파해도 알림 없음
 
 
-def test_load_from_pullback_keeps_state_and_manual(tmp_path):
+def test_load_from_pullback_keeps_state_and_manual(tmp_path, monkeypatch):
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 9, 10, 10, 0)
+
+    monkeypatch.setattr(watch_module, "datetime", FixedDateTime)
     p = tmp_path / "pullback.json"
     rows = [{"date": "20260909", "code": "A", "name": "에이", "theme": "t", "entryPrice": 100, "stopPrice": 90, "strict": True},
             {"date": "20260909", "code": "B", "name": "비", "theme": "t", "entryPrice": 200, "stopPrice": 180, "strict": False},
@@ -43,3 +52,22 @@ def test_load_from_pullback_keeps_state_and_manual(tmp_path):
     # 확정일(asof)이 넘어갔는데 그날 엄선 자리가 없으면 옛 자리는 감시하지 않는다
     p.write_text(json.dumps({"asof": "20260910", "rows": rows}), "utf-8")
     assert w.load_pullback(p) == 1 and set(w.codes) == {"M"}
+
+
+def test_expired_setups_excluded_and_manual_kept(tmp_path, monkeypatch):
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 9, 14, 10, 0)
+
+    monkeypatch.setattr(watch_module, "datetime", FixedDateTime)
+    p = tmp_path / "pullback.json"
+    w = Watchlist()
+    w.add("M", "수동", 50, 45)
+    for date, expected in [("20260910", {"A", "M"}), ("20260909", {"M"})]:
+        p.write_text(json.dumps({"asof": date, "rows": [
+            {"date": date, "code": "A", "name": "에이", "entryPrice": 100,
+             "stopPrice": 90, "strict": True}
+        ]}), "utf-8")
+        w.load_pullback(p)
+        assert set(w.codes) == expected

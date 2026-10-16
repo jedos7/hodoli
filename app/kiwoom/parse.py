@@ -45,10 +45,17 @@ def parse_real(msg: dict, amount_unit: int = 1) -> list[Trade]:
         v = d.get("values", {})
         price = abs(inum(v.get("10")))
         vol = inum(v.get("15"))
+        signed_text = str(v.get("15", "")).strip().replace(',', '')
+        signed_volume = int(signed_text) if re.fullmatch(r'[+-]?\d{1,18}', signed_text) else None
         item = str(d.get("item", ""))
-        market = "NX" if item.endswith("_NX") else "KRX"
+        base, separator, venue = item.partition('_')
+        code = base[1:] if len(base) == 7 and base.startswith('A') else base
+        if not re.fullmatch(r'[0-9A-Z]{6}', code):
+            continue
+        # Integrated/unknown venues must never masquerade as KRX for auto exits.
+        market = ('NX' if venue == 'NX' else 'OTHER') if separator else 'KRX'
         out.append(Trade(
-            code=item.replace("A", "")[:6],
+            code=code,
             time=str(v.get("20", "")),
             price=price,
             change=inum(v.get("11")),
@@ -63,6 +70,7 @@ def parse_real(msg: dict, amount_unit: int = 1) -> list[Trade]:
             buy_total=0,
             sell_total=0,
             market=market,
+            signed_volume=signed_volume,
         ))
     return out
 

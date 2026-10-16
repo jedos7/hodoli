@@ -57,6 +57,7 @@ class Trade:
     buy_total: int = 0       # 총매수수량
     sell_total: int = 0      # 총매도수량
     market: str = "KRX"      # KRX | NX (키움 NXT 야간·프리장 체결)
+    signed_volume: int | None = None  # Optional aggressor side, only when explicitly supplied by the feed.
 
     @property
     def acc_amount_eok(self) -> float:

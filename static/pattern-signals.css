@@ -1,0 +1,7 @@
+#patternSignals p{font-size:11px;color:var(--ink-3);line-height:1.65;white-space:pre-line}
+.pattern-controls{display:flex;flex-wrap:wrap;gap:8px}
+.pattern-controls label{display:flex;flex-direction:column;gap:4px;font-size:11px}
+.pattern-controls input{width:75px}
+.pattern-controls select,.pattern-controls input,.pattern-controls button{background:var(--surface);color:var(--ink);border:1px solid var(--line,#ccc);border-radius:5px;padding:5px;max-width:150px}
+#psRows details{padding:8px 0;border-bottom:1px solid var(--line,#ddd);font-size:12px}
+#psRows summary{cursor:pointer;line-height:1.6}

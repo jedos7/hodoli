@@ -1,0 +1,22 @@
+.exit-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0}
+.exit-mode-tabs button{min-height:40px;padding:8px;font-size:13px;font-weight:700;background:#172332;border-color:#354960;color:#adc1dc}
+.exit-mode-tabs button[aria-pressed=true]{background:#235cb4;border-color:#70a7ff;color:#fff}
+.mode-help{font-size:10px;color:#8aa2bf;margin:5px 0 12px;line-height:1.7}
+.mode-conflict{padding:9px 10px;font-size:11px;border:1px solid #967449;background:#302719;color:#f2d297;border-radius:6px;line-height:1.8}
+.horizon-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}
+.horizon-rules>div{padding:10px 5px;border:1px solid #33465e;background:#131e2c;border-radius:6px;text-align:center}
+.horizon-rules span{display:block;color:#95abc8;font-size:10px}.horizon-rules strong{display:block;font-size:18px;margin-top:5px;white-space:nowrap}
+#hzPrepareForm label{font-size:12px;margin-top:15px}#hzPrepareForm input{width:100%;padding:9px;font-size:13px;background:#162130}#hzPrepareForm .help,#horizonModePanel>.help{font-size:11px;line-height:1.8}
+.horizon-watch-list{margin-top:18px!important;padding-top:12px!important;border-top:1px solid #2d3949!important}
+#hzPlans{max-height:260px;overflow:auto;scrollbar-width:thin}
+.hz-plan{padding:9px;border:1px solid #2e415b;border-left:3px solid #639cfc;border-radius:5px;background:#111b28;margin:6px 0;font-size:11px}
+.hz-plan p{font-size:10px;line-height:1.8;margin:5px 0;color:#91a9c6;overflow-wrap:anywhere}.hz-plan-heading{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.hz-plan-heading b{font-size:12px}.mode-tag{font-size:9px;background:#233a56;color:#a9ceff;border-radius:3px;padding:1px 4px}
+.hz-state{margin-left:auto;color:#b8c6d9;font-size:10px}.hz-state.watching{color:#5ee3a3}.hz-state.connection_wait{color:#f0b39a}.hz-state.session_wait,.hz-state.quote_wait{color:#e7c480}
+.hz-plan-actions{display:flex;gap:6px;flex-wrap:wrap}.hz-plan-actions button{padding:4px 8px;font-size:10px}
+#hzDot{width:6px;height:6px;border-radius:50%;background:#8090a5}#hzDot.active{background:#79e0a5}#hzEnvironment{font-size:9px;color:#e8ba90}#hzStopAll{font-size:10px;padding:3px 7px;margin-left:auto}
+.horizon-order-history{border-top:1px solid #344052;margin-top:24px;padding-top:18px}.order-history>h2{margin-bottom:22px}.order-history h3{margin:0;font-size:14px;color:#b9cce8}
+#hzReview{background:transparent;border:0;padding:0}#hzReviewDialog .review-summary{font-size:13px;line-height:1.9}
+@media(max-width:450px){.horizon-rules strong{font-size:15px}}
+#hzPrepareForm .leg label:has(input[type="checkbox"]) {display:flex;align-items:flex-start;gap:8px;margin:12px 0;line-height:1.6}
+#hzPrepareForm .leg input[type="checkbox"] {width:16px;height:16px;flex:0 0 16px;margin:3px 0 0;padding:0}

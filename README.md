@@ -211,6 +211,10 @@ py scripts\fetch_daily.py --use-cache          # 저장된 일봉으로 스크�
 - 재료: 네이버 전체 테마 매핑(266개, `data/theme_map.json`) + 그 종목 전체의 최근 70일 일봉(`data/candles_naver_all.json`) + 지수 일봉. 처음 만들 때 5분쯤 걸리고, 같은 날 두 번째부터는 캐시로 몇 초입니다.
 - 16:10 자동 실행(`SCHEDULE_CALENDAR`)으로 매일 갱신되고, 창의 "다시 만들기"나 `POST /api/calendar/run` 으로 직접 돌립니다. 명령줄은 `py scripts\build_calendar.py`.
 
+## 종가배팅 자동매매 (변성환 규칙, 실제 주문)
+
+`/closebet.html`. 15:15 후보 선정(거래대금 300억↑ · 일봉 MACD·스토캐스틱 오늘 돌파 · 240분 스토캐스틱 상승 · 전날 급등·고가 근처 제외) → 15:19:50 매도1호가 지정가 매수 → 다음 거래일 08:40 시장가 매도(09:00 시초가). 흉내(dry) 모드가 기본, 실전(live)은 확인란을 선택해야 켜진다. 총 투입 999만 원 이하·5종목 이하. 자세한 규칙·안전장치·검증 결과는 [CLOSEBET.md](CLOSEBET.md).
+
 ## 종가배팅 (고가놀이 표시 · NXT 하락 마감 알림)
 
 검증 (`scripts/sweep_close.py`, `scripts/sweep_close_nxt.py`, 시장 전체 1년 / NXT 는 약 120거래일):

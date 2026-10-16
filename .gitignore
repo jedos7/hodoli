@@ -7,3 +7,5 @@ data/*.json
 .pytest_cache/
 themes.json.bak
 data/*.log
+data/*.lock
+data/*.tmp

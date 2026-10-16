@@ -102,6 +102,10 @@ class KiwoomFeed:
         self.auth = KiwoomAuth(settings)
         self.rest = KiwoomRest(settings, self.auth)
         self.ws = KiwoomWebSocket(settings, self.auth, self._on_trade)
+        self.account_observer = None
+        self.quote_observer = None
+        self.analysis_observer = None
+        self.ws.on_account = self._on_account
         self._task: asyncio.Task | None = None
         self._inv_task: asyncio.Task | None = None
         self._nx_task: asyncio.Task | None = None
@@ -163,7 +167,18 @@ class KiwoomFeed:
                 t.cancel()
         await self.rest.close()
 
+    def _on_account(self, event: dict):
+        if self.account_observer:
+            self.account_observer(event)
+
     def _on_trade(self, t: Trade) -> None:
+        if self.quote_observer:
+            self.quote_observer(t)
+        if self.analysis_observer:
+            try:
+                self.analysis_observer(t)
+            except Exception:
+                log.debug('Horizon reference analytics skipped a tick', exc_info=True)
         hhmmss = t.time[:2] + ":" + t.time[2:4] + ":" + t.time[4:6] if len(t.time) >= 6 else ""
         if t.market == "NX":
             self.state.update_nx(t.code, t.price, hhmmss)   # 야간·프리장은 참고 가격만, 돌파 판정·대금에는 안 섞는다

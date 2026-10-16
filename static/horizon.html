@@ -1,0 +1,42 @@
+<!doctype html>
+
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>호라이즌 관제탑 · 테마 레이더</title><link rel="stylesheet" href="/horizon.css?v=20260923-5"><link rel="stylesheet" href="/horizon-flow.css?v=1"><script src="/app-windows.js?v=2" defer></script></head><body>
+
+<header class="topbar"><a class="brand" href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기"><span class="mark">⌁</span> 호라이즌 <b>관제탑</b></a><p class="strategy-path">기준봉 뒤 D+1 슈팅 없음 → 오후 횡보 → D+2 저점 유지 → 정오 확인</p><nav aria-label="관제탑 도구"><a class="button" href="/reference.html" target="referenceResearch">CVD · 시장 흐름 ↗</a><a class="button" href="/swing-research.html" target="swingResearch">스윙 연구 · 실적·산업 ↗</a><a class="button trade-nav trade-nav-buy" href="/auto-buy.html" target="themeRadarAutoBuy" title="별도 창으로 열기">내 조건 자동매수</a><a class="button trade-nav trade-nav-sell" href="/custom-exit.html" target="themeRadarCustomExit" title="별도 창으로 열기">내 조건 자동매도</a><a class="button trade-nav" href="/closebet.html" target="themeRadarCloseBet" title="별도 창으로 열기">🌙 종가배팅 자동</a><a class="button" href="/theme-radar.html" target="themeRadarThemes" title="별도 창으로 열기">4종목 눌림목 매매 ↗</a><button id="viewButton" aria-pressed="false">▦ 카드로</button><button id="chartButton">⌁ 차트</button><button id="rulesButton">▤ 규칙</button><button id="refreshButton">↻ 다시 읽기</button><button id="holdingsButton">▣ 보유</button><button id="resultsButton">▥ 성적표</button><button id="journalButton">≡ 조건 기록</button></nav></header>
+
+<section class="overview" aria-label="관찰 요약"><div class="summary opportunity"><span>⌁ 매수자리</span><strong id="readyCount">—</strong><p id="readyNote">정오 조건을 확인하고 있습니다</p></div><button class="summary" id="holdingSummary"><span>▣ 계좌 보유</span><strong id="holdingCount">—</strong><p id="holdingNote">계좌 상태 확인 중</p></button><div class="summary"><span>◎ 관찰</span><strong id="watchCount">—</strong><p id="stageSummary">기준봉부터 차례로 확인합니다</p></div><div class="summary connection-summary"><span>▥ 상태 <time id="clock">--:--:--</time></span><strong><i class="led" id="connectionLight"></i><b id="connection">연결 확인 중</b></strong><p id="received">자료 수신 대기</p></div></section>
+
+<div id="errorBanner" class="banner" hidden role="status"></div>
+
+<div class="layout"><aside class="market-rail" aria-label="시장 현황">
+
+<section class="panel today-panel"><h2 class="panel-title">오늘 자리 <span id="marketTime">—</span></h2><div class="today-counts"><div><b class="up" id="todayReady">—</b><small>매수자리</small></div><div><b class="good" id="todayWatch">—</b><small>내일 후보</small></div><div><b class="violet" id="todayBase">—</b><small>기준봉</small></div></div><p id="todayAsOf">거래일 확인 중</p></section>
+
+<section class="market-pair" id="marketIndices"><div class="panel market-card"><h2>코스피</h2><strong>—</strong><small>수신 대기</small></div><div class="panel market-card"><h2>코스닥</h2><strong>—</strong><small>수신 대기</small></div></section>
+
+<div class="market-pair"><section class="panel mini-panel"><h2 class="panel-title">KPI200 · 선물</h2><div id="marketMore" class="kv"><span>선물</span><b>—</b><span>베이시스</span><b>—</b><span>ADR 20일</span><b>—</b></div></section><section class="panel mini-panel"><h2 class="panel-title">프로그램 <span>억원</span></h2><div id="programFlows" class="kv"><span>코스피</span><b>—</b><span>코스닥</span><b>—</b></div><small class="source-note">수급은 각 시장 카드</small></section></div>
+
+<div id="overnight" class="overnight-grid"><section class="panel mini-panel"><h2 class="panel-title">해외 · 야간</h2><p class="muted">자료 수신 대기</p></section></div>
+
+<section class="panel plan"><h2 class="panel-title">호라이즌 매도 규칙 <span>평단 기준</span></h2><div class="plan-values"><b class="up">익절 +15%</b><b class="down">손절 −10%</b></div><p>최초 매수일 D0 → <b>2거래일 뒤 종가</b></p><small>익절 70% 지정가 · 손절 잔량 · 비용 전 가격 기준</small><a class="button" href="/custom-exit.html#horizon" target="themeRadarCustomExit" title="별도 창으로 열기">호라이즌 자동매도 설정 ↗</a><div id="planMonitor" class="plan-monitor" data-state="waiting" aria-label="실제 자동매도 감시 상태"><div class="plan-monitor-heading"><i aria-hidden="true"></i><strong id="planMonitorHeading">자동매도 상태 확인 중</strong></div><div id="planMonitorRows" role="status" aria-live="polite"><small>등록한 종목의 감시 상태를 읽고 있습니다.</small></div><small id="planMonitorUpdated" class="plan-monitor-updated">연결 확인 중</small></div></section><p class="rail-note">관찰 D0는 기준봉 날짜 · 보유 D0는 매수일<br><span id="overnightTime">해외 자료 수신 대기</span></p></aside>
+
+<main class="workspace"><section class="watch-board panel" aria-label="호라이즌 종목 목록"><div class="board-tools"><div class="tabs" role="group" aria-label="종목 필터"><button class="active" data-filter="all">전체 <span id="boardCount">0</span></button><button data-filter="today">D+2 자리</button><button data-filter="watch">관찰</button><button data-filter="excluded">퇴출</button></div><label class="search"><span>⌕</span><input id="search" placeholder="종목 · 테마 검색" aria-label="종목 검색"></label></div><div class="progress-line" id="collectionStatus" role="status">저장된 기준봉을 읽고 있습니다.</div>
+
+<div class="table-wrap" id="tableView"><table class="watch-table"><thead><tr><th>지금</th><th>등급</th><th>종목</th><th>테마</th><th>기준봉 · 대금</th><th>D+1 마감 / 고가 · 오후</th><th>선 · 대비</th><th>조회가 · 등락</th><th>재료</th><th>판정 메모</th></tr></thead><tbody id="stockRows"></tbody></table></div><div id="cardView" class="stock-cards" hidden></div><div class="empty" id="empty" hidden><span>⌁</span><h2>표시할 종목이 없습니다</h2><p>필터를 바꾸거나 다시 읽기로 기준봉을 확인하세요.</p></div><footer class="board-footer"><span id="scope">검색 범위 확인 중</span><span>행 선택: 상세 보기 · ↑↓ 이동</span></footer></section></main>
+
+<aside class="detail-rail" aria-label="선택 종목 분석"><div id="detailEmpty" class="panel empty"><span>↖</span><h2>종목을 선택하세요</h2><p>가격 사다리와 판정 해설을 표시합니다.</p></div><div id="detail" hidden></div></aside></div>
+
+<footer class="app-footer"><span><i class="led good"></i> KRX 정규장 · 1분 수집 · 5초 화면 갱신</span><a href="/custom-exit.html#horizon" target="themeRadarCustomExit" title="별도 창으로 열기">호라이즌 자동매도 <b id="autoexitState">상태 확인 중</b></a></footer>
+
+<dialog id="rulesDialog"><div class="dialog-head"><div><div class="eyebrow">RULEBOOK · 2026.09.21</div><h2>관제탑 판정 규칙</h2></div><button data-close>닫기 ×</button></div><p class="dialog-intro">제공자료의 최신 변경을 적용했습니다. 수식이 명시되지 않은 항목은 아래 계산 정의를 사용합니다.</p><div id="ruleList"></div></dialog>
+
+<dialog id="resultsDialog"><div class="dialog-head"><div><div class="eyebrow">REFERENCE RESEARCH</div><h2>제작자 제공 성적</h2></div><button data-close>닫기 ×</button></div><p class="dialog-intro">직접 재검증하지 않은 참고 수치입니다. 서로 다른 표본·보유 기간의 연구가 포함되어 있으며, 현재 2거래일 매도 설정의 실적이 아닙니다.</p><table class="reference-table"><thead><tr><th>범위</th><th>건수</th><th>승률</th><th>PF</th><th>자료의 평가</th></tr></thead><tbody><tr><td>★★★ S</td><td>50</td><td>66%</td><td>3.86</td><td>표본 부족 · 보류</td></tr><tr><td>★★ A 단독</td><td>22</td><td>64%</td><td>2.25</td><td>S+A 72건 · 표본 부족</td></tr><tr><td>★ B 단독</td><td>71</td><td>—</td><td>1.13</td><td>누적 통계와 구분</td></tr><tr class="selected"><td>S+A+B 누적</td><td>143</td><td>57%</td><td>1.83</td><td>제공자료의 기준 통과</td></tr><tr><td>상한가 잠김·갭 제외</td><td>111</td><td>—</td><td>1.61</td><td>제작자의 보수적 비교치</td></tr></tbody></table><p class="dialog-intro">PF = 총이익 ÷ 총손실. 제공자료의 비교 기준은 PF 1.5 · 표본 100건 · 앞뒤 구간 PF 1.2입니다. 미래 수익률이나 이 계좌의 예상 성적으로 환산하지 않습니다.</p></dialog>
+
+<dialog id="holdingsDialog"><div class="dialog-head"><div><div class="eyebrow">POSITIONS · SHADOW MODE</div><h2>계좌 보유 · 조건 계산</h2></div><button data-close>닫기 ×</button></div><p class="dialog-intro" id="positionsStatus"></p><div id="positions"></div><a class="button" href="/account-setup.html#sell" target="themeRadarThemes" title="별도 창으로 열기">계좌 연결 · 매수일 확인 화면으로 ↗</a></dialog>
+
+<dialog id="journalDialog"><div class="dialog-head"><div><div class="eyebrow">SIGNAL LOG</div><h2>조건 도달 기록 · 주문 기록 아님</h2></div><button data-close>닫기 ×</button></div><p class="dialog-intro">검증 중 기록된 조건 신호입니다. 실제 주문·체결 기록과 구분합니다.</p><div id="journal"></div></dialog>
+
+<dialog id="chartDialog" class="chart-dialog"><div class="dialog-head"><div><div class="eyebrow">KRX · 15분봉</div><h2 id="chartTitle">종목 차트</h2></div><button data-close>닫기 ×</button></div><div id="largeChart"></div></dialog>
+
+<script src="/horizon-flow.js?v=1" defer></script><script src="/horizon.js?v=20260923-7" defer></script><script src="/horizon-exit-status.js?v=2" defer></script></body></html>
+
