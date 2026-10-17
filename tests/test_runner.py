@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.runner import drop_incomplete_today, market_open
 
 

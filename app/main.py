@@ -118,9 +118,7 @@ from app.price_chart import PriceChartService, create_price_chart_router
 
 from app.stock_flow import StockFlowService, create_stock_flow_router
 
-from app.feeds import KisFeed, KiwoomFeed, MockFeed
-
-from app.kis.futures import KisFutures
+from app.feeds import KiwoomFeed, MockFeed
 
 from app.scheduler import Job, Scheduler
 
@@ -140,7 +138,7 @@ log = logging.getLogger("radar")
 
 state = MarketState.from_file(settings.themes_file)
 
-feed: MockFeed | KisFeed | None = None
+feed: MockFeed | KiwoomFeed | None = None
 
 clients: set[WebSocket] = set()
 
@@ -177,8 +175,7 @@ async def start_feed() -> None:
         feed.analysis_observer = stock_flow_service.on_trade
 
     else:
-
-        feed = KisFeed(state, settings)
+        raise RuntimeError(f"BROKER={settings.broker} 는 모릅니다. mock | kiwoom 중 하나여야 합니다.")
 
     log.info("피드: %s (BROKER=%s, %d 테마 %d 종목)", type(feed).__name__, settings.broker, len(state.themes), len(state.stocks))
 
@@ -402,19 +399,7 @@ async def autocollect() -> None:
 
 async def foreign_futures() -> dict:
 
-    """코스피200 선물 외국인 순매수(계약). 기본은 네이버 투자자별 매매동향(증권사 무관, 키 불필요).
-
-    FUT_SOURCE=kis 면 한국투자증권 API 로 조회. 실패해도 예외 대신 error 를 돌려준다."""
-
-    if settings.fut_source == "kis":
-
-        if not isinstance(feed, KisFeed):
-
-            return {"prev": None, "now": None, "src": "kis", "error": "FUT_SOURCE=kis 인데 BROKER 가 kis 가 아닙니다"}
-
-        r = await KisFutures(feed.rest, settings).foreign_net()
-
-        return {"prev": r.prev, "now": r.today, "src": f"KIS {r.today_date[4:] if r.today_date else ''}".strip(), "error": r.error}
+    """코스피200 선물 외국인 순매수(계약). 기본은 네이버 투자자별 매매동향(증권사 무관, 키 불필요). 실패해도 예외 대신 error 를 돌려준다."""
 
     try:
 
@@ -954,7 +939,7 @@ app.include_router(create_stock_flow_router(stock_flow_service))
 
 def health():
 
-    return {"ok": True, "broker": settings.broker, "env": settings.kiwoom_env if settings.broker == "kiwoom" else settings.env,
+    return {"ok": True, "broker": settings.broker, "env": settings.kiwoom_env if settings.broker == "kiwoom" else "mock",
 
             "feed": type(feed).__name__ if feed else None, "tick": state.tick, "themes": len(state.themes), "stocks": len(state.stocks),
 
@@ -1595,14 +1580,6 @@ async def stream(ws: WebSocket):
     finally:
 
         clients.discard(ws)
-
-
-
-
-
-from app.pattern_service import create_pattern_router
-
-app.include_router(create_pattern_router(lambda: state))
 
 
 

@@ -20,7 +20,7 @@ import websockets
 from app.config import Settings
 from app.kiwoom.auth import KiwoomAuth
 from app.kiwoom.parse import parse_real, inum
-from app.kis.parse import Trade
+from app.models import Trade
 
 log = logging.getLogger(__name__)
 MAX_ITEMS = 100

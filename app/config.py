@@ -11,18 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 
-def _broker_default() -> str:
-    """BROKER 가 없으면 KIS_ENV 로 유추 (예전 설정 호환): mock → mock, vts/real → kis"""
-    b = os.getenv("BROKER", "").lower()
-    if b:
-        return b
-    return "mock" if os.getenv("KIS_ENV", "mock").lower() == "mock" else "kis"
-
-
 @dataclass(frozen=True)
 class Settings:
-    broker: str = field(default_factory=_broker_default)  # mock | kis | kiwoom
-    env: str = field(default_factory=lambda: os.getenv("KIS_ENV", "mock").lower())  # (KIS) mock | vts | real
+    broker: str = field(default_factory=lambda: os.getenv("BROKER", "mock").lower())  # mock | kiwoom
 
     # ── 키움 REST API ──
     kiwoom_env: str = field(default_factory=lambda: os.getenv("KIWOOM_ENV", "paper").lower())  # paper(모의) | real
@@ -31,9 +22,6 @@ class Settings:
     kiwoom_rps: float = field(default_factory=lambda: float(os.getenv("KIWOOM_RPS", "3")))  # 초당 조회 수 (4 에서 가끔 429 가 나서 3)
     # 키움 거래대금 단위(원). 실시간 FID 14 · 일봉 trde_prica · 투자자 acc_trde_prica 모두 백만원 (문서·실응답으로 확인)
     kiwoom_amount_unit: int = field(default_factory=lambda: int(os.getenv("KIWOOM_AMOUNT_UNIT", "1000000")))
-    app_key: str = field(default_factory=lambda: os.getenv("KIS_APP_KEY", ""))
-    app_secret: str = field(default_factory=lambda: os.getenv("KIS_APP_SECRET", ""))
-    account_no: str = field(default_factory=lambda: os.getenv("KIS_ACCOUNT_NO", ""))
     host: str = field(default_factory=lambda: os.getenv("HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
 
@@ -63,13 +51,6 @@ class Settings:
     # 야간 지표(야후 파이낸스) 수집 주기(분). 0 이면 서버가 수집하지 않는다.
     overnight_minutes: int = field(default_factory=lambda: int(os.getenv("OVERNIGHT_MINUTES", "5")))
 
-    # 외인 선물 소스: naver (기본, 네이버 투자자별 매매동향·키 불필요) | kis (한국투자증권 API, 아래 설정 사용)
-    fut_source: str = field(default_factory=lambda: os.getenv("FUT_SOURCE", "naver").lower())
-    # 한국투자증권으로 조회할 때의 설정. app/kis/futures.py 참고. 문서와 다르면 여기서 바꾼다.
-    fut_path: str = field(default_factory=lambda: os.getenv("KIS_FUT_PATH", "/uapi/domestic-stock/v1/quotations/inquire-investor-daily-by-market"))
-    fut_tr_id: str = field(default_factory=lambda: os.getenv("KIS_FUT_TR_ID", "FHPTJ04040000"))
-    fut_params: str = field(default_factory=lambda: os.getenv("KIS_FUT_PARAMS", '{"FID_INPUT_ISCD": "F001", "FID_INPUT_DATE_1": "{today}"}'))
-    fut_field: str = field(default_factory=lambda: os.getenv("KIS_FUT_FIELD", "frgn_ntby_qty"))
 
     themes_file: Path = ROOT / "themes.json"
     data_dir: Path = ROOT / "data"
@@ -92,32 +73,12 @@ class Settings:
     def kiwoom_token_cache(self) -> Path:
         return self.data_dir / f"kiwoom_token_{self.kiwoom_env}.json"
 
-    @property
-    def rest_base(self) -> str:
-        if self.env == "real":
-            return "https://openapi.koreainvestment.com:9443"
-        return "https://openapivts.koreainvestment.com:29443"
-
-    @property
-    def ws_url(self) -> str:
-        # 실시간 체결/호가는 실전 21000, 모의투자 31000 포트
-        if self.env == "real":
-            return "ws://ops.koreainvestment.com:21000"
-        return "ws://ops.koreainvestment.com:31000"
-
-    @property
-    def token_cache(self) -> Path:
-        return self.data_dir / f"kis_token_{self.env}.json"
-
     def validate(self) -> None:
         if self.is_mock:
             return
-        if self.broker == "kiwoom":
-            pairs = (("KIWOOM_APP_KEY", self.kiwoom_app_key), ("KIWOOM_APP_SECRET", self.kiwoom_app_secret))
-        elif self.broker == "kis":
-            pairs = (("KIS_APP_KEY", self.app_key), ("KIS_APP_SECRET", self.app_secret))
-        else:
-            raise RuntimeError(f"BROKER={self.broker} 는 모릅니다. mock | kis | kiwoom 중 하나여야 합니다.")
+        if self.broker != "kiwoom":
+            raise RuntimeError(f"BROKER={self.broker} 는 모릅니다. mock | kiwoom 중 하나여야 합니다.")
+        pairs = (("KIWOOM_APP_KEY", self.kiwoom_app_key), ("KIWOOM_APP_SECRET", self.kiwoom_app_secret))
         missing = [k for k, v in pairs if not v]
         if missing:
             raise RuntimeError(f"BROKER={self.broker} 인데 {', '.join(missing)} 가 비어 있습니다. .env 를 확인하세요.")

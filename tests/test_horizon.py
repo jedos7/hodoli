@@ -6,7 +6,7 @@ import pytest
 
 from app.horizon import Bar, KST, baseline, evaluate, grade, window
 from app.horizon_service import HorizonService, parse_minutes
-from app.kis.rest import Candle
+from app.models import Candle
 
 
 def fixture():

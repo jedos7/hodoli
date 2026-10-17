@@ -21,7 +21,7 @@ import httpx
 from app.config import Settings
 from app.kiwoom.auth import KiwoomAuth
 from app.kiwoom.parse import BasicInfo, parse_basic, parse_daily, parse_investor
-from app.kis.rest import Candle
+from app.models import Candle
 
 log = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 import httpx
 from app.config import settings
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.runner import drop_incomplete_today, get_candles
 from app.collectors.overnight import series, value_at, YAHOO
 KST = timezone(timedelta(hours=9))

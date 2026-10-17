@@ -1,7 +1,7 @@
 """시세 피드. 두 구현 모두 MarketState 만 갱신하고, 방송은 main 의 broadcaster 가 맡는다.
 
-MockFeed : 키 없이 랜덤워크로 시세를 만든다. 개발·UI 작업용.
-KisFeed  : 시작 시 REST 로 전일 종가·현재가를 채우고, 이후 웹소켓 체결 데이터로 갱신한다.
+MockFeed   : 키 없이 랜덤워크로 시세를 만든다. 개발·UI 작업용.
+KiwoomFeed : 시작 시 REST 로 전일 종가·현재가를 채우고, 이후 웹소켓 체결·계좌 이벤트로 갱신한다.
 """
 from __future__ import annotations
 
@@ -10,10 +10,7 @@ import logging
 import random
 
 from app.config import Settings
-from app.kis.auth import KisAuth
-from app.kis.parse import Trade
-from app.kis.rest import KisRest
-from app.kis.ws import KisWebSocket
+from app.models import Trade
 from app.state import MarketState
 
 log = logging.getLogger(__name__)
@@ -193,74 +190,3 @@ class KiwoomFeed:
             await asyncio.sleep(120.0)
             await self._refresh_all()
 
-
-class KisFeed:
-    def __init__(self, state: MarketState, settings: Settings):
-        self.state = state
-        self.s = settings
-        self.auth = KisAuth(settings)
-        self.rest = KisRest(settings, self.auth)
-        self.ws = KisWebSocket(settings, self.auth, self._on_trade)
-        self._task: asyncio.Task | None = None
-        self._inv_task: asyncio.Task | None = None
-        self._estimate_ok = True
-
-    async def start(self) -> None:
-        # 1) REST 로 초기값: 전일 종가(ref), 현재가, 누적 거래대금
-        for code in self.state.codes:
-            try:
-                q = await self.rest.quote(code)
-                self.state.seed(code, q.price, q.acc_amount / 1e8, prev_close=q.prev_close, change_rate=q.change_rate)
-            except Exception as e:  # 한 종목 실패로 전체를 멈추지 않는다
-                log.warning("초기 시세 실패 %s: %s", code, e)
-        self.state.recompute()
-        # 2) 웹소켓 실시간 체결
-        self._task = asyncio.create_task(self.ws.run(self.state.codes), name="kis-ws")
-        # 3) 외인·기관 순매수 주기 조회
-        self._inv_task = asyncio.create_task(self._investor_loop(), name="kis-investor")
-
-    async def stop(self) -> None:
-        self.ws.stop()
-        for t in (self._task, self._inv_task):
-            if t:
-                t.cancel()
-        await self.rest.close()
-
-    def _on_trade(self, t: Trade) -> None:
-        self.state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
-        self.state.on_trade(t.code, t.price)
-        self.state.tick += 1
-
-    async def watch_codes(self, codes: list[str]) -> int:
-        """KIS 웹소켓은 시작 시 구독 목록이 고정이라 추가 구독은 재시작이 필요하다."""
-        missing = [c for c in codes if c not in self.state.codes]
-        if missing:
-            log.warning("KIS 피드는 감시 종목 %d개를 실시간 구독에 추가하지 못합니다 (서버 재시작 필요)", len(missing))
-        return 0
-
-    async def _investor_loop(self) -> None:
-        """장중 추정치를 우선 쓰고, 그 API 가 안 되면(모의투자 등) 전일 확정치로 대신한다.
-        한 바퀴에 종목 수만큼 호출하므로 호출 제한을 rest 가 알아서 늦춘다."""
-        interval = 60.0 if self.s.env == "real" else 180.0
-        while True:
-            for code in self.state.codes:
-                s = self.state.stocks[code]
-                try:
-                    if self._estimate_ok:
-                        est = await self.rest.investor_estimate(code)
-                        if est is not None:
-                            frgn_qty, orgn_qty, _ = est
-                            px = s.price or s.ref
-                            self.state.set_investor(code, frgn_qty * px / 1e8, orgn_qty * px / 1e8, "추정")
-                            continue
-                except Exception as e:
-                    if self._estimate_ok:
-                        log.warning("추정가집계 API 사용 불가(%s) → 전일 확정치로 대체", e)
-                    self._estimate_ok = False
-                try:
-                    d = await self.rest.investor_daily(code)
-                    if d:
-                        self.state.set_investor(code, d["frgn_amount"] / 1e8, d["orgn_amount"] / 1e8, "전일")
-                except Exception as e:
-                    log.warning("투자자 매매동향 실패 %s: %s", code, e)
-            await asyncio.sleep(interval)

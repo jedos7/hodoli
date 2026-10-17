@@ -11,6 +11,5 @@
 | [after-hours-exit.md](after-hours-exit.md) | 시간외(NXT·KRX 16~20시) 매도 티켓 |
 | [INTRADAY_SESSION_FIX.md](INTRADAY_SESSION_FIX.md) | 장중 접속 시 장 상태 판정 수정 기록 |
 | [CLOSEBET.md](CLOSEBET.md) | 종가배팅 자동매매 (변성환 규칙): 흐름, 조건, 수량, 안전장치, 검증 결과 |
-| [prototype-standalone.html](prototype-standalone.html) | 2026-09 첫 시제품 화면 (브라우저에서 열면 모의 데이터로 동작, 참고용) |
 
 공식 키움 REST API 명세: https://github.com/Kiwoom-Securities/Kiwoom-REST-API

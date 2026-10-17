@@ -11,7 +11,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 import math
 
-from app.kis.rest import Candle
+from app.models import Candle
 
 KST = timezone(timedelta(hours=9))
 VERSION = '2026-09-21.1'

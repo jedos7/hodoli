@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from app.horizon import Bar, KST, RULES, VERSION, baseline, evaluate, now_kst, valid_bar
 from app.kiwoom.parse import num
-from app.kis.rest import Candle
+from app.models import Candle
 
 log = logging.getLogger(__name__)
 

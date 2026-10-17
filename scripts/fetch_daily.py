@@ -2,7 +2,6 @@
 
   py scripts/fetch_daily.py                         # 네이버 일봉, themes.json 종목 (수 초)
   py scripts/fetch_daily.py --universe market       # 코스피+코스닥 거래대금 30억 이상 전 종목 (1~3분)
-  py scripts/fetch_daily.py --source kis            # KIS REST 일봉 (KIS_ENV=vts/real 필요)
   py scripts/fetch_daily.py --source mock           # 합성 일봉 (UI 확인용)
 
 서버가 떠 있으면 화면의 '다시 찾기' 버튼이나 POST /api/screener/run 으로 같은 일을 한다.
@@ -25,7 +24,7 @@ from app.screener.runner import run_screener  # noqa: E402
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", choices=["auto", "naver", "kis", "kiwoom", "mock"], default="naver")
+    ap.add_argument("--source", choices=["auto", "naver", "kiwoom", "mock"], default="naver")
     ap.add_argument("--universe", choices=["themes", "market"], default="themes")
     ap.add_argument("--days", type=int, default=250)
     ap.add_argument("--recent", type=int, default=5, help="표에 보여줄 최근 거래일 수")

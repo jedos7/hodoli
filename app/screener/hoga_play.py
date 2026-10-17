@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from statistics import mean
 
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.indicators import macd
 
 

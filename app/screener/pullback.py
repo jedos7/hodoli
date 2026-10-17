@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.hoga_play import backtest  # 같은 통계 함수 재사용
 from app.screener.indicators import adx
 

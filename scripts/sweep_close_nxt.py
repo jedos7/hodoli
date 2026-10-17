@@ -25,7 +25,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from app.config import settings  # noqa: E402
-from app.kis.rest import Candle  # noqa: E402
+from app.models import Candle  # noqa: E402
 from app.kiwoom.auth import KiwoomAuth  # noqa: E402
 from app.kiwoom.rest import KiwoomRest  # noqa: E402
 from app.screener.hoga_play import find_setups  # noqa: E402

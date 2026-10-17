@@ -23,7 +23,8 @@ theme_radar/
 ├─ app/
 │  ├─ main.py                  FastAPI: /api/*, /ws/stream, 정적 파일, 스케줄 작업, 각 서비스 연결
 │  ├─ config.py                .env → Settings (증권사, 스케줄 시각, 텔레그램)
-│  ├─ feeds.py                 KiwoomFeed (REST 초기값 + WebSocket 체결·계좌 이벤트) / KisFeed / MockFeed
+│  ├─ feeds.py                 KiwoomFeed (REST 초기값 + WebSocket 체결·계좌 이벤트) / MockFeed
+│  ├─ models.py                공용 자료형 Candle(일봉) · Trade(체결)
 │  ├─ kiwoom/                  auth 토큰 · rest 조회 · ws 실시간(체결·계좌·장 상태) · parse
 │  │   ├─ orders.py            현금 매도 1회 전송 (kt10001) · 주문 상세 (kt00007) · 잔고 (kt00018)
 │  │   ├─ buy_orders.py        지정가 매수 (kt10000) · 잔량 취소 (kt10003) · 주문가능 (kt00011)
@@ -38,7 +39,7 @@ theme_radar/
 │  ├─ state.py, supply.py      테마 지표(활동도·5분 유입) · 수급 점수
 │  ├─ scheduler.py             하루 한 번 작업 (15:35 테마 수집, 15:45 스크리너, 16:10 달력, 19:50 NXT 종배 알림)
 │  ├─ watch.py, nxt_close.py, market_risk.py, events.py, notify.py   돌파 감시 · NXT 종배 알림 · 시장 위험 · 일정 · 텔레그램
-│  ├─ stock_flow.py, trade_tape.py, price_chart.py, pattern_service.py, swing_research.py, dart_research.py, reference_research.py   참고 패널
+│  ├─ stock_flow.py, trade_tape.py, price_chart.py, swing_research.py, dart_research.py, reference_research.py   참고 패널
 │  ├─ collectors/              네이버(테마·일봉·뉴스·리서치·선물·지수) · 야후(야간 지표)
 │  └─ screener/                고가놀이 · 눌림목 · 일별 테마 달력 · runner
 ├─ static/                     화면 (html + js + css, 라이브러리 없음)
@@ -64,7 +65,7 @@ theme_radar/
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.example .env          # 기본 KIS_ENV=mock
+copy .env.example .env          # 기본 BROKER=mock
 py -m pytest -q
 uvicorn app.main:app            # http://127.0.0.1:8000  (평소에는 start_server.bat 더블클릭)
 ```
@@ -73,8 +74,8 @@ uvicorn app.main:app            # http://127.0.0.1:8000  (평소에는 start_ser
 
 ## 증권사 연결
 
-`.env` 의 `BROKER` 로 고릅니다. `mock` 은 키 없이 가짜 시세, `kiwoom` 은 키움 REST API, `kis` 는 한국투자증권입니다.
-주문은 키움(`kiwoom`)에서만 되고, 종가배팅·내 조건 자동매수·내 조건 자동매도 화면에서 사용자가 직접 켠 계획만 실행합니다. KIS 는 시세 조회만 됩니다.
+`.env` 의 `BROKER` 로 고릅니다. `mock` 은 키 없이 가짜 시세, `kiwoom` 은 키움 REST API 입니다. (한국투자증권 연동은 2026-10-17 에 걷어냈습니다. 필요하면 git 기록의 `app/kis/` 를 보세요.)
+주문은 종가배팅·내 조건 자동매수·내 조건 자동매도 화면에서 사용자가 직접 켠 계획만 실행합니다.
 
 ### 키움 REST API (BROKER=kiwoom) — 실제 접속으로 검증됨
 
@@ -94,19 +95,6 @@ uvicorn app.main:app            # http://127.0.0.1:8000  (평소에는 start_ser
 
 공식 명세·예제: https://github.com/Kiwoom-Securities/Kiwoom-REST-API (`kiwoom/_data/kiwoom_api_spec.json` 에 전체 항목 정의).
 외인 선물 한 칸은 키움에 해당 API 가 없어 네이버 금융에서 받습니다 (아래 '외인 선물' 참고).
-
-### 한국투자증권 (BROKER=kis)
-
-1. https://apiportal.koreainvestment.com 에서 앱 등록 → APP KEY / SECRET 발급.
-2. `.env` 에 `KIS_ENV=vts`(모의투자) 또는 `real`, 키 두 개 입력.
-3. 서버 재시작. 시작 시 REST 로 전일 종가·현재가를 채우고, 이후 체결은 WebSocket 으로 옵니다.
-
-| 항목 | 실전 | 모의투자 |
-|---|---|---|
-| REST | `https://openapi.koreainvestment.com:9443` | `https://openapivts.koreainvestment.com:29443` |
-| WebSocket | `ws://ops.koreainvestment.com:21000` | `ws://ops.koreainvestment.com:31000` |
-| 호출 제한 | 초당 20건 | 초당 2건 |
-| 실시간 구독 | 접속당 약 41건 | 동일 |
 
 접근토큰은 하루 1개가 원칙이라 `data/kis_token_*.json` 에 캐시합니다. 지우면 재발급합니다.
 
@@ -131,7 +119,6 @@ uvicorn app.main:app            # http://127.0.0.1:8000  (평소에는 start_ser
 |---|---|---|
 | `--source` | `naver` (기본) | 네이버 일봉. 키 불필요. 거래대금은 거래량×종가 근사 |
 | | `kiwoom` | 키움 일봉 `ka10081` (정확한 거래대금, 65종목 17초) — 실접속 검증됨 |
-| | `kis` | 한국투자증권 REST 일봉 (`KIS_ENV=vts/real`) |
 | | `auto` | 증권사 피드가 켜져 있으면 그 증권사 일봉, 모의 모드면 네이버. 화면의 '다시 찾기' 가 이걸 쓴다 |
 | | `mock` | 합성 일봉 (UI 확인용) |
 | `--universe` | `themes` (기본) | themes.json 의 종목만. 수 초 |
@@ -210,7 +197,7 @@ py scripts\fetch_daily.py --use-cache          # 저장된 일봉으로 스크�
 
 ## 부팅 시 자동 시작 (start_server_boot.bat)
 
-시작프로그램 폴더(`shell:startup`)의 **Theme Radar (auto)** 바로가기가 로그인하면 `start_server_boot.bat` 를 최소화 창으로 띄웁니다. 25초 기다린 뒤 서버를 올리고, 서버가 죽으면 10초 뒤 다시 올립니다. 이미 8000 포트에 서버가 있으면(수동 실행) 싸우지 않고 기다립니다.
+시작프로그램 폴더(`shell:startup`)의 **주식자동프로그램 (auto)** 바로가기가 로그인하면 `start_server_boot.bat` 를 최소화 창으로 띄우고, 그 안에서 `start_server_boot.ps1`(PowerShell 감시 루프)이 돕니다. 25초 기다린 뒤 서버를 올리고, 서버가 죽으면 10초 뒤 다시 올립니다. 이미 8000 포트에 서버가 있으면(수동 실행) 싸우지 않고 기다립니다. 감시 루프를 cmd 배치가 아니라 PowerShell 로 둔 이유: 배치는 자식이 강제 종료될 때 "배치 작업을 종료할까요(Y/N)?" 에 걸려 멈추는 일이 있었습니다.
 `stop_server.bat` 은 서버와 이 감시 루프를 함께 끕니다(다음 부팅에는 다시 뜸). 자동 시작을 아예 없애려면 시작프로그램 폴더의 바로가기를 지우면 됩니다. 브라우저는 자동으로 열지 않으니 바탕화면 바로가기나 `http://127.0.0.1:8000` 으로 여세요.
 
 ## 종가배팅 자동매매 (변성환 규칙, 실제 주문)
@@ -340,13 +327,6 @@ py scripts\collect_themes.py --merge            # 손으로 넣은 테마(id 가
 
 코스피200 선물 외국인 순매수(계약 수)입니다. 표에는 전일 값(확정), 당일 값(장중 잠정), 차이(계약)가 나옵니다.
 기본 소스는 네이버 금융 '투자자별 매매동향 · 선물' 페이지라 증권사·키와 무관하게 동작합니다. 키움 REST API 명세에는 선물·옵션 분류가 없어 키움에서는 받을 수 없습니다.
-`FUT_SOURCE=kis` 로 바꾸면 한국투자증권 API(`app/kis/futures.py`)로 조회하며, 그 설정은 **추정치**라 아래로 원본 응답을 보고
-`.env` 의 `KIS_FUT_PATH / KIS_FUT_TR_ID / KIS_FUT_PARAMS / KIS_FUT_FIELD` 를 맞추세요.
-
-```powershell
-py scripts\probe_kis.py --quote 005930     # 키·토큰 점검
-py scripts\probe_kis.py                    # 현재 설정으로 외인 선물 조회, 원본 응답 출력
-```
 
 응답 목록의 첫 행을 당일, 둘째 행을 전일로 해석하며, 필드가 없으면 `frgn_shnu_vol - frgn_seln_vol` 로 계산합니다. 실패하면 표에 오류 사유가 툴팁으로 남고 다른 지표는 정상 갱신됩니다.
 
@@ -371,7 +351,3 @@ py scripts\probe_kis.py                    # 현재 설정으로 외인 선물 �
 - **모의투자 서버 검증**: 자동 주문 코드는 가짜 증권사로만 테스트했습니다. 실전 첫 주문 날은 15:20 과 다음 날 09:00 에 키움 앱 주문내역과 대조하세요.
 - **화면 테스트(tests/*.cjs)** 는 node 가 설치되어 있어야 돕니다. 이 PC 에는 node 가 없어 파이썬 테스트만 돌립니다.
 
-## 필드 참고 (H0STCNT0 실시간 체결)
-
-인덱스 0 종목코드 · 1 체결시간 · 2 현재가 · 3 전일대비부호 · 4 전일대비 · 5 등락률 · 7 시가 · 8 고가 · 9 저가 · 12 체결량 · 13 누적거래량 · 14 누적거래대금(원).
-필드 순서는 KIS 포털의 최신 문서로 한 번 더 확인하세요.

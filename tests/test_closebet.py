@@ -8,7 +8,7 @@ from app.autoexit import AutoExit
 from app.autosell import KST, SellMonitor
 from app.closebet import (CloseBet, bars_240, crossed_up, evaluate, in_window, late_amount, macd, normalize_settings,
                           plan_quantity, stoch, BUY_WINDOW, SCAN_WINDOW)
-from app.kis.rest import Candle
+from app.models import Candle
 from app.kiwoom.orders import OrderRejected, OrderUnknown
 
 

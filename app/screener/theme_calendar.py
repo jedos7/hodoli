@@ -25,7 +25,7 @@ from app.collectors.naver_daily import HEADERS as NAVER_HEADERS
 from app.collectors.naver_daily import NaverDaily, parse_fchart
 from app.collectors.naver_theme import NaverThemeCollector
 from app.config import settings
-from app.kis.rest import Candle
+from app.models import Candle
 
 log = logging.getLogger(__name__)
 Progress = Callable[[int, int, str], None]

@@ -16,7 +16,7 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
 from app.config import settings
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.hoga_play import backtest, baseline, find_setups
 from app.screener.pullback import find_pullbacks
 
@@ -90,33 +90,6 @@ async def fetch_candles(source: str, universe: list[tuple[str, str, str]], days:
                     out[code] = await rest.daily_candles(code, days)
                 except Exception as e:
                     log.warning("키움 일봉 실패 %s(%s): %s", name, code, e)
-                if progress:
-                    progress(i, n, name)
-        finally:
-            await rest.close()
-        return out
-    if source == "kis":
-        settings.validate()
-        from app.kis.auth import KisAuth
-        from app.kis.rest import KisRest
-
-        rest = KisRest(settings, KisAuth(settings))
-        end = date.today()
-        start = end - timedelta(days=int(days * 1.5))
-        try:
-            for i, (code, name, _) in enumerate(universe, 1):
-                cs: list[Candle] = []
-                cur_end = end
-                while len(cs) < days:  # 한 번에 100봉까지라 나눠 받는다
-                    chunk = await rest.daily_candles(code, start.strftime("%Y%m%d"), cur_end.strftime("%Y%m%d"))
-                    if not chunk:
-                        break
-                    cs = chunk + cs
-                    first = datetime.strptime(chunk[0].date, "%Y%m%d").date()
-                    cur_end = first - timedelta(days=1)
-                    if len(chunk) < 100:
-                        break
-                out[code] = cs[-days:]
                 if progress:
                     progress(i, n, name)
         finally:
@@ -221,7 +194,7 @@ async def run_screener(source: str = "naver", universe: str = "themes", days: in
     dates = sorted({c.date for cs in candles.values() for c in cs})
     recent_days = set(dates[-recent:])
     meta = {
-        "asof": asof, "env": settings.env, "source": source, "universe": universe, "stocks": len(uni),
+        "asof": asof, "env": settings.kiwoom_env, "source": source, "universe": universe, "stocks": len(uni),
         "ranAt": datetime.now().isoformat(timespec="seconds"), "todayIncluded": include_today or not market_open(), "recentDays": recent,
     }
 

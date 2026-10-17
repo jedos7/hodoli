@@ -10,8 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.kis.parse import Trade  # 동일한 Trade 구조를 재사용해 상태 계산 코드를 공유한다
-from app.kis.rest import Candle
+from app.models import Candle, Trade
 
 _NUM = re.compile(r"[-+]?\d+(?:\.\d+)?")
 

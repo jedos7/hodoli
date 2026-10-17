@@ -1,4 +1,4 @@
-from app.kis.rest import Candle
+from app.models import Candle
 from app.screener.theme_calendar import compute_days
 
 

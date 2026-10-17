@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.collectors.naver_api import NaverApi, num
-from app.kis.rest import Candle
+from app.models import Candle
 
 log = logging.getLogger(__name__)
 
