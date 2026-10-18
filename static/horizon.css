@@ -36,3 +36,34 @@ dialog{color:var(--ink);background:#171d26;border:1px solid #566a83;border-radiu
 .topbar nav a.trade-nav:focus-visible{outline:2px solid #fff;outline-offset:3px}
 @media(max-width:650px){.topbar nav a.trade-nav{padding:10px 12px;font-size:13px;flex:1 1 auto}}
 .topbar nav{min-width:0;flex-wrap:wrap;align-items:center}
+
+/* 2026-10-19 왼쪽 시장 패널 확대 (사용자 요청: 글씨가 작아 안 보임). 폭 228→340px, 글씨 9~10px→12~13px */
+:root{--left:340px}
+@media(min-width:1800px){:root{--left:380px}}
+@media(max-width:1540px){:root{--left:300px}}
+@media(max-width:1180px){:root{--left:260px}}
+.market-rail{gap:7px}
+.market-rail .mini-panel,.market-rail .market-card{padding:9px 10px}
+.market-rail .panel-title{font-size:13px;margin-bottom:7px;color:#b7c4d8}
+.market-rail .panel-title>span{font-size:11px}
+.market-rail .today-panel{padding:8px 10px}
+.market-rail .today-counts b{font-size:28px}
+.market-rail .today-counts small,.market-rail .today-panel>p{font-size:12px}
+.market-rail .market-card h2{font-size:13px;color:#b7c4d8;padding-bottom:6px;margin-bottom:6px}
+.market-rail .market-card strong{font-size:24px}
+.market-rail .market-change{font-size:13px;margin-left:6px}
+.market-rail .market-card>small,.market-rail .market-stats,.market-rail .market-card .flow-row{font-size:12.5px;line-height:1.6;color:#aab8cc}
+.market-rail .market-stats b,.market-rail .market-card .flow-row b{color:var(--ink)}
+.market-rail .kv{font-size:13px;gap:4px 8px}
+.market-rail .kv>span{color:#aab8cc}
+.market-rail .kv small{font-size:11.5px}
+.market-rail .source-note,.market-rail .leader-list{font-size:12px}
+.market-rail .plan-values{font-size:15px}
+.market-rail .plan p{font-size:12.5px;color:#b7c4d8}
+.market-rail .plan small{font-size:11.5px}
+.market-rail .plan .button{font-size:12.5px;padding:7px 8px}
+.market-rail .plan-monitor-heading{font-size:13px}
+.market-rail .plan-monitor-line>b{font-size:13.5px}
+.market-rail .plan-monitor-badge,.market-rail .plan .plan-monitor-row>small{font-size:12px}
+.market-rail .plan .plan-monitor-updated,.market-rail .rail-note{font-size:11.5px;color:#8fa0b8}
+@media(max-width:1540px){.market-rail .market-card strong{font-size:20px}.market-rail .kv{font-size:12px}.market-rail .market-card>small,.market-rail .market-stats,.market-rail .market-card .flow-row{font-size:11.5px}}
