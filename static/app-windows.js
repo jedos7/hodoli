@@ -3,7 +3,6 @@
   'use strict';
   const routes = {
     '/horizon.html': {name:'themeRadarHorizon', width:1600},
-    '/theme-radar.html': {name:'themeRadarThemes', width:1600},
     '/auto-buy.html': {name:'themeRadarAutoBuy', width:1400},
     '/autoexit.html': {name:'themeRadarAutoExit', width:1280},
     '/custom-exit.html': {name:'themeRadarCustomExit', width:1680},

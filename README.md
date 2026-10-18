@@ -11,7 +11,7 @@
 | `/closebet.html` | **종가배팅 자동매매** | 15:15 후보 → 15:19:50 매수 → 다음 날 09:00 시초가 매도. 흉내/실전 모드 ([docs/CLOSEBET.md](docs/CLOSEBET.md)) |
 | `/auto-buy.html` | 내 조건 자동매수 | 종목·가격·수량을 정해 지정가 1회 매수, 체결 후 익절·손절 연결 ([docs/AUTO_BUY.md](docs/AUTO_BUY.md)) |
 | `/custom-exit.html` | 내 조건 자동매도 | 보유 종목의 익절·손절·이익보전·시간외 매도 티켓, 호라이즌 D+2 자동매도 ([docs/CUSTOM_EXIT.md](docs/CUSTOM_EXIT.md), [docs/AUTOEXIT.md](docs/AUTOEXIT.md)) |
-| `/theme-radar.html` | 테마 레이더 | 테마 카드(활동도·수급·대장주·5분 유입), 고가놀이·눌림목 스크리너, 돌파 감시, 리서치, 일별 테마 달력 |
+| (화면 없음) | 테마 레이더 뒷단 | 테마 카드 화면은 2026-10-19 에 지웠습니다. 15:45 일봉 수집·고가놀이/눌림목 스크리너·돌파 감시·19:50 NXT 종배 알림은 API(`/api/screener/*`, `/api/watch`, `/api/nxtclose`)와 텔레그램으로만 남아 있습니다 |
 | `/reference.html` · `/swing-research.html` | 참고 연구 | CVD·시장 흐름, 실적·산업 리포트 |
 
 주문이 나가는 화면은 종가배팅·내 조건 자동매수·내 조건 자동매도 셋뿐이고, 모두 **사용자가 화면에서 직접 켠 계획만** 실행합니다. 서버를 재시작해도 자동매수·자동매도 계획은 다시 켜지지 않습니다(종가배팅의 보유 종목 매도만 예외).
