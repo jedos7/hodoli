@@ -9,3 +9,4 @@ themes.json.bak
 data/*.log
 data/*.lock
 data/*.tmp
+data/tape/
