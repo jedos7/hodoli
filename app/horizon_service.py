@@ -279,7 +279,9 @@ class HorizonService:
             if full or (now.weekday()<5 and '0900'<=now.strftime('%H%M')<='1540'):
                 await self.refresh(full=full)
                 if not self.error or (self.scan_at and self.scan_at[:10]==now.date().isoformat()):
-                    self.last_scan_key=key
+                    if self.last_scan_key!=key:
+                        self.last_scan_key=key
+                        self.save()      # 어느 단계까지 긁었는지 바로 남긴다 (재시작 때 다시 긁지 않게)
             await asyncio.sleep(60 if not self.error else 180)
 
     def start(self):

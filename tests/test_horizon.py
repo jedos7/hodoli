@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 from dataclasses import replace
 from types import SimpleNamespace
 import asyncio
+import json
 import pytest
 
 from app.horizon import Bar, KST, baseline, evaluate, grade, window
-from app.horizon_service import HorizonService, parse_minutes
+from app.horizon_service import HorizonService, now_kst, parse_minutes
 from app.models import Candle
 
 
@@ -234,3 +235,34 @@ def test_scan_phase_is_remembered_so_restart_does_not_refetch_everything(tmp_pat
     t = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
     t.load()
     assert t.last_scan_key == '20260921close'
+
+
+def test_loop_writes_down_which_phase_was_collected(tmp_path):
+    """전 종목 수집을 끝낸 단계를 그 자리에서 저장해야, 장 끝난 뒤 재시작해도 700종목을 다시 받지 않는다."""
+    s = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
+    s.loaded = True
+    s.daily['005930'] = [Candle('20260921', 10, 12, 9, 11, 5, 7)]
+    calls = []
+
+    async def fake_refresh(full=False):
+        calls.append(full)
+        s.scan_at = now_kst().isoformat(timespec='seconds')
+    s.refresh = fake_refresh
+
+    async def one_round():
+        task = asyncio.create_task(s.loop())
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if calls:
+                break
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    asyncio.run(one_round())
+    now = now_kst()
+    want = now.strftime('%Y%m%d') + ('close' if now.strftime('%H%M') >= '1540' else 'day')
+    assert calls == [True]                                   # 처음에는 전 종목 수집
+    assert s.last_scan_key == want
+    assert json.loads((tmp_path / 'horizon.json').read_text('utf-8'))['scanKey'] == want
