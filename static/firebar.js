@@ -30,10 +30,17 @@
   function conds(checks) {
     return Object.entries(checks || {}).map(([k, [ok, why]]) => `<span class="cond ${ok ? 'ok' : ''}" title="${esc(why)}">${ok ? '✓' : '✗'} ${esc(condNames[k] || k)}</span>`).join('');
   }
+  function took(scan) {
+    // 몇 초 걸렸는지 · 등락 범위 안에 든 종목만 일봉을 받는다 (나머지는 순위 자료만으로 끝낸다)
+    if (!scan.took_ms) return '';
+    const fetched = scan.fetched === undefined ? '' : ` · 일봉 조회 ${scan.fetched}종목`;
+    return ` · ${(scan.took_ms / 1000).toFixed(1)}초${fetched}`;
+  }
+
   function renderScan(scan, label) {
     if (!scan) { $('scanMeta').textContent = '아직 후보 선정 전 (매 거래일 15:15 자동)'; $('scanRows').innerHTML = '<tr><td colspan="4" class="empty">아직 후보 선정 전</td></tr>'; return; }
     const rows = scan.rows || [], passed = rows.filter(r => r.pass);
-    $('scanMeta').textContent = `${label} ${scan.at.slice(5, 16).replace('T', ' ')} · 대금 ${fmt(scan.threshold_eok)}억 넘는 ${rows.length}종목 중 통과 ${passed.length}${scan.error ? ' · ' + scan.error : ''}`;
+    $('scanMeta').textContent = `${label} ${scan.at.slice(5, 16).replace('T', ' ')} · 대금 ${fmt(scan.threshold_eok)}억 넘는 ${rows.length}종목 중 통과 ${passed.length}${took(scan)}${scan.error ? ' · ' + scan.error : ''}`;
     $('scanRows').innerHTML = rows.length ? rows.map(r => `<tr class="${r.pass ? 'pass' : ''}"><td><b>${esc(r.name)}</b> <small>${esc(r.code)}</small>${r.pass ? ' <b style="color:#9fe3b3">통과</b>' : ''}</td><td class="num">${fmt(Math.round(r.amount_eok))}억</td><td class="num">${Number(r.chg).toFixed(2)}%</td><td>${conds(r.checks)}</td></tr>`).join('')
       : `<tr><td colspan="4" class="empty">${scan.error || '문턱을 넘는 종목이 없습니다'}</td></tr>`;
   }

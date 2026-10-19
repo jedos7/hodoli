@@ -18,8 +18,10 @@ from __future__ import annotations
 
 from datetime import time
 from statistics import mean
+from time import monotonic
 
 from app.closebet import SKIP_NAME, CloseBet, buy_price
+from app.fanout import fanout
 from app.kiwoom.extended_sell import tick
 from app.kiwoom.orders import NotSent
 
@@ -43,45 +45,63 @@ def tail_pct(high, price, prev_close):
     return (high - price) / prev_close * 100 if prev_close > 0 else 99.0
 
 
-def evaluate(row, daily, threshold_eok, today):
-    """후보 한 종목 판정. row = 거래대금 순위 행, daily = 오늘 봉 포함 일봉(Candle)."""
-    checks = {}
-    checks['amount'] = (row['amount_eok'] >= threshold_eok,
-                        f"거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")
-    if today is None and daily:
-        today = daily[-1].date
-    if not daily or daily[-1].date != today or len(daily) < 25:
-        checks['data'] = (False, '오늘 일봉 없음 또는 일봉 25개 미만')
-        return {'pass': False, 'checks': checks}
+def cheap_checks(row, threshold_eok):
+    """일봉 없이 순위 자료만으로 보는 조건 → (checks, 전날 종가).
 
-    # 전날 종가·등락률은 **키움 순위 자료(flu_rt)** 로 계산한다.
-    # ka10081 일봉은 수정주가라 과거 종가가 실제와 다를 수 있다 (2026-10-19 에스엠벡셀: 일봉 3,150 / 실제 3,110
-    # → 등락이 28.25% 로 계산돼 상한가 제외를 빠져나갔다). 오늘 봉의 고가·거래대금은 수정 대상이 아니라 그대로 쓴다.
-    t = daily[-1]
-    chg = row.get('chg')
-    if chg is None or 1 + chg / 100 <= 0 or not row.get('price'):
+    전날 종가·등락률은 **키움 순위 자료(flu_rt)** 로 계산한다.
+    ka10081 일봉은 수정주가라 과거 종가가 실제와 다를 수 있다 (2026-10-19 에스엠벡셀: 일봉 3,150 / 실제 3,110
+    → 등락이 28.25% 로 계산돼 상한가 제외를 빠져나갔다).
+    등락이 +15~29% 밖인 종목(보통 거래대금 상위의 95%)은 여기서 끝나므로 일봉을 받지 않는다."""
+    checks = {'amount': (row['amount_eok'] >= threshold_eok,
+                         f"거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")}
+    chg, price = row.get('chg'), row.get('price')
+    if chg is None or 1 + chg / 100 <= 0 or not price:
         checks['data'] = (False, '순위 자료의 등락률·현재가 확인 필요')
-        return {'pass': False, 'checks': checks}
-    prev_close = round(row['price'] / (1 + chg / 100))
+        return checks, 0
+    prev_close = round(price / (1 + chg / 100))
     checks['price'] = (prev_close >= 1000, f"전날 종가 {prev_close:,}원 (1,000원 미만 제외)")
     checks['rise'] = (MIN_RISE <= chg < MAX_RISE, f"오늘 등락 {chg:+.2f}% ({MIN_RISE:.0f}~{MAX_RISE:.0f}% 사이만)")
+    return checks, prev_close
+
+
+def evaluate(row, daily, threshold_eok, today):
+    """후보 한 종목 판정. row = 거래대금 순위 행, daily = 오늘 봉 포함 일봉(Candle).
+    daily=None 이면 싼 조건만 보고 **일봉이 필요한지**(need_daily) 알려준다."""
+    checks, prev_close = cheap_checks(row, threshold_eok)
+    out = {'pass': False, 'checks': checks, 'need_daily': False,
+           'prev_close': prev_close, 'upper_limit': upper_limit(prev_close)}
+    if row.get('chg') is not None:
+        out['chg'] = round(row['chg'], 2)
+    if not all(ok for ok, _ in checks.values()):
+        return out
+    if daily is None:
+        return out | {'need_daily': True}
+
+    # 오늘 봉의 고가·거래대금은 수정 대상이 아니라 그대로 쓴다.
+    if not daily or daily[-1].date != (today or daily[-1].date) or len(daily) < 25:
+        checks['data'] = (False, '오늘 일봉 없음 또는 일봉 25개 미만')
+        return out
+    t = daily[-1]
     avg20 = mean(c.amount for c in daily[-21:-1]) if len(daily) >= 21 else 0
     mult = t.amount / avg20 if avg20 else 0
     checks['multiple'] = (mult >= MIN_MULTIPLE, f"평소(20일 평균) 대비 {mult:,.1f}배 ({MIN_MULTIPLE:.0f}배 이상)")
     tail = tail_pct(t.high, row['price'], prev_close)      # 지금 값은 순위 자료 기준
     checks['tail'] = (tail < MAX_TAIL, f"윗꼬리 {tail:.2f}%p (고가 {t.high:,} − 지금 {t.close:,}) · {MAX_TAIL}%p 미만만")
-    return {'pass': all(ok for ok, _ in checks.values()), 'checks': checks,
-            'chg': round(chg, 2), 'tail': round(tail, 2), 'multiple': round(mult, 1),
-            'prev_close': prev_close, 'upper_limit': upper_limit(prev_close)}
+    return out | {'pass': all(ok for ok, _ in checks.values()),
+                  'tail': round(tail, 2), 'multiple': round(mult, 1)}
 
 
 class FireBar(CloseBet):
     label, icon = '기준봉 종가', '🔥'
     scan_window, buy_window = SCAN_WINDOW, BUY_WINDOW
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._info = {}      # code → (받은 시각, ka10001) · 주문 직전에 같은 조회를 두 번 하지 않게
+
     async def scan(self, preview=False):
         today = self.today()
-        at = self.clock()
+        at, started = self.clock(), monotonic()
         result = {'at': at.isoformat(), 'preview': preview, 'threshold_eok': self.settings['threshold_eok'],
                   'rows': [], 'error': ''}
         try:
@@ -93,18 +113,25 @@ class FireBar(CloseBet):
                     and not any(k in r['name'] for k in SKIP_NAME)]
             rows.sort(key=lambda r: -r['amount_eok'])
             ymd = None if preview else today.replace('-', '')
-            for r in rows:
-                try:
-                    ev = evaluate(r, await broker.daily(r['code']), self.settings['threshold_eok'], ymd)
-                    r = r | {'pass': ev['pass'], 'checks': {k: list(v) for k, v in ev['checks'].items()},
-                             'prev_close': ev.get('prev_close'), 'upper_limit': ev.get('upper_limit'),
-                             'tail': ev.get('tail'), 'multiple': ev.get('multiple')}
-                except Exception as exc:
-                    r = r | {'pass': False, 'checks': {'error': [False, f'조회 실패: {str(exc)[:80]}']}}
-                result['rows'].append(r)
+            th = self.settings['threshold_eok']
+
+            async def judge(r):
+                """등락이 범위 밖이면 일봉을 받지 않는다 (거래대금 상위 90종목 중 보통 2~5종목만 받는다)."""
+                ev = evaluate(r, None, th, ymd)
+                if ev['need_daily']:
+                    ev = evaluate(r, await broker.daily(r['code']), th, ymd)
+                return r | {'pass': ev['pass'], 'checks': {k: list(v) for k, v in ev['checks'].items()},
+                            'prev_close': ev.get('prev_close'), 'upper_limit': ev.get('upper_limit'),
+                            'tail': ev.get('tail'), 'multiple': ev.get('multiple')}
+
+            for r, judged in zip(rows, await fanout(rows, judge)):
+                result['rows'].append(judged if not isinstance(judged, Exception) else
+                                      r | {'pass': False, 'checks': {'error': [False, f'조회 실패: {str(judged)[:80]}']}})
             result['passed'] = [r['code'] for r in result['rows'] if r['pass']]
+            result['fetched'] = sum(1 for r in result['rows'] if r.get('multiple') is not None)
         except Exception as exc:
             result['error'] = f'후보 선정 실패: {str(exc)[:120]}'
+        result['took_ms'] = round((monotonic() - started) * 1000)
         if not preview:
             self.scans[today] = result
             self.day()['scanned'] = at.isoformat()
@@ -118,12 +145,21 @@ class FireBar(CloseBet):
         self.scan_task = None
         return result
 
+    async def now_info(self, broker, code):
+        """지금 시세(ka10001). 주문가 계산과 주문 직전 재확인이 **같은 값**을 쓰게 5초만 기억한다."""
+        hit = self._info.get(code)
+        if hit and monotonic() - hit[0] < 5:
+            return hit[1]
+        info = await broker.rest.basic(code)
+        self._info[code] = (monotonic(), info)
+        return info
+
     async def pre_buy_check(self, broker, r, price):
         """15:19:40 주문 직전 재확인 — 15:10 이후 윗꼬리가 생겼거나 상한가에 잠기면 사지 않는다."""
         prev_close = r.get('prev_close') or 0
         if prev_close <= 0:
             return
-        info = await broker.rest.basic(r['code'])
+        info = await self.now_info(broker, r['code'])
         if info.price <= 0 or info.high <= 0:
             raise NotSent('주문 직전 시세 확인 실패')
         chg = (info.price / prev_close - 1) * 100
@@ -135,7 +171,7 @@ class FireBar(CloseBet):
 
     async def order_price(self, broker, book, r):
         """지금 값 + 2틱. 상한가는 넘지 않는다."""
-        info = await broker.rest.basic(r['code'])
+        info = await self.now_info(broker, r['code'])
         now_px = info.price if info.price > 0 else r['price']
         price = buy_price(now_px)
         cap = r.get('upper_limit') or 0

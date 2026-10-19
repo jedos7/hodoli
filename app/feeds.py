@@ -134,7 +134,8 @@ class KiwoomFeed:
         return await self.ws.ensure(codes)
 
     def status(self) -> dict:
-        return {"type": "kiwoom", **self.ws.status()}
+        return {"type": "kiwoom", "restCalls": self.rest.calls, "throttled": self.rest.throttled, "restByApi": dict(self.rest.by_api),
+                **self.ws.status()}
 
     async def _refresh_all(self, initial: bool = False) -> None:
         """ka10059 로 종목마다 현재가·전일종가·누적거래대금·외인/기관 순매수를 채운다 (종목당 조회 1회)."""

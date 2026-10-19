@@ -26,9 +26,11 @@ import math
 import secrets
 from datetime import datetime, time
 from statistics import mean
+from time import monotonic
 
 from app.autoexit import PENDING, AutoExit
 from app.autosell import normal_code
+from app.fanout import fanout
 from app.kiwoom.extended_sell import tick
 from app.kiwoom.orders import NotSent, OrderRejected
 
@@ -361,7 +363,7 @@ class CloseBet(AutoExit):
     # ── 15:15 후보 선정 ──
     async def scan(self, preview=False):
         today = self.today()
-        at = self.clock()
+        at, started = self.clock(), monotonic()
         result = {'at': at.isoformat(), 'preview': preview, 'threshold_eok': self.settings['threshold_eok'], 'rows': [], 'error': ''}
         try:
             broker = self.broker()
@@ -371,21 +373,25 @@ class CloseBet(AutoExit):
             rows = [r for r in rows if r['amount_eok'] >= self.settings['threshold_eok'] and not any(k in r['name'] for k in SKIP_NAME)]
             rows.sort(key=lambda r: -r['amount_eok'])
             ymd = None if preview else today.replace('-', '')
-            for r in rows:
-                try:
-                    daily = await broker.daily(r['code'])
-                    ev = evaluate(r, daily, None, self.settings['threshold_eok'], ymd)
-                    core = [k for k in ('macd', 'stoch', 'prev', 'high') if k in ev['checks']]
-                    if ev['checks'].get('data', (True,))[0] and all(ev['checks'][k][0] for k in core):
-                        hourly = await broker.minutes(r['code'], '60')     # 일봉 조건을 다 넘은 종목만 240분봉을 받는다
-                        ev = evaluate(r, daily, hourly, self.settings['threshold_eok'], ymd)
-                    r = r | {'pass': ev['pass'], 'checks': {k: list(v) for k, v in ev['checks'].items()}}
-                except Exception as exc:
-                    r = r | {'pass': False, 'checks': {'error': [False, f'조회 실패: {str(exc)[:80]}']}}
-                result['rows'].append(r)
+            th = self.settings['threshold_eok']
+
+            async def judge(r):
+                daily = await broker.daily(r['code'])
+                ev = evaluate(r, daily, None, th, ymd)
+                core = [k for k in ('macd', 'stoch', 'prev', 'high') if k in ev['checks']]
+                if ev['checks'].get('data', (True,))[0] and all(ev['checks'][k][0] for k in core):
+                    hourly = await broker.minutes(r['code'], '60')     # 일봉 조건을 다 넘은 종목만 240분봉을 받는다
+                    ev = evaluate(r, daily, hourly, th, ymd)
+                return r | {'pass': ev['pass'], 'checks': {k: list(v) for k, v in ev['checks'].items()}}
+
+            # 종목마다 일봉을 하나씩 기다리면 '호출 간격 + 왕복시간' 이 매번 더해진다. 몇 개를 겹쳐 보낸다.
+            for r, judged in zip(rows, await fanout(rows, judge)):
+                result['rows'].append(judged if not isinstance(judged, Exception) else
+                                      r | {'pass': False, 'checks': {'error': [False, f'조회 실패: {str(judged)[:80]}']}})
             result['passed'] = [r['code'] for r in result['rows'] if r['pass']]
         except Exception as exc:
             result['error'] = f'후보 선정 실패: {str(exc)[:120]}'
+        result['took_ms'] = round((monotonic() - started) * 1000)
         if not preview:
             self.scans[today] = result
             self.day()['scanned'] = at.isoformat()

@@ -8,6 +8,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
+from app.fanout import fanout
 from app.horizon import Bar, KST, RULES, VERSION, baseline, evaluate, now_kst, valid_bar
 from app.kiwoom.parse import num
 from app.models import Candle
@@ -60,6 +61,8 @@ class HorizonService:
                 self.index=d.get('index',{})
                 self.master=d.get('master',{})
                 self.scan_at=d.get('scanAt')
+                # 어느 단계(날짜+장중/종가)까지 전 종목을 긁었는지. 재시작 때 같은 단계면 700종목을 다시 받지 않는다.
+                self.last_scan_key=d.get('scanKey') or None
             else:
                 p=self.s.data_dir/'candles_kiwoom_market.json'
                 if p.exists():
@@ -72,7 +75,7 @@ class HorizonService:
 
     def save(self):
         self.path.parent.mkdir(parents=True,exist_ok=True)
-        d={'version':VERSION,'scanAt':self.scan_at,'names':self.names,'index':self.index,'master':self.master,
+        d={'version':VERSION,'scanAt':self.scan_at,'scanKey':self.last_scan_key,'names':self.names,'index':self.index,'master':self.master,
            'daily':{c:[[x.date,x.open,x.high,x.low,x.close,x.volume,x.amount] for x in cs] for c,cs in self.daily.items()},
            'detail':self.detail}
         temp=self.path.with_suffix('.tmp')
@@ -154,21 +157,44 @@ class HorizonService:
         if not uni:
             raise ValueError('관제탑 검색 범위가 비었습니다')
         self.job.update(total=len(uni),done=0,current='기준봉 찾는 중')
-        success=0
-        for n,(code,label) in enumerate(uni.items(),1):
+        done=[0]
+
+        async def one(item):
+            # 종목마다 하나씩 기다리면 '호출 간격 + 왕복시간' 이 매번 더해진다. 몇 개를 겹쳐 보낸다.
+            code,label=item
+            ok=False
             try:
                 cs=await rest.daily_candles(code,280)
                 if not cs:
                     raise ValueError('일봉 없음')
                 self.daily[code]=cs
                 self.names[code]=label
-                success+=1
+                ok=True
             except Exception:
                 self.job['errors']+=1
-            self.job.update(done=n,current=label[0])
+            done[0]+=1
+            self.job.update(done=done[0],current=label[0])
+            return ok
+
+        success=sum(1 for ok in await fanout(list(uni.items()),one) if ok is True)
         if not success:
             raise ValueError('일봉을 받지 못했습니다. 기존 자료만 표시합니다.')
         self.scan_at=now_kst().isoformat(timespec='seconds')
+
+    async def recent_daily(self,rest,code,keep=280,recent=10):
+        """최근 일봉만 받아 쌓아 둔 일봉에 덮는다 (280일을 1분마다 다시 받지 않으려고).
+
+        겹치는 날(오늘 봉 제외)의 종가가 저장된 것과 다르면 권리 조정(수정주가)이 된 것이므로 전체를 다시 받는다.
+        쌓아 둔 게 없으면 받은 것만 돌려주고, 다음 전 종목 수집이 280일을 채운다."""
+        fresh=await rest.daily_candles(code,recent)
+        have=self.daily.get(code) or []
+        if not fresh or not have:
+            return fresh
+        old={c.date:c for c in have}
+        if any(c.date in old and old[c.date].close!=c.close for c in fresh[:-1]):
+            return await rest.daily_candles(code,keep)
+        merged=old|{c.date:c for c in fresh}
+        return [merged[d] for d in sorted(merged)][-keep:]
 
     async def minutes(self,rest,code,since):
         nk=''
@@ -205,11 +231,14 @@ class HorizonService:
                     await self.scan(rest)
                 candidates=self.candidates()
                 self.job.update(total=len(candidates),done=0)
-                for n,(code,cs,i) in enumerate(candidates,1):
+                done=[0]
+
+                async def one(item):
+                    code,cs,i=item
                     try:
                         basic,_=await rest.post('/api/dostk/stkinfo','ka10001',{'stk_cd':code})
-                        # D+1 당일 고가/종가를 놓치지 않도록 일봉도 갱신.
-                        daily=await rest.daily_candles(code,280)
+                        # D+1 당일 고가/종가를 놓치지 않도록 일봉도 갱신. 지난 일봉은 바뀌지 않으므로 최근 것만 받는다.
+                        daily=await self.recent_daily(rest,code)
                         if not daily:
                             raise ValueError('종목 일봉 없음')
                         bars=await self.minutes(rest,code,cs[i].date)
@@ -225,7 +254,10 @@ class HorizonService:
                     except Exception:
                         self.job['errors']+=1
                         # 이전 수신 시각을 남긴다. 실패를 최신 자료로 포장하지 않는다.
-                    self.job.update(done=n,current=self.names.get(code,[code])[0])
+                    done[0]+=1
+                    self.job.update(done=done[0],current=self.names.get(code,[code])[0])
+
+                await fanout(candidates,one)      # 후보마다 ka10001·일봉·분봉 세 묶음을 겹쳐 받는다
                 active={c for c,_,_ in self.candidates()}
                 self.detail={c:v for c,v in self.detail.items() if c in active}
                 self.updated_at=now_kst().isoformat(timespec='seconds')

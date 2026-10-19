@@ -34,3 +34,8 @@ class Trade:
     sell_total: int = 0      # 총매도수량
     market: str = "KRX"      # KRX | NX (키움 NXT 야간·프리장 체결)
     signed_volume: int | None = None  # 매수/매도 방향이 명시된 체결량 (피드가 줄 때만)
+
+    @property
+    def acc_amount_eok(self) -> float:
+        # 누적거래대금을 억으로. 화면·상태(app/state.py)는 억 단위를 쓴다.
+        return self.acc_amount / 1e8

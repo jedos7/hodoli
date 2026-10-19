@@ -28,6 +28,7 @@ from datetime import time
 from app.autoexit import PENDING
 from app.closebet import SKIP_NAME, CloseBet, in_window, plan_quantity
 from app.collectors.naver_api import NaverApi, num
+from app.fanout import fanout
 from app.kiwoom.orders import NotSent, OrderRejected
 
 MONITOR_WINDOW = (time(10, 0), time(14, 59))     # 문서: 10:00~14:59 에 닿은 것만
@@ -175,13 +176,17 @@ class LeaderDip(CloseBet):
         try:
             universe = await self.universe()
             broker = self.broker()
+            ymd = self.today().replace('-', '')
+            codes = list(universe)
+            # 대장주 15분봉을 몇 개씩 겹쳐 받는다. 판단과 주문은 받은 뒤 **목록 순서대로** 한다 (자리 상한·몰린 날 셈이 어긋나지 않게).
+            fetched = await fanout(codes, lambda c: broker.minutes(c, '15'))
             touched_today = {s['code'] for s in self.setups.values() if s['day'] == self.today()}
-            for code, info in universe.items():
-                try:
-                    bars = [b for b in await broker.minutes(code, '15') if b[0][:8] == self.today().replace('-', '')]
-                except Exception as exc:
-                    self.day().setdefault('poll_errors', {})[code] = str(exc)[:60]
+            for code, got in zip(codes, fetched):
+                info = universe[code]
+                if isinstance(got, Exception):
+                    self.day().setdefault('poll_errors', {})[code] = str(got)[:60]
                     continue
+                bars = [b for b in got if b[0][:8] == ymd]
                 if not bars:
                     continue
                 anchor, anchor_at = anchor_line(bars)

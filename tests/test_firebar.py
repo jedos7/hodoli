@@ -190,3 +190,48 @@ def test_limit_up_is_rejected_even_when_adjusted_daily_says_otherwise():
     ev = evaluate({'amount_eok': 994, 'price': 4040, 'chg': 29.9}, d, 300, '20261019')
     assert not ev['checks']['rise'][0] and not ev['pass']
     assert ev['chg'] == 29.9 and ev['prev_close'] == 3110
+
+
+def test_scan_does_not_fetch_daily_for_rows_outside_the_rise_range(eng):
+    """등락 범위·주가는 순위 자료만으로 알 수 있다. 거래대금 상위 대부분이 여기서 걸러지므로 일봉을 받지 않는다.
+    2026-10-19 실제 자료로는 83종목 중 81종목이 일봉 조회 없이 끝난다."""
+    fetched = []
+    eng.b.daily = lambda code: _record(fetched, code)
+
+    async def ranking(market):
+        return [{'code': '000001', 'name': '종목A', 'price': 12000, 'amount_eok': 500, 'chg': 20.0},
+                {'code': '000002', 'name': '종목B', 'price': 9000, 'amount_eok': 900, 'chg': 3.0},
+                {'code': '000003', 'name': '종목C', 'price': 4040, 'amount_eok': 700, 'chg': 29.9}] if market == '001' else []
+    eng.b.ranking = ranking
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    scan = eng.e.scans['2026-10-19']
+    assert fetched == ['000001']                      # 범위 안 한 종목만 일봉을 받았다
+    assert scan['passed'] == ['000001'] and len(scan['rows']) == 3
+    rows = {r['code']: r for r in scan['rows']}
+    assert not rows['000002']['checks']['rise'][0] and not rows['000003']['checks']['rise'][0]
+    assert 'multiple' not in rows['000002']['checks']  # 일봉이 필요한 조건은 비워 둔다
+    assert rows['000003']['prev_close'] == 3110        # 일봉 없이도 전날 종가·상한가는 계산된다
+    assert scan['took_ms'] >= 0 and scan['fetched'] == 1
+
+
+async def _record(into, code):
+    into.append(code)
+    return good()
+
+
+def test_order_price_and_pre_buy_check_share_one_quote(eng):
+    """주문가와 주문 직전 재확인이 ka10001 을 두 번 부르지 않는다 (15:19:40 은 1초가 아깝다)."""
+    seen = []
+    eng.b.rest = SimpleNamespace(basic=lambda code: _quote(seen, code, eng.b.basic_info))
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 40, tzinfo=KST)
+    run(eng.e.tick())
+    assert seen == ['000001']
+    assert eng.b.calls == [('buy', '000001', 41, 12020)]
+
+
+async def _quote(into, code, info):
+    into.append(code)
+    return info

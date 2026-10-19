@@ -34,6 +34,9 @@ class KiwoomRest:
         self._gap = 1.0 / settings.kiwoom_rps
         self._lock = asyncio.Lock()
         self._last = 0.0
+        self.calls = 0          # 보낸 조회 수
+        self.by_api = {}        # api-id 별 조회 수 (누가 조회를 많이 쓰는지 찾도록)
+        self.throttled = 0      # 429(호출 제한)로 한 번 더 보낸 수 · /api/health 에서 본다
 
     async def close(self) -> None:
         await self.client.aclose()
@@ -53,8 +56,12 @@ class KiwoomRest:
             if wait > 0:
                 await asyncio.sleep(wait)
             self._last = time.monotonic()
+        self.calls += 1
+        self.by_api[api_id] = self.by_api.get(api_id, 0) + 1
         r = await self.client.post(path, headers=headers, json=body)
         if r.status_code == 429:  # 호출 제한: 잠깐 쉬고 한 번 더
+            self.throttled += 1
+            log.warning("키움 %s 호출 제한(429) · 1.2초 쉬고 한 번 더 (누적 %d/%d)", api_id, self.throttled, self.calls)
             await asyncio.sleep(1.2)
             r = await self.client.post(path, headers=headers, json=body)
         r.raise_for_status()

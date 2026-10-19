@@ -184,3 +184,53 @@ def test_universe_outage_does_not_stop_existing_watch(tmp_path,monkeypatch):
     s.names={'005930':['시험','시험']}
     asyncio.run(s.scan(Rest()))
     assert s.daily['005930'] and s.scan_at and '기존 범위' in s.scope_warning
+
+
+def test_recent_daily_only_fetches_recent_bars_and_merges(tmp_path):
+    """장중 1분 갱신은 280일을 다시 받지 않고 최근 봉만 받아 덮는다 (키움 조회 초당 3건을 아끼려고)."""
+    class Rest:
+        def __init__(self):
+            self.asked = []
+        async def daily_candles(self, code, days):
+            self.asked.append(days)
+            # 최근 열흘만 달라고 하면 열흘만 준다 (실제 ka10081 도 한 페이지로 끝난다)
+            end = 30 if days > 10 else 10
+            return [Candle(f'202609{10 + i:02d}', 10, 12, 9, 100 + i, 5, 7) for i in range(30 - end, 30)]
+
+    s = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
+    s.loaded = True
+    s.daily['005930'] = [Candle(f'202609{10 + i:02d}', 10, 12, 9, 100 + i, 5, 7) for i in range(30)]
+    rest = Rest()
+    out = asyncio.run(s.recent_daily(rest, '005930'))
+    assert rest.asked == [10]                      # 280일을 다시 받지 않았다
+    assert len(out) == 30 and out[-1].close == 129  # 쌓아 둔 역사 + 최근 봉
+
+
+def test_recent_daily_refetches_everything_when_past_closes_changed(tmp_path):
+    """권리 조정(수정주가)으로 과거 종가가 바뀌면 전체를 다시 받는다. 섞인 일봉으로 판정하지 않는다."""
+    class Rest:
+        def __init__(self):
+            self.asked = []
+        async def daily_candles(self, code, days):
+            self.asked.append(days)
+            return [Candle(f'202609{10 + i:02d}', 5, 6, 4, 50 + i, 5, 7) for i in range(30 - (30 if days > 10 else 10), 30)]
+
+    s = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
+    s.loaded = True
+    s.daily['005930'] = [Candle(f'202609{10 + i:02d}', 10, 12, 9, 100 + i, 5, 7) for i in range(30)]
+    rest = Rest()
+    out = asyncio.run(s.recent_daily(rest, '005930'))
+    assert rest.asked == [10, 280]
+    assert len(out) == 30 and all(c.close < 100 for c in out)   # 조정된 값으로 통째로 갈았다
+
+
+def test_scan_phase_is_remembered_so_restart_does_not_refetch_everything(tmp_path):
+    """서버를 다시 띄울 때 같은 단계(날짜+장중/종가)면 700종목 일봉을 다시 받지 않는다."""
+    s = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
+    s.loaded = True
+    s.daily['005930'] = [Candle('20260921', 10, 12, 9, 11, 5, 7)]
+    s.last_scan_key = '20260921close'
+    s.save()
+    t = HorizonService(SimpleNamespace(data_dir=tmp_path), lambda: None, lambda: None)
+    t.load()
+    assert t.last_scan_key == '20260921close'

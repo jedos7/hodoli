@@ -1,4 +1,5 @@
 from app.kiwoom.parse import inum, num, parse_basic, parse_daily, parse_investor, parse_real
+from app.state import MarketState, Stock, Theme
 
 
 def test_signed_numbers():
@@ -45,3 +46,21 @@ def test_parse_investor_real_shape():
     assert r["date"] == "20260909" and r["price"] == 268500 and r["prev_close"] == 269500
     assert r["acc_amount"] == 3_648_859_000_000 and r["frgn"] == 136_412_000_000 and r["orgn"] == 211_366_000_000 and r["prsn"] == 0
     assert parse_investor({"stk_invsr_orgn": []}) is None
+
+
+def test_real_tick_reaches_state_in_eok():
+    """실시간 체결 한 건이 상태(억 단위)까지 들어가는 길 전체.
+
+    2026-10-19 KIS 연동을 걷어내며 Trade.acc_amount_eok 를 빠뜨려 app/feeds.py 가 틱마다 AttributeError 를 냈고,
+    그 예외가 WS 루프까지 올라가 **체결이 올 때마다 재접속**했다 (그날 12:55~18:50 사이 1만 번).
+    같은 일이 다시 생기지 않게 원(acc_amount)과 억(acc_amount_eok) 두 단위를 함께 못 박는다."""
+    msg = {"trnm": "REAL", "data": [{"type": "0B", "item": "005930", "values": {
+        "10": "+71500", "12": "+0.42", "13": "123456", "14": "8800", "20": "093012", "228": "132.55"}}]}
+    t, = parse_real(msg, amount_unit=1_000_000)
+    assert t.acc_amount == 8_800_000_000 and t.acc_amount_eok == 88.0
+
+    stock = Stock(code='005930', name='삼성전자', theme_id='semi', ref=71200)
+    state = MarketState([Theme(id='semi', name='반도체', grade='A', report='', news='', stocks=[stock])])
+    state.update(t.code, t.price, t.acc_amount_eok, change_rate=t.change_rate, cttr=t.cttr)
+    s = state.stocks['005930']
+    assert s.price == 71500 and s.acc_amount == 88.0 and s.cttr == 132.55

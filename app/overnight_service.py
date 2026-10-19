@@ -157,11 +157,18 @@ def create_overnight_router(service, prefix, header, model, scan_preview=True):
             try:
                 universe = await service.engine.universe()
                 broker = service.engine.broker()
+                from app.fanout import fanout
                 from app.leaderdip import anchor_line, zones
                 today = service.engine.today().replace('-', '')
+                codes = list(universe)
+                fetched = await fanout(codes, lambda c: broker.minutes(c, '15'))
                 out = []
-                for code, info in universe.items():
-                    bars = [b for b in await broker.minutes(code, '15') if b[0][:8] == today]
+                for code, got in zip(codes, fetched):
+                    info = universe[code]
+                    if isinstance(got, Exception):
+                        out.append({**info, 'note': f'조회 실패: {str(got)[:60]}'})
+                        continue
+                    bars = [b for b in got if b[0][:8] == today]
                     if not bars:
                         out.append({**info, 'note': '오늘 15분봉 없음'})
                         continue
