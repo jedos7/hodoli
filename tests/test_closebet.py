@@ -6,16 +6,25 @@ import pytest
 
 from app.autoexit import AutoExit
 from app.autosell import KST, SellMonitor
-from app.closebet import (CloseBet, bars_240, crossed_up, evaluate, in_window, late_amount, macd, normalize_settings,
-                          plan_quantity, stoch, BUY_WINDOW, SCAN_WINDOW)
+from app.closebet import (STOCH_SETS, CloseBet, bars_240, buy_price, crossed_within, evaluate, in_window,
+                          late_amount, macd, normalize_settings, plan_quantity, stoch_k, turned_up_from_low,
+                          BUY_WINDOW, SCAN_WINDOW)
 from app.models import Candle
 from app.kiwoom.orders import OrderRejected, OrderUnknown
 
 
 # ── 지표·판정 ──
-def test_crossed_up_level_and_series():
-    assert crossed_up([15, 25], level=20) and not crossed_up([25, 30], level=20) and not crossed_up([25, 15], level=20)
-    assert crossed_up([1, 3], other=[2, 2]) and not crossed_up([3, 4], other=[2, 2])
+def test_crossed_within_looks_back_not_just_today():
+    a, b = [1, 3, 4, 5], [2, 2, 2, 2]          # 3번째 봉에서 돌파, 오늘은 이미 위
+    assert crossed_within(a, b, 10) and not crossed_within(a, b, 1)
+    assert not crossed_within([3, 4, 5], [2, 2, 2], 10)   # 처음부터 위 = 돌파 아님
+
+
+def test_turned_up_from_low_needs_recent_low_above_now_and_rising():
+    assert turned_up_from_low([10, 15, 22, 25], 20, 10)          # 최근 20 이하 → 지금 위 → 오름
+    assert not turned_up_from_low([10, 15, 30, 25], 20, 10)      # 어제보다 내림
+    assert not turned_up_from_low([10, 15, 18, 19], 20, 10)      # 아직 20 아래
+    assert not turned_up_from_low([30, 40, 50, 60], 20, 2)       # 최근 2봉에 20 이하가 없음
 
 
 def test_bars_240_groups_morning_and_afternoon():
@@ -23,6 +32,12 @@ def test_bars_240_groups_morning_and_afternoon():
               ('20261016130000', 11, 14, 11, 13, 1), ('20261016150000', 13, 13, 12, 12, 1), ('20261017090000', 12, 12, 11, 11, 1)]
     b = bars_240(hourly)
     assert b == [('20261016', 10, 13, 9, 11), ('20261016', 11, 14, 11, 12), ('20261017', 12, 12, 11, 11)]
+
+
+def _rally(decline=55, days=4, step=6.0):
+    """55일 하락 뒤 4일 +6% 반등 — MACD 10일 내 돌파·스토캐스틱 셋 다 20 재돌파를 만족한다."""
+    base = [100 - i * 0.9 for i in range(decline)]
+    return base + [base[-1] * (1 + step / 100) ** (j + 1) for j in range(days)]
 
 
 def _daily(closes, today='20261017'):
@@ -45,25 +60,43 @@ def _hourly(days=20, trend=1.0):
     return out
 
 
-def test_evaluate_passes_on_fresh_crosses_and_quiet_day():
-    closes = [100 - i for i in range(36)] + [66, 70]   # 36일 하락 뒤 이틀 반등: 오늘 MACD·스토캐스틱(12,5,5) 둘 다 돌파
+def test_evaluate_passes_when_all_documented_conditions_hold():
+    closes = _rally()
     daily = _daily(closes)
-    t = daily[-1]
-    daily[-1] = Candle(t.date, 64, 74, 64, 70, 1000, 0)           # 범위 위치 60% (고가 근처 아님)
-    row = {'code': '000001', 'name': '테스트', 'amount_eok': 400, 'chg': 6.0}
-    ev = evaluate(row, daily, _hourly(trend=1.003), 300, '20261017')
-    assert ev['checks']['amount'][0] and ev['checks']['prev'][0] and ev['checks']['high'][0]
-    assert ev['checks']['macd'][0] and ev['checks']['stoch'][0] and ev['checks']['stoch240'][0]
+    last = closes[-1]
+    daily[-1] = Candle(daily[-1].date, last * 0.94, last * 1.02, last * 0.93, last, 1000, 0)   # 장중 위치 약 76%
+    row = {'code': '000001', 'name': '테스트', 'price': 12000, 'amount_eok': 400, 'chg': 6.0}
+    ev = evaluate(row, daily, _hourly(trend=1.003), 300, daily[-1].date)
+    assert all(ok for ok, _ in ev['checks'].values()), ev['checks']
     assert ev['pass']
+    assert len(STOCH_SETS) == 3 and STOCH_SETS[0] == (5, 3, 3)
+
+
+def test_evaluate_needs_all_three_daily_stochastics():
+    """(20,12,12) 는 느려서 짧은 반등으로는 20 을 못 넘는다 → 셋 다 조건이 실제로 거른다."""
+    daily = _daily(_rally(days=2))
+    row = {'code': '000001', 'name': '테스트', 'price': 12000, 'amount_eok': 400, 'chg': 6.0}
+    ev = evaluate(row, daily, _hourly(trend=1.003), 300, daily[-1].date)
+    ks = [stoch_k([(c.high, c.low, c.close) for c in daily], n, k) for n, k, _ in STOCH_SETS]
+    assert ks[0][-1] > 20 and ks[2][-1] <= 20          # 빠른 것만 올라옴
+    assert not ev['checks']['stoch'][0] and not ev['pass']
+
+
+def test_evaluate_rejects_cheap_and_limit_up():
+    daily = _daily(_rally())
+    cheap = evaluate({'code': 'A', 'name': 'x', 'price': 900, 'amount_eok': 400, 'chg': 5.0}, daily, None, 300, daily[-1].date)
+    assert not cheap['checks']['price'][0]
+    limit = evaluate({'code': 'A', 'name': 'x', 'price': 12000, 'amount_eok': 400, 'chg': 29.8}, daily, None, 300, daily[-1].date)
+    assert not limit['checks']['limit'][0]
 
 
 def test_evaluate_rejects_near_high_prev_spike_and_missing_today():
-    daily = _daily([100 + i for i in range(40)])
+    daily = _daily([100 + i for i in range(60)])
     t = daily[-1]
     daily[-1] = Candle(t.date, 130, 140, 130, 139, 1000, 0)          # 범위 90% → 고가 근처
     daily[-2] = Candle(daily[-2].date, 120, 130, 120, 130, 1000, 0)  # 전날 급등
     daily[-3] = Candle(daily[-3].date, 120, 120, 120, 120, 1000, 0)
-    row = {'code': '000001', 'name': '테스트', 'amount_eok': 400, 'chg': 1.0}
+    row = {'code': '000001', 'name': '테스트', 'price': 12000, 'amount_eok': 400, 'chg': 1.0}
     ev = evaluate(row, daily, _hourly(), 300, '20261017')
     assert not ev['checks']['high'][0] and not ev['checks']['prev'][0] and not ev['pass']
     stale = evaluate(row, daily, _hourly(), 300, '20261018')
@@ -72,14 +105,21 @@ def test_evaluate_rejects_near_high_prev_spike_and_missing_today():
 
 
 # ── 사이징·설정 ──
+def test_buy_price_adds_two_ticks():
+    assert buy_price(10000) == 10020      # 1만원대 호가단위 10
+    assert buy_price(60000) == 60200      # 5만~20만 호가단위 100
+    assert buy_price(0) == 0
+
+
 def test_plan_quantity_caps():
-    assert plan_quantity(10000, 500, 400, 1_000_000, 3_000_000, 0, 10**8)[0] == 100
-    assert plan_quantity(10000, 50, 400, 1_000_000, 3_000_000, 0, 10**8)[0] == 50       # 호가잔량
-    assert plan_quantity(10000, 500, 400, 1_000_000, 300_000, 0, 10**8)[0] == 30       # 총액 잔여
-    assert plan_quantity(10000, 500, 400, 1_000_000, 3_000_000, 2_000_000, 10**8)[0] == 20   # 15:00~15:20 대금의 10%
-    assert plan_quantity(10000, 500, 400, 1_000_000, 3_000_000, 0, 7)[0] == 7           # 주문가능 수량
-    assert plan_quantity(0, 500, 400, 1_000_000, 3_000_000, 0, 10**8)[0] == 0
-    assert plan_quantity(2_000_000, 5, 5, 1_000_000, 3_000_000, 0, 10**8)[0] == 0
+    assert plan_quantity(10000, 500, 1_000_000, 3_000_000, 0, 10**8)[0] == 100
+    assert plan_quantity(10000, 50, 1_000_000, 3_000_000, 0, 10**8)[0] == 50        # 호가 총잔량
+    assert plan_quantity(10000, 500, 1_000_000, 300_000, 0, 10**8)[0] == 30         # 총액 잔여
+    assert plan_quantity(10000, 500, 1_000_000, 3_000_000, 2_000_000, 10**8)[0] == 20   # 15:00~15:20 대금의 10%
+    assert plan_quantity(10000, 500, 1_000_000, 3_000_000, 0, 7)[0] == 7            # 주문가능 수량
+    assert plan_quantity(10000, 10**9, 10**9, 10**9, 0, 10**8)[0] == 20000          # 한 종목 2억 상한
+    assert plan_quantity(0, 500, 1_000_000, 3_000_000, 0, 10**8)[0] == 0
+    assert plan_quantity(2_000_000, 5, 1_000_000, 3_000_000, 0, 10**8)[0] == 0
     assert late_amount([('20261017145500', 1, 1, 1, 100, 10), ('20261017150000', 1, 1, 1, 100, 10), ('20261017151500', 1, 1, 1, 200, 5)], '20261017') == 2000
 
 
@@ -100,16 +140,17 @@ def test_windows():
 class Broker:
     def __init__(self):
         self.calls, self.rows, self.failure = [], {}, None
-        self.ask, self.ask_qty, self.bid_qty = 10000, 300, 300
+        self.ask, self.ask_qty, self.bid_qty, self.total_ask_qty = 10000, 300, 300, 3000
         self.detail_response = {'filled': 0, 'remaining': 0, 'rejected': False}
 
     async def ranking(self, market):
-        return [{'code': '000001', 'name': '종목A', 'price': 10000, 'amount_eok': 500, 'chg': 3.0}] if market == '001' else []
+        return [{'code': '000001', 'name': '종목A', 'price': 10000, 'amount_eok': 500, 'chg': 6.0}] if market == '001' else []
 
     async def daily(self, code):
-        closes = [100 - i for i in range(36)] + [66, 70]
+        closes = _rally()
         d = _daily(closes, today='20261019')
-        d[-1] = Candle('20261019', 64, 74, 64, 70, 1000, 0)
+        last = closes[-1]
+        d[-1] = Candle('20261019', last * 0.94, last * 1.02, last * 0.93, last, 1000, 0)
         return d
 
     async def minutes(self, code, scope):
@@ -118,7 +159,8 @@ class Broker:
         return [('20261019150500', 1, 1, 1, 10000, 500)]
 
     async def book(self, code):
-        return {'ask': self.ask, 'ask_qty': self.ask_qty, 'bid': self.ask - 50, 'bid_qty': self.bid_qty, 'at': '151950'}
+        return {'ask': self.ask, 'ask_qty': self.ask_qty, 'bid': self.ask - 50, 'bid_qty': self.bid_qty,
+                'total_ask_qty': self.total_ask_qty, 'at': '151950'}
 
     async def stock(self, code, price):
         return {'code': code, 'name': '종목A'}
@@ -185,7 +227,7 @@ def test_dry_mode_full_cycle_records_without_sending(eng):
     run(eng.e.tick())
     assert eng.b.calls == []                                   # 흉내: 전송 없음
     p = eng.e.positions['000001']
-    assert p['dry'] and p['quantity'] == 50 and p['average'] == 10000 and p['status'] == 'held'
+    assert p['dry'] and p['quantity'] == 49 and p['average'] == 10020 and p['status'] == 'held'
     eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
     run(eng.e.tick())
     assert eng.e.positions['000001']['status'] == 'sold' and eng.b.calls == []
@@ -197,23 +239,23 @@ def test_live_buy_journals_intent_then_sends_once_and_settles(eng):
     run(eng.e.scan())
     eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
     run(eng.e.tick())
-    assert eng.b.calls == [('buy', '000001', 50, 10000)], eng.e.day()
+    assert eng.b.calls == [('buy', '000001', 49, 10020)], eng.e.day()
     o = eng.e.orders[-1]
     assert o['status'] == 'accepted' and o['order_no'] == '0001' and o['side'] == 'buy' and not o['dry']
     run(eng.e.tick())                                          # 같은 창에서 두 번 안 산다
     assert len(eng.b.calls) == 1
-    eng.b.detail_response = {'filled': 50, 'remaining': 0, 'rejected': False}
-    eng.b.rows['000001'] = {'code': '000001', 'name': '종목A', 'quantity': 50, 'available': 50, 'average': 10020.0}
+    eng.b.detail_response = {'filled': 49, 'remaining': 0, 'rejected': False}
+    eng.b.rows['000001'] = {'code': '000001', 'name': '종목A', 'quantity': 49, 'available': 49, 'average': 10030.0}
     eng.now[0] = datetime(2026, 10, 19, 15, 31, 0, tzinfo=KST)
     run(eng.e.tick())
     p = eng.e.positions['000001']
-    assert p['status'] == 'held' and p['quantity'] == 50 and p['average'] == 10020.0 and not p['dry']
-    assert eng.e.invested() == 50 * 10020.0
+    assert p['status'] == 'held' and p['quantity'] == 49 and p['average'] == 10030.0 and not p['dry']
+    assert eng.e.invested() == 49 * 10030.0
     # 다음 날 08:40 시장가 매도 → 체결 → sold
     eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
     run(eng.e.tick())
-    assert eng.b.calls[-1] == ('sell', '000001', 50) and eng.e.positions['000001']['status'] == 'selling'
-    eng.b.detail_response = {'filled': 50, 'remaining': 0, 'rejected': False}
+    assert eng.b.calls[-1] == ('sell', '000001', 49) and eng.e.positions['000001']['status'] == 'selling'
+    eng.b.detail_response = {'filled': 49, 'remaining': 0, 'rejected': False}
     run(eng.e.reconcile())
     assert eng.e.positions['000001']['status'] == 'sold'
     eng.now[0] = datetime(2026, 10, 20, 9, 3, 0, tzinfo=KST)

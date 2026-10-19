@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>장세와 매매 성적</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 한 줄 기둥(52rem) — 결론 → 보수적으로 → 규칙 → 곡선 → [탭] 갈래별 · 달별 · 종목 · 못 산 것 · 전체 매매. 오름 빨강 · 내림 파랑(한국 시세). */
+:root{
+  --bg:#f5f7f8; --panel:#fff; --ink:#18232d; --sub:#55636f; --line:#d9e0e5; --grid:#e8edf0;
+  --up:#c8352e; --dn:#2a5fb0; --warn:#a15c00; --mute:#8a97a2;
+  --hz:#c56a00; --ch:#8e2c8a; --cb:#2d6f8f; --eb:#1f7a5c; --s1:#0f6b6b;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181d; --panel:#1a2228; --ink:#e6ecf0; --sub:#9aa8b3; --line:#2c3740; --grid:#24303a;
+  --up:#ff6b61; --dn:#6f9ef0; --warn:#e5a54a; --mute:#6f7d88; --hz:#f0a040; --ch:#d07ad0; --cb:#6fb8dc; --eb:#5cc99a; --s1:#4fc1bd; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181d; --panel:#1a2228; --ink:#e6ecf0; --sub:#9aa8b3; --line:#2c3740; --grid:#24303a;
+  --up:#ff6b61; --dn:#6f9ef0; --warn:#e5a54a; --mute:#6f7d88; --hz:#f0a040; --ch:#d07ad0; --cb:#6fb8dc; --eb:#5cc99a; --s1:#4fc1bd; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;margin:0}
+.wrap{max-width:52rem;margin:0 auto;padding-inline:16px;padding-block:28px 56px}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--sub);font-weight:500}
+h1{font-size:28px;line-height:1.3;margin:6px 0 10px;text-wrap:balance}
+h2{font-size:19px;margin:38px 0 10px;text-wrap:balance}
+p{margin:0 0 12px}
+.lede{color:var(--sub)}
+.up{color:var(--up)} .dn{color:var(--dn)} .mute{color:var(--mute)}
+.verdict{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:16px 0 6px}
+.verdict div{background:var(--panel);padding:14px}
+.verdict b{display:block;font-family:var(--f-num);font-size:22px;font-weight:500}
+.verdict span{font-size:12.5px;color:var(--sub)}
+@media (max-width:560px){.verdict{grid-template-columns:1fr}}
+.rules{display:grid;gap:6px;margin-top:6px}
+.rule{display:grid;grid-template-columns:6.5rem minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--grid)}
+.rule i{font-style:normal;font-weight:700}
+.k-HZ{color:var(--hz)} .k-CH{color:var(--ch)} .k-CB{color:var(--cb)} .k-EB{color:var(--eb)}
+.cards.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:760px){.cards.three{grid-template-columns:1fr}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 12px 6px;margin-top:10px;position:relative}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--sub);margin-bottom:6px}
+.legend span::before{content:"";display:inline-block;width:14px;height:2px;margin-right:6px;vertical-align:middle;background:currentColor}
+.legend .l1{color:var(--s1)} .legend .l2{color:var(--warn)} .legend em{font-style:normal;color:var(--ink)}
+svg{display:block;width:100%;height:auto}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:4px;white-space:nowrap;font-family:var(--f-num)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:30px 0 4px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
+.tabs button{font:inherit;font-size:14px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tabs button:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.tbl{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--panel);border:1px solid var(--line)}
+th,td{padding:7px 9px;border-bottom:1px solid var(--grid);text-align:left;white-space:nowrap}
+th{font-weight:500;color:var(--sub);font-size:12.5px;position:sticky;top:0;background:var(--panel)}
+td.n,th.n{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+tr.total td{font-weight:700;border-top:1px solid var(--line)}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+@media (max-width:640px){.cards{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;min-width:0}
+.card h3{margin:0 0 6px;font-size:15px}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:13px}
+.card dt{color:var(--sub)} .card dd{margin:0;text-align:right;font-family:var(--f-num)}
+details{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+summary{cursor:pointer;padding:10px 14px;font-weight:500}
+summary:focus-visible{outline:2px solid var(--s1)}
+details .tbl{max-height:32rem;overflow:auto;margin:0}
+details table{border:0}
+.tools{display:flex;gap:8px;padding:0 14px 10px;flex-wrap:wrap}
+.tools input,.tools select{font:inherit;font-size:13.5px;padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);min-width:0}
+.tools input{flex:1}
+.note{border-left:3px solid var(--warn);background:var(--panel);padding:10px 14px;margin:14px 0;border-radius:0 6px 6px 0}
+.note b{color:var(--warn)}
+.foot{font-size:12.5px;color:var(--sub);margin-top:36px;border-top:1px solid var(--line);padding-top:14px}
+
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
+@media (max-width:760px){.fgrid{grid-template-columns:1fr}}
+.fbox{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.fbox h3{margin:0 0 6px;font-size:14.5px}
+.fbox table{border:0;font-size:12.5px} .fbox td,.fbox th{padding:5px 6px}
+.now{outline:2px solid var(--warn);outline-offset:-2px}
+.pf{display:inline-block;min-width:3.2em;text-align:right;font-family:var(--f-num);padding:1px 4px;border-radius:3px}
+.hint{font-size:12px;color:var(--sub);margin-top:4px}
+.ins li{margin-bottom:6px}
+</style>
+<div class="wrap">
+  <div class="eyebrow">장세 자료 20251002~20261016 · 매매마다 '산 날 앞 거래일' 값(그날 아침에 아는 값)으로 나눔 · 비용 0.25% 뺀 값</div>
+  <h1>장세와 매매 성적</h1>
+  <p class="lede">관제탑 📈 장세 흐름 창의 지표들(유동성 · 시장 대금 · 상한가 · 신고가 · 예탁금 · 신용 · 반대매매)이 어떤 칸일 때 세 매매가 잘 됐고 안 됐는지입니다. 각 지표를 1년 동안의 날들로 셋(낮음 · 가운데 · 높음)으로 나눴습니다. 숫자는 PF 이고 괄호는 건수 · 건당입니다. <b>노란 테두리 = 지금(20261016) 장세가 든 칸</b>.</p>
+  <div class="verdict" id="vd"></div>
+
+  <h2>한눈에 — 이럴 때 잘 되고, 이럴 때 약했다</h2>
+  <ul class="ins" id="ins"></ul>
+
+  <h2>지표마다</h2>
+  <div class="legend" style="font-size:12.5px;color:var(--sub)"><span style="color:var(--up)">■</span> PF 3 이상 &nbsp; <span style="color:var(--warn)">■</span> 1.5~3 &nbsp; <span style="color:var(--dn)">■</span> 1 아래(손해) &nbsp;· 10번 아래 칸은 흐리게</div>
+  <div class="fgrid" id="grid"></div>
+
+  <h2>장세 이름(장세 장부)</h2>
+  <div class="tbl"><table><thead><tr><th>장세</th><th class="n">🌅 호라이즌존</th><th class="n">🗻 대장 눌림목</th><th class="n">🌙 종가배팅</th></tr></thead><tbody id="rg"></tbody></table></div>
+
+  <h2>조심할 점</h2>
+  <ul>
+    <li><b>한 시장, 1년치입니다.</b> 칸마다 표본이 10~50번이라 우연이 섞입니다. 특히 10번 아래 칸(흐린 것)은 참고만 하십시오.</li>
+    <li><b>지표 하나씩 따로 나눴습니다.</b> 시장 대금이 크고 오른 종목이 적은 날처럼 여러 지표가 같이 움직이니, 한 지표의 차이가 다른 지표 때문일 수 있습니다.</li>
+    <li><b>이 표로 매매를 켜고 끄지는 않습니다.</b> 10-17 종가배팅 켜고 끄기 9가지를 재 봤을 때 앞·뒤 반이 엇갈렸습니다. 이 페이지는 '지금 장에서 어느 매매를 더 믿을지' 감을 잡는 용도입니다. 규칙으로 쓰려면 앞·뒤 반 검증과 돈 시뮬을 따로 합니다.</li>
+  </ul>
+  <div class="foot">자료: 장세 장부(tema_regime) · 금융투자협회 증시자금(hz_kofia) · 호라이즌존 자리 · 대장 눌림목 자리(칸 몫) · 종가배팅 1배 판 매매. 스크립트 _data\research\scripts\20261018_regime_link.py</div>
+</div>
+<script>
+const J = {"at": "20261016", "span": "20251002~20261016", "feats": [{"key": "liq", "name": "유동성(대금 20/60일선)", "unit": "", "cuts": [0.887, 1.209], "bins": [{"lab": "낮음", "rng": "0.89 아래", "by": {"🌅 호라이즌존": {"n": 26, "avg": 5.03, "pf": 4.94, "win": 62}, "🗻 대장 눌림목": {"n": 20, "avg": 2.74, "pf": 3.89, "win": 75}, "🌙 종가배팅": {"n": 34, "avg": 1.21, "pf": 2.93, "win": 53}}}, {"lab": "가운데", "rng": "0.89~1.21", "by": {"🌅 호라이즌존": {"n": 21, "avg": 9.22, "pf": 15.51, "win": 76}, "🗻 대장 눌림목": {"n": 38, "avg": 0.61, "pf": 1.38, "win": 47}, "🌙 종가배팅": {"n": 51, "avg": 1.14, "pf": 3.42, "win": 61}}}, {"lab": "높음", "rng": "1.21 이상", "by": {"🌅 호라이즌존": {"n": 21, "avg": 7.33, "pf": 9.95, "win": 76}, "🗻 대장 눌림목": {"n": 20, "avg": 3.17, "pf": 5.51, "win": 75}, "🌙 종가배팅": {"n": 37, "avg": 1.15, "pf": 2.52, "win": 57}}}]}, {"key": "tot", "name": "시장 대금(조)", "unit": "조", "cuts": [441297.0, 661255.0], "bins": [{"lab": "낮음", "rng": "441,297.00 아래", "by": {"🌅 호라이즌존": {"n": 18, "avg": 8.01, "pf": 72.75, "win": 83}, "🗻 대장 눌림목": {"n": 3, "avg": 2.25, "pf": 99.0, "win": 100}, "🌙 종가배팅": {"n": 50, "avg": 0.46, "pf": 1.82, "win": 58}}}, {"lab": "가운데", "rng": "441,297.00~661,255.00", "by": {"🌅 호라이즌존": {"n": 27, "avg": 5.06, "pf": 3.65, "win": 56}, "🗻 대장 눌림목": {"n": 23, "avg": -0.68, "pf": 0.71, "win": 52}, "🌙 종가배팅": {"n": 36, "avg": 1.44, "pf": 3.15, "win": 44}}}, {"lab": "높음", "rng": "661,255.00 이상", "by": {"🌅 호라이즌존": {"n": 23, "avg": 8.59, "pf": 20.16, "win": 78}, "🗻 대장 눌림목": {"n": 52, "avg": 2.89, "pf": 4.64, "win": 63}, "🌙 종가배팅": {"n": 36, "avg": 1.86, "pf": 4.23, "win": 69}}}]}, {"key": "vol_ma", "name": "대금 / 20일선(%)", "unit": "%", "cuts": [-12.67329246845601, 9.962453250673043], "bins": [{"lab": "낮음", "rng": "-12.67 아래", "by": {"🌅 호라이즌존": {"n": 22, "avg": 7.63, "pf": 14.89, "win": 77}, "🗻 대장 눌림목": {"n": 22, "avg": -0.75, "pf": 0.69, "win": 36}, "🌙 종가배팅": {"n": 41, "avg": 1.16, "pf": 2.6, "win": 59}}}, {"lab": "가운데", "rng": "-12.67~9.96", "by": {"🌅 호라이즌존": {"n": 14, "avg": 5.49, "pf": 3.63, "win": 71}, "🗻 대장 눌림목": {"n": 29, "avg": 1.3, "pf": 2.08, "win": 69}, "🌙 종가배팅": {"n": 34, "avg": 0.5, "pf": 1.97, "win": 56}}}, {"lab": "높음", "rng": "9.96 이상", "by": {"🌅 호라이즌존": {"n": 32, "avg": 7.3, "pf": 11.38, "win": 66}, "🗻 대장 눌림목": {"n": 27, "avg": 4.44, "pf": 17.7, "win": 74}, "🌙 종가배팅": {"n": 47, "avg": 1.65, "pf": 3.97, "win": 57}}}]}, {"key": "limit", "name": "상한가 수", "unit": "개", "cuts": [6, 9], "bins": [{"lab": "낮음", "rng": "6.00 아래", "by": {"🌅 호라이즌존": {"n": 16, "avg": 8.42, "pf": 55.08, "win": 75}, "🗻 대장 눌림목": {"n": 8, "avg": 5.16, "pf": 37.71, "win": 88}, "🌙 종가배팅": {"n": 45, "avg": 1.12, "pf": 3.1, "win": 53}}}, {"lab": "가운데", "rng": "6.00~9.00", "by": {"🌅 호라이즌존": {"n": 18, "avg": 5.55, "pf": 5.7, "win": 61}, "🗻 대장 눌림목": {"n": 28, "avg": 0.63, "pf": 1.32, "win": 57}, "🌙 종가배팅": {"n": 33, "avg": 1.49, "pf": 2.87, "win": 64}}}, {"lab": "높음", "rng": "9.00 이상", "by": {"🌅 호라이즌존": {"n": 34, "avg": 7.17, "pf": 7.09, "win": 74}, "🗻 대장 눌림목": {"n": 42, "avg": 1.96, "pf": 3.09, "win": 60}, "🌙 종가배팅": {"n": 44, "avg": 0.97, "pf": 2.85, "win": 57}}}]}, {"key": "nh", "name": "신고가 수", "unit": "개", "cuts": [36, 106], "bins": [{"lab": "낮음", "rng": "36.00 아래", "by": {"🌅 호라이즌존": {"n": 14, "avg": 6.4, "pf": 6.97, "win": 71}, "🗻 대장 눌림목": {"n": 42, "avg": 1.7, "pf": 1.95, "win": 60}, "🌙 종가배팅": {"n": 29, "avg": 1.87, "pf": 3.52, "win": 52}}}, {"lab": "가운데", "rng": "36.00~106.00", "by": {"🌅 호라이즌존": {"n": 20, "avg": 6.3, "pf": 6.34, "win": 60}, "🗻 대장 눌림목": {"n": 22, "avg": 2.51, "pf": 5.32, "win": 68}, "🌙 종가배팅": {"n": 48, "avg": 1.49, "pf": 4.06, "win": 71}}}, {"lab": "높음", "rng": "106.00 이상", "by": {"🌅 호라이즌존": {"n": 34, "avg": 7.72, "pf": 11.46, "win": 76}, "🗻 대장 눌림목": {"n": 14, "avg": 1.06, "pf": 3.09, "win": 57}, "🌙 종가배팅": {"n": 45, "avg": 0.37, "pf": 1.58, "win": 47}}}]}, {"key": "up_pct", "name": "오른 종목 비율(%)", "unit": "%", "cuts": [35.5, 57.2], "bins": [{"lab": "낮음", "rng": "35.50 아래", "by": {"🌅 호라이즌존": {"n": 17, "avg": 6.45, "pf": 9.22, "win": 59}, "🗻 대장 눌림목": {"n": 48, "avg": 3.52, "pf": 7.68, "win": 75}, "🌙 종가배팅": {"n": 32, "avg": 1.32, "pf": 2.53, "win": 50}}}, {"lab": "가운데", "rng": "35.50~57.20", "by": {"🌅 호라이즌존": {"n": 25, "avg": 8.06, "pf": 8.96, "win": 76}, "🗻 대장 눌림목": {"n": 8, "avg": -2.17, "pf": 0.35, "win": 50}, "🌙 종가배팅": {"n": 51, "avg": 1.17, "pf": 3.05, "win": 61}}}, {"lab": "높음", "rng": "57.20 이상", "by": {"🌅 호라이즌존": {"n": 26, "avg": 6.42, "pf": 7.66, "win": 73}, "🗻 대장 눌림목": {"n": 22, "avg": -0.47, "pf": 0.76, "win": 36}, "🌙 종가배팅": {"n": 39, "avg": 1.03, "pf": 3.41, "win": 59}}}]}, {"key": "k5", "name": "코스피 5일 등락(%)", "unit": "%", "cuts": [-1.1320366179004004, 4.695124517291349], "bins": [{"lab": "낮음", "rng": "-1.13 아래", "by": {"🌅 호라이즌존": {"n": 17, "avg": 7.15, "pf": 8.8, "win": 71}, "🗻 대장 눌림목": {"n": 39, "avg": 2.43, "pf": 2.78, "win": 67}, "🌙 종가배팅": {"n": 28, "avg": 1.87, "pf": 4.47, "win": 64}}}, {"lab": "가운데", "rng": "-1.13~4.70", "by": {"🌅 호라이즌존": {"n": 26, "avg": 8.88, "pf": 18.08, "win": 85}, "🗻 대장 눌림목": {"n": 13, "avg": 4.49, "pf": 11.57, "win": 77}, "🌙 종가배팅": {"n": 39, "avg": 0.09, "pf": 1.13, "win": 51}}}, {"lab": "높음", "rng": "4.70 이상", "by": {"🌅 호라이즌존": {"n": 23, "avg": 4.88, "pf": 4.34, "win": 57}, "🗻 대장 눌림목": {"n": 26, "avg": -0.46, "pf": 0.67, "win": 46}, "🌙 종가배팅": {"n": 51, "avg": 1.66, "pf": 4.12, "win": 57}}}]}, {"key": "deposit", "name": "예탁금(조)", "unit": "조", "cuts": [97761496.0, 111296538.0], "bins": [{"lab": "낮음", "rng": "97,761,496.00 아래", "by": {"🌅 호라이즌존": {"n": 24, "avg": 9.59, "pf": 26.88, "win": 88}, "🗻 대장 눌림목": {"n": 3, "avg": 1.58, "pf": 22.61, "win": 67}, "🌙 종가배팅": {"n": 56, "avg": 0.9, "pf": 2.66, "win": 59}}}, {"lab": "가운데", "rng": "97,761,496.00~111,296,538.00", "by": {"🌅 호라이즌존": {"n": 25, "avg": 4.62, "pf": 5.56, "win": 64}, "🗻 대장 눌림목": {"n": 29, "avg": 2.67, "pf": 2.86, "win": 69}, "🌙 종가배팅": {"n": 31, "avg": 0.86, "pf": 2.21, "win": 42}}}, {"lab": "높음", "rng": "111,296,538.00 이상", "by": {"🌅 호라이즌존": {"n": 19, "avg": 6.98, "pf": 5.49, "win": 58}, "🗻 대장 눌림목": {"n": 46, "avg": 1.28, "pf": 2.11, "win": 57}, "🌙 종가배팅": {"n": 35, "avg": 1.86, "pf": 4.08, "win": 69}}}]}, {"key": "dep_ch", "name": "예탁금 20일 변화(%)", "unit": "%", "cuts": [-2.4834236693615175, 9.645368847431325], "bins": [{"lab": "낮음", "rng": "-2.48 아래", "by": {"🌅 호라이즌존": {"n": 23, "avg": 3.93, "pf": 3.4, "win": 57}, "🗻 대장 눌림목": {"n": 41, "avg": 1.78, "pf": 2.12, "win": 61}, "🌙 종가배팅": {"n": 45, "avg": 0.89, "pf": 2.39, "win": 58}}}, {"lab": "가운데", "rng": "-2.48~9.65", "by": {"🌅 호라이즌존": {"n": 21, "avg": 7.8, "pf": 8.64, "win": 76}, "🗻 대장 눌림목": {"n": 11, "avg": -0.6, "pf": 0.42, "win": 45}, "🌙 종가배팅": {"n": 46, "avg": 1.94, "pf": 4.61, "win": 59}}}, {"lab": "높음", "rng": "9.65 이상", "by": {"🌅 호라이즌존": {"n": 24, "avg": 9.33, "pf": 49.28, "win": 79}, "🗻 대장 눌림목": {"n": 26, "avg": 2.89, "pf": 5.05, "win": 69}, "🌙 종가배팅": {"n": 30, "avg": 0.51, "pf": 1.9, "win": 57}}}]}, {"key": "mratio", "name": "신용/예탁(%)", "unit": "%", "cuts": [29.358034235988452, 31.446464618546248], "bins": [{"lab": "낮음", "rng": "29.36 아래", "by": {"🌅 호라이즌존": {"n": 29, "avg": 7.33, "pf": 9.28, "win": 62}, "🗻 대장 눌림목": {"n": 35, "avg": 2.38, "pf": 3.58, "win": 57}, "🌙 종가배팅": {"n": 30, "avg": 1.58, "pf": 3.16, "win": 60}}}, {"lab": "가운데", "rng": "29.36~31.45", "by": {"🌅 호라이즌존": {"n": 24, "avg": 7.23, "pf": 6.83, "win": 75}, "🗻 대장 눌림목": {"n": 24, "avg": 1.38, "pf": 2.49, "win": 75}, "🌙 종가배팅": {"n": 48, "avg": 0.85, "pf": 3.07, "win": 62}}}, {"lab": "높음", "rng": "31.45 이상", "by": {"🌅 호라이즌존": {"n": 15, "avg": 6.16, "pf": 12.11, "win": 80}, "🗻 대장 눌림목": {"n": 19, "avg": 1.31, "pf": 1.61, "win": 53}, "🌙 종가배팅": {"n": 44, "avg": 1.23, "pf": 2.71, "win": 50}}}]}, {"key": "bandae", "name": "반대매매(억)", "unit": "억", "cuts": [8660.0, 19029.0], "bins": [{"lab": "낮음", "rng": "8,660.00 아래", "by": {"🌅 호라이즌존": {"n": 25, "avg": 4.82, "pf": 4.64, "win": 56}, "🗻 대장 눌림목": {"n": 5, "avg": -0.01, "pf": 0.99, "win": 40}, "🌙 종가배팅": {"n": 51, "avg": 0.99, "pf": 3.17, "win": 57}}}, {"lab": "가운데", "rng": "8,660.00~19,029.00", "by": {"🌅 호라이즌존": {"n": 28, "avg": 8.86, "pf": 16.5, "win": 79}, "🗻 대장 눌림목": {"n": 21, "avg": 3.2, "pf": 7.69, "win": 90}, "🌙 종가배팅": {"n": 45, "avg": 1.08, "pf": 2.4, "win": 56}}}, {"lab": "높음", "rng": "19,029.00 이상", "by": {"🌅 호라이즌존": {"n": 15, "avg": 7.32, "pf": 8.51, "win": 80}, "🗻 대장 눌림목": {"n": 52, "avg": 1.43, "pf": 1.96, "win": 52}, "🌙 종가배팅": {"n": 26, "avg": 1.65, "pf": 3.8, "win": 62}}}]}, {"key": "bandae5", "name": "반대매매 5일 평균(억)", "unit": "억", "cuts": [10970.2, 18664.4], "bins": [{"lab": "낮음", "rng": "10,970.20 아래", "by": {"🌅 호라이즌존": {"n": 27, "avg": 9.74, "pf": 31.11, "win": 85}, "🗻 대장 눌림목": {"n": 1, "avg": -0.22, "pf": 0.0, "win": 0}, "🌙 종가배팅": {"n": 50, "avg": 0.96, "pf": 3.04, "win": 60}}}, {"lab": "가운데", "rng": "10,970.20~18,664.40", "by": {"🌅 호라이즌존": {"n": 25, "avg": 4.87, "pf": 5.24, "win": 60}, "🗻 대장 눌림목": {"n": 32, "avg": 1.78, "pf": 2.87, "win": 66}, "🌙 종가배팅": {"n": 34, "avg": 0.91, "pf": 2.2, "win": 47}}}, {"lab": "높음", "rng": "18,664.40 이상", "by": {"🌅 호라이즌존": {"n": 16, "avg": 5.86, "pf": 4.56, "win": 62}, "🗻 대장 눌림목": {"n": 45, "avg": 1.88, "pf": 2.31, "win": 60}, "🌙 종가배팅": {"n": 38, "avg": 1.66, "pf": 3.63, "win": 63}}}]}], "regimes": [{"lab": "순환매(보합)", "by": {"🌅 호라이즌존": {"n": 1, "avg": 4.81, "pf": 99.0, "win": 100}, "🗻 대장 눌림목": {"n": 8, "avg": 0.43, "pf": 1.21, "win": 50}, "🌙 종가배팅": {"n": 5, "avg": 0.21, "pf": 1.52, "win": 40}}}, {"lab": "유동성 축소", "by": {"🌅 호라이즌존": {"n": 29, "avg": 4.39, "pf": 3.83, "win": 55}, "🗻 대장 눌림목": {"n": 28, "avg": 2.55, "pf": 2.71, "win": 68}, "🌙 종가배팅": {"n": 47, "avg": 0.85, "pf": 2.32, "win": 51}}}, {"lab": "유동성 확장", "by": {"🌅 호라이즌존": {"n": 12, "avg": 8.33, "pf": 13.75, "win": 83}, "🗻 대장 눌림목": {"n": 21, "avg": 3.3, "pf": 4.82, "win": 76}, "🌙 종가배팅": {"n": 25, "avg": 2.21, "pf": 5.7, "win": 76}}}, {"lab": "지수·대형주 장세", "by": {"🌅 호라이즌존": {"n": 26, "avg": 9.47, "pf": 23.64, "win": 81}, "🗻 대장 눌림목": {"n": 21, "avg": -0.13, "pf": 0.85, "win": 43}, "🌙 종가배팅": {"n": 45, "avg": 1.01, "pf": 2.57, "win": 56}}}], "base": {"🌅 호라이즌존": {"n": 68, "avg": 7.03, "pf": 8.5, "win": 71}, "🗻 대장 눌림목": {"n": 78, "avg": 1.81, "pf": 2.49, "win": 62}, "🌙 종가배팅": {"n": 122, "avg": 1.16, "pf": 2.94, "win": 57}}, "now": {"d": "20261016", "regime": "유동성 축소", "tag": "보통", "liq": 0.845, "tot": 368671.0, "limit": 6, "nh": 16, "deposit": 96912122.0, "margin": 32749897.0, "bandae": 80498.0, "vol_ma": -3.8197293331159288, "mratio": 33.79339583545596, "dep_ch": -9.475301622746024, "bandae5": 64066.75, "k5": -14.69599806156342, "up_pct": 87.0}};
+const K = ["🌅 호라이즌존", "🗻 대장 눌림목", "🌙 종가배팅"];
+const CONV = {tot: [1e4, "조"], deposit: [1e6, "조"], bandae: [100, "억"], bandae5: [100, "억"]};
+const LAB = {tot: "시장 대금(조)", deposit: "예탁금(조)", bandae: "반대매매(억)", bandae5: "반대매매 5일 평균(억)"};
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmt = (key, v) => { const c = CONV[key]; const x = c ? v / c[0] : v; return Math.abs(x) >= 100 ? x.toLocaleString("ko-KR", {maximumFractionDigits: 0}) : x.toFixed(x % 1 ? (Math.abs(x) < 10 ? 2 : 1) : 0); };
+const colr = s => !s || !s.n ? "var(--mute)" : s.pf >= 3 ? "var(--up)" : s.pf >= 1.5 ? "var(--warn)" : s.pf < 1 ? "var(--dn)" : "var(--ink)";
+const cell = s => !s || !s.n ? `<td class="n mute">—</td>` :
+  `<td class="n" style="opacity:${s.n < 10 ? .45 : 1}"><span class="pf" style="color:${colr(s)};font-weight:600">${s.pf >= 99 ? "99" : s.pf.toFixed(2)}</span> <span style="color:var(--sub)">(${s.n} · ${s.avg >= 0 ? "+" : ""}${s.avg.toFixed(2)}%)</span></td>`;
+const N = J.now || {};
+document.getElementById("vd").innerHTML = K.map(k => { const b = J.base[k]; return `<div><b>${b.pf.toFixed(2)}</b><span>${k} 전체 PF · ${b.n}번 · 건당 ${b.avg >= 0 ? "+" : ""}${b.avg}%</span></div>`; }).join("")
+  + `<div><b>${esc(N.regime || "—")}</b><span>지금 장세(${esc(N.d || "")} · 장세 장부)</span></div>`;
+document.getElementById("grid").innerHTML = J.feats.map(f => {
+  const nv = N[f.key];
+  const [c1, c2] = f.cuts;
+  const nowBin = nv == null ? -1 : nv < c1 ? 0 : nv < c2 ? 1 : 2;
+  const rows = f.bins.map((b, i) => {
+    const rng = i === 0 ? `${fmt(f.key, c1)} 아래` : i === 1 ? `${fmt(f.key, c1)}~${fmt(f.key, c2)}` : `${fmt(f.key, c2)} 이상`;
+    return `<tr class="${i === nowBin ? "now" : ""}"><td><b>${b.lab}</b><div class="hint">${rng}</div></td>${K.map(k => cell(b.by[k])).join("")}</tr>`;
+  }).join("");
+  return `<div class="fbox"><h3>${esc(LAB[f.key] || f.name)}${nv != null ? ` <span style="font-weight:400;color:var(--sub);font-size:12px">· 지금 ${fmt(f.key, nv)}</span>` : ""}</h3>
+    <div class="tbl" style="margin:0"><table><thead><tr><th>칸</th><th class="n">🌅</th><th class="n">🗻</th><th class="n">🌙</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}).join("");
+document.getElementById("rg").innerHTML = J.regimes.map(r => `<tr class="${r.lab === N.regime ? "now" : ""}"><td><b>${esc(r.lab)}</b></td>${K.map(k => cell(r.by[k])).join("")}</tr>`).join("");
+document.getElementById("ins").innerHTML = ["<b>🌅 호라이즌존은 어느 장에서도 버텼습니다.</b> 모든 칸에서 PF 3.4 이상입니다. 가장 좋았던 때는 <b>예탁금이 20일 동안 9.7% 넘게 늘 때</b>(24번 PF 49 · 건당 +9.3%)와 <b>반대매매 5일 평균이 낮을 때</b>(27번 PF 31), 가장 약했던 때는 예탁금이 줄 때(23번 PF 3.4 · +3.9%)였습니다.", "<b>🗻 대장 눌림목은 장세를 많이 탑니다.</b> <b>시장 대금이 66조 이상</b>일 때 52번 PF 4.64 · 건당 +2.89%였고, 44~66조 '가운데' 대금에서는 23번 PF 0.71로 손해였습니다. <b>그날 대금이 20일 평균보다 10% 넘게 붙은 날</b> 27번 PF 17.7(+4.44%), 대금이 13% 넘게 마른 날 22번 PF 0.69(−0.75%) — 돈이 붙으며 빠진 대장은 다음날 돌아오고, 돈이 말라 빠진 대장은 계속 빠졌습니다.", "<b>🗻 대장 눌림목은 시장 전체가 빠진 날이 자리입니다.</b> 오른 종목이 35% 아래인 날 48번 PF 7.68(+3.52%), 오른 종목이 많은 날은 손해였습니다(PF 0.35~0.76). 코스피가 5일 동안 4.7% 넘게 오른 뒤의 눌림도 26번 PF 0.67로 약했습니다. 장세 이름이 '지수·대형주 장세' 일 때 21번 PF 0.85.", "<b>🌙 종가배팅은 '유동성 확장' 장세에서 가장 좋았고</b>(25번 PF 5.7 · +2.21%), 순환매(보합)에서 약했습니다(5번 PF 1.52). <b>신고가가 하루 106개 넘게 쏟아지는 과열 때</b> 45번 PF 1.58 · +0.37%로 가장 약했고, 시장 대금이 44조 아래로 적은 날도 50번 PF 1.82 · +0.46%로 약했습니다.", "<b>반대매매가 많을 때(투매) 세 매매 모두 손해는 아니었습니다</b> — 🌅 PF 8.5 · 🗻 1.96 · 🌙 3.8. 신용/예탁 비율은 높아질수록 🗻이 약해졌습니다(3.58 → 2.49 → 1.61)."].map(s => `<li>${s}</li>`).join("");
+</script>
+
+</body></html>

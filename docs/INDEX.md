@@ -10,6 +10,8 @@
 | [CUSTOM_EXIT.md](CUSTOM_EXIT.md) · [CUSTOM_EXIT_TICKETS.md](CUSTOM_EXIT_TICKETS.md) · [PROFIT_PROTECTION.md](PROFIT_PROTECTION.md) · [EXIT_CHART.md](EXIT_CHART.md) | 내 조건 자동매도: 익절·손절·이익보전 티켓, 차트 |
 | [after-hours-exit.md](after-hours-exit.md) | 시간외(NXT·KRX 16~20시) 매도 티켓 |
 | [INTRADAY_SESSION_FIX.md](INTRADAY_SESSION_FIX.md) | 장중 접속 시 장 상태 판정 수정 기록 |
+| [호라이즌_매매법_넷.html](호라이즌_매매법_넷.html) | **원본 규칙 문서** (2026-10-19 변성환 제공): 네 매매법의 매수·매도 조건 전부 |
+| [장세와 매매 성적.html](장세와 매매 성적.html) | 원본 자료: 장세 지표별 매매 성적 (유동성·대금·상한가·예탁금·반대매매) |
 | [CLOSEBET.md](CLOSEBET.md) | 종가배팅 자동매매 (변성환 규칙): 흐름, 조건, 수량, 안전장치, 검증 결과 |
 
 공식 키움 REST API 명세: https://github.com/Kiwoom-Securities/Kiwoom-REST-API

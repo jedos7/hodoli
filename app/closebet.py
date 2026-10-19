@@ -1,13 +1,14 @@
 """종가배팅 자동매매 (변성환 규칙). 15:15 후보 선정 → 15:19:50 매도1호가 지정가 매수 → 다음 거래일 08:40 시장가 매도(09:00 시초가 체결).
 
 규칙 (제공 자료 그대로. 원본 수식이 없는 부분은 아래에 명시)
-  후보: 15:15 까지 정규장 거래대금 ≥ 문턱(기본 300억)
-      · 일봉 MACD(12,26,9) 가 오늘 시그널을 위로 돌파
-      · 일봉 슬로우 스토캐스틱(12,5,5) %K 가 오늘 20 을 위로 돌파
-      · 240분봉 스토캐스틱(12,5,5) 의 fast %K · slow %K · slow %D 중 둘 이상이 직전 봉보다 상승  ← "둘 이상 상향" 해석
+  후보 (2026-10-19 받은 규칙 문서 그대로):
+      · 15:15 까지 정규장 거래대금 ≥ 문턱(기본 300억) · 주가 1,000원↑ · 상한가 근처(+29.5%↑) 제외
+      · 일봉 MACD(12,26,9): 최근 10일 안에 시그널 상향 돌파 + 오늘 MACD > 시그널 + 어제보다 오름
+      · 일봉 슬로우 스토캐스틱 (5,3,3)·(10,6,6)·(20,12,12) 셋 다: 최근 10일 안에 20 이하였다가 지금 20 위 + 어제보다 오름
+      · 240분봉(09:00~12:59 / 13:00~15:30) 같은 스토캐스틱 셋 중 둘 이상이 앞 봉보다 상승
       · 전날 등락 +6.65% 초과 종목 제외
-      · 오늘 고가 근처 종목 제외: (현재가−저가)/(고가−저가) > 81.4%
-  매수: 15:19:50 에 매도1호가 지정가. 수량 ≤ 매도1·매수1 잔량 중 작은 쪽, 금액 ≤ 설정 금액, ≤ 15:00~15:20 거래대금의 10%, 총액 ≤ 상한(1,000만 원 미만)
+      · 15:15 장중 위치 (현재가−저가)/(고가−저가) > 81.4% 면 제외
+  매수: 15:19:50 에 매도1호가 +2틱 지정가, 대금 큰 순. 수량 ≤ 호가 총잔량, 금액 ≤ 설정 금액·2억·15:00~15:20 거래대금의 10%, 총액 ≤ 상한(1,000만 원 미만)
   매도: 다음 거래일 08:40 시장가(장전 동시호가 → 09:00 시초가). 09:03 체결 대조, 안 팔렸으면 장중 시장가 1회 더.
   240분봉 = 키움 60분봉을 09:00~12:00 / 13:00~15:30 두 덩어리로 합친 것. 오늘 봉은 15:15 시점의 미완성 봉.
 
@@ -28,9 +29,11 @@ from statistics import mean
 
 from app.autoexit import PENDING, AutoExit
 from app.autosell import normal_code
+from app.kiwoom.extended_sell import tick
 from app.kiwoom.orders import NotSent, OrderRejected
 
 TOTAL_CAP_MAX = 9_990_000       # 사용자 요구: 총 투입 1,000만 원 미만
+PER_STOCK_MAX = 200_000_000     # 규칙 문서: 한 종목 최대 2억
 MAX_POSITIONS_MAX = 5
 SCAN_WINDOW = (time(15, 15), time(15, 18))
 BUY_WINDOW = (time(15, 19, 50), time(15, 22))
@@ -57,16 +60,17 @@ def macd(closes, fast=12, slow=26, signal=9):
     return m, ema(m, signal)
 
 
-def stoch(bars, n=12, k=5, d=5):
-    """bars = [(high, low, close)]. 슬로우 스토캐스틱 → (fast %K, slow %K, slow %D)"""
+STOCH_SETS = ((5, 3, 3), (10, 6, 6), (20, 12, 12))   # 슬로우 스토캐스틱 세 가지 (규칙 문서 그대로)
+
+
+def stoch_k(bars, n, k):
+    """슬로우 %K 수열. bars = [(high, low, close)]. fast %K(n) 를 k 로 평활한 값."""
     fast = []
     for i in range(len(bars)):
         w = bars[max(0, i - n + 1):i + 1]
         hi, lo = max(b[0] for b in w), min(b[1] for b in w)
         fast.append((bars[i][2] - lo) / (hi - lo) * 100 if hi > lo else 50.0)
-    sma = lambda xs, m: [mean(xs[max(0, i - m + 1):i + 1]) for i in range(len(xs))]
-    sk = sma(fast, k)
-    return fast, sk, sma(sk, d)
+    return [mean(fast[max(0, i - k + 1):i + 1]) for i in range(len(fast))]
 
 
 def bars_240(hourly):
@@ -79,45 +83,69 @@ def bars_240(hourly):
     return [(k[0], *groups[k]) for k in sorted(groups)]
 
 
-def crossed_up(series, level=None, other=None):
-    """오늘 값이 기준(level 또는 other 시리즈)을 위로 넘었나. 어제는 기준 이하, 오늘은 초과."""
+def crossed_within(a, b, lookback=10):
+    """최근 lookback 봉 안에 a 가 b 를 위로 돌파한 적이 있나 (오늘 돌파가 아니어도 됨)."""
+    for j in range(max(1, len(a) - lookback), len(a)):
+        if a[j] > b[j] and a[j - 1] <= b[j - 1]:
+            return True
+    return False
+
+
+def turned_up_from_low(series, level=20, lookback=10):
+    """최근 lookback 봉 안에 level 이하였다가, 지금은 level 위이고, 앞 봉보다 올랐나."""
     if len(series) < 2:
         return False
-    ref_now, ref_prev = (level, level) if other is None else (other[-1], other[-2])
-    return series[-1] > ref_now and series[-2] <= ref_prev
+    return min(series[-(lookback + 1):]) <= level and series[-1] > level and series[-1] > series[-2]
 
 
 def evaluate(row, daily, hourly, threshold_eok, today):
-    """후보 한 종목의 조건 판정. row = ranking 행, daily = 오늘 봉 포함 일봉(Candle), hourly = 60분봉.
-    → {'pass': bool, 'checks': {이름: (통과, 설명)}, 값들}"""
+    """후보 한 종목의 조건 판정 (규칙 문서 '🌙 종가배팅' 그대로).
+    row = 거래대금 순위 행, daily = 오늘 봉 포함 일봉(Candle), hourly = 60분봉(없으면 None → 240분 조건 보류).
+    → {'pass': bool, 'checks': {이름: (통과, 설명)}}"""
     checks = {}
-    amount_ok = row['amount_eok'] >= threshold_eok
-    checks['amount'] = (amount_ok, f"15:15 거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")
+    checks['amount'] = (row['amount_eok'] >= threshold_eok,
+                        f"15:15 거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")
+    checks['price'] = (row['price'] >= 1000, f"주가 {row['price']:,}원 (1,000원 미만 제외)")
+    checks['limit'] = (row['chg'] < 29.5, f"오늘 등락 {row['chg']:+.2f}% (상한가 근처 +29.5% 이상 제외)")
     if today is None and daily:          # 미리보기(휴장일 등): 마지막 일봉 날짜를 '오늘'로 본다
         today = daily[-1].date
-    if not daily or daily[-1].date != today or len(daily) < 35:
-        checks['data'] = (False, '오늘 일봉 없음 또는 일봉 35개 미만')
+    if not daily or daily[-1].date != today or len(daily) < 50:
+        checks['data'] = (False, '오늘 일봉 없음 또는 일봉 50개 미만')
         return {'pass': False, 'checks': checks}
+
     closes = [c.close for c in daily]
+    hlc = [(c.high, c.low, c.close) for c in daily]
     m, s = macd(closes)
-    checks['macd'] = (crossed_up(m, other=s), f"MACD {m[-1]:.1f} / 시그널 {s[-1]:.1f} (어제 {m[-2]:.1f} / {s[-2]:.1f})")
-    _, sk, _ = stoch([(c.high, c.low, c.close) for c in daily])
-    checks['stoch'] = (crossed_up(sk, level=20), f"스토캐스틱 %K {sk[-1]:.1f} (어제 {sk[-2]:.1f}), 20 상향 돌파")
+    macd_ok = crossed_within(m, s, 10) and m[-1] > s[-1] and m[-1] > m[-2]
+    checks['macd'] = (macd_ok, f"MACD {m[-1]:,.0f} / 시그널 {s[-1]:,.0f} · 최근 10일 돌파 {'O' if crossed_within(m, s, 10) else 'X'}"
+                               f" · 어제보다 {'오름' if m[-1] > m[-2] else '내림'}")
+    ks = [stoch_k(hlc, n, k) for n, k, _ in STOCH_SETS]
+    daily_ok = [turned_up_from_low(x, 20, 10) for x in ks]
+    checks['stoch'] = (all(daily_ok), '스토캐스틱 ' + ' · '.join(
+        f"({n},{k},{d}) {x[-1]:.0f}{'O' if ok else 'X'}" for (n, k, d), x, ok in zip(STOCH_SETS, ks, daily_ok))
+        + ' (셋 다 최근 10일 20 이하 → 지금 20 위 · 상승)')
+
     b240 = bars_240(hourly or [])
     if hourly is None:
         checks['stoch240'] = (False, '일봉 조건을 먼저 통과해야 240분봉을 조회함')
-    elif len(b240) < 14:
-        checks['stoch240'] = (False, f'240분봉 {len(b240)}개 (14개 필요)')
+    elif len(b240) < 34:
+        checks['stoch240'] = (False, f'240분봉 {len(b240)}개 (34개 필요)')
     else:
-        f, k, d = stoch([(b[2], b[3], b[4]) for b in b240])
-        ups = sum(1 for x in (f, k, d) if x[-1] > x[-2])
-        checks['stoch240'] = (ups >= 2, f"240분 스토캐스틱 fast {f[-1]:.0f}·%K {k[-1]:.0f}·%D {d[-1]:.0f}, 상승 {ups}/3")
-    t, y = daily[-1], daily[-2]
+        bars = [(b[2], b[3], b[4]) for b in b240]
+        ups = [stoch_k(bars, n, k) for n, k, _ in STOCH_SETS]
+        rising = [x[-1] > x[-2] for x in ups]
+        checks['stoch240'] = (sum(rising) >= 2, '240분 스토캐스틱 ' + ' · '.join(
+            f"({n},{k},{d}) {x[-1]:.0f}{'↑' if r else '↓'}" for (n, k, d), x, r in zip(STOCH_SETS, ups, rising))
+            + f" · 상승 {sum(rising)}/3 (둘 이상)")
+
+    y = daily[-2]
     prev_chg = (y.close / daily[-3].close - 1) * 100 if daily[-3].close else 0.0
     checks['prev'] = (prev_chg <= 6.65, f"전날 등락 {prev_chg:+.2f}% (6.65% 초과면 제외)")
+    t = daily[-1]
     pos = (t.close - t.low) / (t.high - t.low) * 100 if t.high > t.low else 50.0
-    checks['high'] = (pos <= 81.4, f"오늘 범위 위치 {pos:.0f}% (81.4% 넘으면 고가 근처 제외)")
-    return {'pass': all(ok for ok, _ in checks.values()), 'checks': checks, 'prev_chg': round(prev_chg, 2), 'pos': round(pos, 1)}
+    checks['high'] = (pos <= 81.4, f"오늘 장중 위치 {pos:.0f}% (81.4% 넘으면 고가 근처 제외)")
+    return {'pass': all(ok for ok, _ in checks.values()), 'checks': checks,
+            'prev_chg': round(prev_chg, 2), 'pos': round(pos, 1)}
 
 
 # ── 사이징 ───────────────────────────────────────────────────
@@ -126,19 +154,25 @@ def late_amount(five_min, today):
     return sum(c * v for stamp, o, h, l, c, v in five_min if stamp[:8] == today and stamp[8:12] >= '1500')
 
 
-def plan_quantity(ask, ask_qty, bid_qty, per_trade, remaining_cap, late_amt, cap_qty):
-    """매수 수량과 이유. 0 이면 못 산다."""
+def buy_price(ask):
+    """매도1호가 + 2틱 (규칙 문서). 호가단위는 가격대별."""
     if ask <= 0:
+        return 0
+    return ask + tick(ask) * 2
+
+
+def plan_quantity(price, total_ask_qty, per_trade, remaining_cap, late_amt, cap_qty):
+    """매수 수량과 이유. 0 이면 못 산다.
+    예산 = min(한 종목 설정액, 총액 잔여, 15:00~15:20 대금의 10%, 한 종목 2억) · 수량 ≤ 호가 총잔량 · 주문가능 수량"""
+    if price <= 0:
         return 0, '매도1호가 없음'
-    budget = min(per_trade, remaining_cap)
+    budget = min(per_trade, remaining_cap, PER_STOCK_MAX)
     if late_amt > 0:
         budget = min(budget, late_amt * 0.10)
-    qty = int(budget // ask)
-    depth = min(ask_qty, bid_qty)
-    qty = min(qty, depth, cap_qty)
+    qty = min(int(budget // price), total_ask_qty, cap_qty)
     if qty <= 0:
-        return 0, f'예산 {budget:,.0f}원 · 호가잔량 {depth:,}주 · 주문가능 {cap_qty:,}주 → 1주도 못 삼'
-    return qty, f'{qty:,}주 × {ask:,}원 = {qty * ask:,}원 (예산 {budget:,.0f}원, 잔량 {depth:,}주)'
+        return 0, f'예산 {budget:,.0f}원 · 호가 총잔량 {total_ask_qty:,}주 · 주문가능 {cap_qty:,}주 → 1주도 못 삼'
+    return qty, f'{qty:,}주 × {price:,}원 = {qty * price:,}원 (예산 {budget:,.0f}원, 호가 총잔량 {total_ask_qty:,}주)'
 
 
 def in_window(now: datetime, window):
@@ -353,29 +387,30 @@ class CloseBet(AutoExit):
                 book = await broker.book(code)
                 five = await broker.minutes(code, '5')
                 remaining = self.settings['total_cap'] - self.invested()
+                price = buy_price(book['ask'])        # 매도1호가 + 2틱
                 cap_qty = 10 ** 8
                 if self.live():
-                    broker_stock = await broker.stock(code, book['ask'] or 1)   # 거래정지·투자유의·호가단위 확인
-                    cap_qty = (await broker.capacity(code, book['ask']))['quantity'] if book['ask'] else 0
+                    await broker.stock(code, price or 1)   # 거래정지·투자유의·호가단위 확인
+                    cap_qty = (await broker.capacity(code, price))['quantity'] if price else 0
                     if code in (await broker.positions()):
                         raise NotSent('이미 계좌에 있는 종목 (종배 외 보유) · 섞이지 않게 건너뜀')
-                qty, why = plan_quantity(book['ask'], book['ask_qty'], book['bid_qty'], self.settings['per_trade_amount'], remaining,
+                qty, why = plan_quantity(price, book['total_ask_qty'], self.settings['per_trade_amount'], remaining,
                                          late_amount(five, self.today().replace('-', '')), cap_qty)
                 if qty <= 0:
                     raise NotSent(why)
                 self.guard_live(epoch)
-                order = {'id': secrets.token_hex(12), 'side': 'buy', 'code': code, 'name': r['name'], 'quantity': qty, 'limit_price': book['ask'],
+                order = {'id': secrets.token_hex(12), 'side': 'buy', 'code': code, 'name': r['name'], 'quantity': qty, 'limit_price': price,
                          'reason': 'CLOSE_BET', 'environment': self.env, 'day': now.date().isoformat(), 'at': now.isoformat(),
                          'status': 'submitting', 'order_no': '', 'filled': 0, 'remaining': qty, 'note': why, 'checked_at': None,
                          'dry': not self.live()}
                 self.orders.append(order)
                 self.persist()
                 if self.live():
-                    order['order_no'] = await broker.buy_once(code, qty, book['ask'], lambda: self.guard_live(epoch))
+                    order['order_no'] = await broker.buy_once(code, qty, price, lambda: self.guard_live(epoch))
                     order['status'], order['note'] = 'accepted', '지정가 매수 접수 · 15:31 체결 확인'
                 else:
-                    order['status'], order['note'], order['filled'], order['remaining'] = 'dry', '흉내: 전송하지 않음 · 매도1호가에 전량 체결로 가정', qty, 0
-                    self.positions[code] = {'code': code, 'name': r['name'], 'quantity': qty, 'average': book['ask'], 'bought_on': now.date().isoformat(),
+                    order['status'], order['note'], order['filled'], order['remaining'] = 'dry', '흉내: 전송하지 않음 · 매도1호가+2틱에 전량 체결로 가정', qty, 0
+                    self.positions[code] = {'code': code, 'name': r['name'], 'quantity': qty, 'average': price, 'bought_on': now.date().isoformat(),
                                             'status': 'held', 'dry': True, 'buy_order': order['id']}
                 self.persist()
                 return True

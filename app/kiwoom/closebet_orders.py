@@ -47,11 +47,13 @@ class CloseBetBroker(KiwoomBuyOrders):
         return out
 
     async def book(self, code):
-        """ka10004 호가: 매도1호가·잔량, 매수1호가·잔량."""
+        """ka10004 호가: 매도1호가·잔량, 매수1호가·잔량, 매도 총잔량(없으면 10호가 합)."""
         data, _ = await self.rest.post('/api/dostk/mrkcond', 'ka10004', {'stk_cd': code})
+        ask_total = int(num(data.get('tot_sel_req'))) or sum(int(num(data.get(k))) for k in
+                     ('sel_fpr_req',) + tuple(f'sel_{i}th_pre_req' for i in range(2, 11)))
         return {'ask': abs(int(num(data.get('sel_fpr_bid')))), 'ask_qty': int(num(data.get('sel_fpr_req'))),
                 'bid': abs(int(num(data.get('buy_fpr_bid')))), 'bid_qty': int(num(data.get('buy_fpr_req'))),
-                'at': str(data.get('bid_req_base_tm', ''))}
+                'total_ask_qty': ask_total, 'at': str(data.get('bid_req_base_tm', ''))}
 
     async def detail(self, order):
         if order.get('side') == 'sell':

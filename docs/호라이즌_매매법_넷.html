@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>호라이즌 매매법 넷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#f6f7f5; --paper:#ffffff; --ink:#1c2321; --ink2:#4a5551; --mute:#7b8682; --line:#dfe4e1;
+  --hz:#c2611f; --eb:#3d6b8c; --bb:#b8322a; --cb:#4b4f8f; --good:#2f7a4b; --warn:#9a6a12;
+  --chip:#eef1ef;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141816; --paper:#1c211f; --ink:#e6ebe8; --ink2:#b5bfbb; --mute:#87928e; --line:#2f3633;
+    --hz:#e88a4a; --eb:#7fb0d3; --bb:#ec6f66; --cb:#9da2e6; --good:#6cc08d; --warn:#e0b252; --chip:#252b28;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141816; --paper:#1c211f; --ink:#e6ebe8; --ink2:#b5bfbb; --mute:#87928e; --line:#2f3633;
+  --hz:#e88a4a; --eb:#7fb0d3; --bb:#ec6f66; --cb:#9da2e6; --good:#6cc08d; --warn:#e0b252; --chip:#252b28;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px;line-height:1.65;padding-inline:16px;padding-block:28px 56px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-size:26px;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.lede{color:var(--ink2);margin:6px 0 0;max-width:62ch}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.day{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.day h2{font-size:14px;margin:0 0 10px;color:var(--mute);letter-spacing:.04em;font-weight:500}
+.tl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tl div{border-top:3px solid var(--c);padding-top:6px;font-size:13.5px}
+.tl b{display:block;font-size:15px}
+.tl span{color:var(--mute)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:20px 20px 16px;border-top:4px solid var(--c)}
+.card header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:4px}
+.card h3{margin:0;font-size:20px}
+.rank{font-size:12.5px;color:var(--c);font-weight:700;letter-spacing:.03em}
+.one{color:var(--ink2);margin:0 0 12px}
+.stats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.stats span{background:var(--chip);border-radius:6px;padding:2px 9px;font-size:13px}
+.rows{display:grid;grid-template-columns:88px 1fr;gap:10px 14px;margin:0}
+.rows dt{font-weight:700;color:var(--c);font-size:14px;padding-top:1px}
+.rows dd{margin:0}
+.rows ul{margin:0;padding-left:18px}
+.rows li{margin:2px 0}
+.note{font-size:13.5px;color:var(--warn);margin:12px 0 0;border-left:3px solid var(--warn);padding-left:10px}
+.common{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.common h2{font-size:17px;margin:0 0 8px}
+.common ul{margin:0;padding-left:18px}
+.foot{color:var(--mute);font-size:13px}
+@media (max-width:560px){
+  .tl{grid-template-columns:repeat(2,1fr)}
+  .rows{grid-template-columns:1fr;gap:2px}
+  .rows dd{margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div>
+    <h1>호라이즌 매매법 넷 — 매수·매도 조건</h1>
+    <p class="lede">지금 자동으로 돌리는 매매법 네 가지의 사는 조건과 파는 조건입니다. 숫자는 2025-09부터 2026-10까지 약 1년 동안의 자료로 검증한 값입니다. PF는 번 돈 합 ÷ 잃은 돈 합이고, 건당 수익은 수수료·세금 전입니다.</p>
+  </div>
+
+  <section class="day" aria-label="하루 순서">
+    <h2>하루 순서 · 계좌를 2칸으로 나눠 쓰고, 먼저 오는 순서대로 칸을 차지합니다</h2>
+    <div class="tl">
+      <div style="--c:var(--hz)"><b>12:00</b>🌅 호라이즌존<br><span>D+2 정오 매수</span></div>
+      <div style="--c:var(--eb)"><b>10:00~14:59</b>🗻 대장 눌림목<br><span>F2 닿을 때</span></div>
+      <div style="--c:var(--bb)"><b>15:19:40</b>🔥 기준봉 종가<br><span>종배보다 10초 먼저</span></div>
+      <div style="--c:var(--cb)"><b>15:19:50</b>🌙 종가배팅<br><span>남은 빈 칸만</span></div>
+    </div>
+  </section>
+
+  <!-- 1 호라이즌존 -->
+  <article class="card" style="--c:var(--hz)">
+    <header><h3>🌅 호라이즌존</h3><span class="rank">1순위 · 2~4일 보유</span></header>
+    <p class="one">큰 기준봉이 나온 뒤 하루를 조용히 쉬고, 다음 날 오전에도 전날 저가를 지킨 종목을 D+2 정오에 삽니다.</p>
+    <div class="stats"><span class="mono">기준봉 대금 1,500억↑ 73자리</span><span class="mono">건당 +7.2%</span><span class="mono">PF 9.4</span></div>
+    <dl class="rows">
+      <dt>기준봉 (D0)</dt>
+      <dd><ul>
+        <li><b>상한가형</b>: 등락 +29%↑ · 종가가 고가의 99.5% 이상 · 대금 100억↑</li>
+        <li><b>대금폭발형</b>: 상한가는 아님 · 등락 +15%↑ · 대금 300억↑ · 앞 20일 평균 대금의 5배↑</li>
+        <li>주가 1,000원↑ · <b>기준봉 대금 1,500억↑</b>만 삼</li>
+        <li>앞 10거래일 안에 다른 기준봉이 있으면 안 삼(첫 기준봉만)</li>
+      </ul></dd>
+      <dt>D+1</dt>
+      <dd><ul>
+        <li>D+1 고가가 기준봉 종가 +15% 미만(슈팅이 이미 나왔으면 버림)</li>
+        <li>12시 이후 15분봉이 평평: 기울기 ±0.1%/봉 안 · 오후 폭 5% 안</li>
+        <li>단, 오후에 흘러내렸어도 <b>마감이 기준봉 종가 위면 통과</b></li>
+      </ul></dd>
+      <dt>D+2 오전</dt>
+      <dd><ul>
+        <li>09:00~11:45 동안 <b>D+1 저가를 한 번도 안 깸</b>(한 번 깨면 정오에 다시 올라와도 퇴출)</li>
+        <li>오전 폭(고가−저가)이 4% 이상</li>
+      </ul></dd>
+      <dt>매수</dt>
+      <dd><b>D+2 12:00</b>에 한 번에 삼. 크기: 아래 S등급은 두 칸, A·B는 한 칸
+        <ul>
+          <li>S: 시총 3,000억↑ · D+1 상대강도(시장 대비) −3%p 아래 · D+2 첫 한 시간 대금이 평소 2배 아래</li>
+          <li>A: (시총 3,000억↑ 또는 기준대금 1,000억↑) · D+1 상대강도 −3%p 아래</li>
+          <li>B: 시총 3,000억↑ 또는 기준대금 1,000억↑</li>
+        </ul></dd>
+      <dt>매도</dt>
+      <dd><ul>
+        <li>손절 <b>−10%</b> 전량</li>
+        <li>익절 <b>+15%</b>에 70%를 팔고, 나머지는 고점에서 −3% 빠지면 매도</li>
+        <li><b>청산날 D+4</b>(산 날에서 2거래일 뒤): 08:00 또는 09:00 첫 값이 본전 아래면 본전 +0.5%에 지정가를 걸어 둠 → 15:18에 안 팔렸으면 취소 → 15:20 종가에 전량 매도</li>
+      </ul></dd>
+    </dl>
+  </article>
+
+  <!-- 2 대장 눌림목 -->
+  <article class="card" style="--c:var(--eb)">
+    <header><h3>🗻 대장 눌림목</h3><span class="rank">2순위 · 하룻밤</span></header>
+    <p class="one">코스피 대형주가 장중에 크게 밀릴 때 F존(F2·F3)에서 반씩 받아서 다음 날 시초가에 팝니다.</p>
+    <div class="stats"><span class="mono">53번</span><span class="mono">PF 2.82</span><span class="mono">칸 몫 건당 약 +1.8%</span></div>
+    <dl class="rows">
+      <dt>대상</dt>
+      <dd>전날 종가 기준 <b>코스피 시총 상위 10종목</b>(상위 20·30으로 넓히면 나빠졌음)</dd>
+      <dt>기준선</dt>
+      <dd>그날 09:00부터의 15분봉으로 F존 고가라인을 잡음(4% 넘게 반등한 봉이나 새 고가가 나온 봉의 고가)<br>
+        <span class="mono">F2 = 고가라인 × 0.90</span> · <span class="mono">F3 = 고가라인 × 0.88</span></dd>
+      <dt>매수</dt>
+      <dd><ul>
+        <li><b>10:00~14:59</b>에 값이 F2 아래로 내려오면 그 순간 고가라인을 고정하고, 한 칸의 반은 F2 지정가, 나머지 반은 F3 지정가로 동시에 걸어 둠</li>
+        <li>F3가 15:19까지 안 체결되면 취소(반 칸만 들고 감)</li>
+        <li><b>몰린 날</b>: 그날 F2에 닿은 대장주가 3종목 이상이면(시장 전체가 빠지는 날) 반 칸만 씀</li>
+        <li>한 종목 하루 한 번 · 이미 들고 있는 종목은 안 삼 · 미수 2.5배 기준</li>
+      </ul></dd>
+      <dt>매도</dt>
+      <dd>다음 날 <b>09:00 시초가에 시장가 전량</b>. 손절선 없음</dd>
+    </dl>
+    <p class="note">고가라인을 08:00(NXT)부터 잡으면 결과가 전부 나빠져서 09:00부터 잡습니다. 시간대는 10~14시로 넓혔을 때 돈이 가장 고르게 좋았습니다.</p>
+  </article>
+
+  <!-- 3 기준봉 종가 -->
+  <article class="card" style="--c:var(--bb)">
+    <header><h3>🔥 기준봉 종가</h3><span class="rank">3순위 · 하룻밤</span></header>
+    <p class="one">오늘 대금이 터진 기준봉 가운데 윗꼬리 없이 마감하는 종목을 종가에 사서 다음 날 시초가에 팝니다.</p>
+    <div class="stats"><span class="mono">213번 · PF 4.34</span><span class="mono">다른 매매와 함께 돌리면 129번 · PF 3.20</span></div>
+    <dl class="rows">
+      <dt>후보</dt>
+      <dd><ul>
+        <li>오늘 등락 <b>+15% ~ +29%</b>(상한가에 잠긴 종목은 종가에 못 사므로 뺌)</li>
+        <li>대금 <b>300억↑</b> · 앞 20일 평균 대금의 <b>5배↑</b></li>
+        <li>전날 종가 1,000원↑ · 위험 종목 제외</li>
+      </ul></dd>
+      <dt>판정</dt>
+      <dd>15:10 · 15:15 값으로 판정. <b>윗꼬리 = (고가 − 지금 값) ÷ 전날 종가 &lt; 2%p</b>, 곧 고가 근처에서 끝나는 종목만 → 대금 큰 순</dd>
+      <dt>매수</dt>
+      <dd><b>15:19:40</b> 지금 값 +2틱 지정가(상한가는 넘지 않게) · 현금(1배)</dd>
+      <dt>매도</dt>
+      <dd>다음 날 <b>09:00 시초가에 시장가 전량</b>. 손절선 없음</dd>
+    </dl>
+    <p class="note">검증은 일봉(하루 대금·종가)으로 했고 실전은 15:15 값으로 고르므로 문턱 근처에서는 결과가 갈릴 수 있습니다. 최근 30번은 PF 2.44로 누적 4.34보다 낮아서 지켜보는 중입니다.</p>
+  </article>
+
+  <!-- 4 종가배팅 -->
+  <article class="card" style="--c:var(--cb)">
+    <header><h3>🌙 종가배팅</h3><span class="rank">4순위 · 하룻밤 · 빈 칸이 있는 날만</span></header>
+    <p class="one">바닥에서 막 돌아서는 종목(MACD·스토캐스틱)을 종가에 사서 다음 날 시초가에 무조건 팝니다.</p>
+    <div class="stats"><span class="mono">대금 300억↑ 108번</span><span class="mono">PF 3.47</span></div>
+    <dl class="rows">
+      <dt>일봉 MACD</dt>
+      <dd>MACD(12·26·9)가 최근 10일 안에 시그널을 위로 돌파 · 오늘 값으로 MACD &gt; 시그널이고 어제보다 오름</dd>
+      <dt>일봉 스토캐</dt>
+      <dd>슬로우 (5,3,3) · (10,6,6) · (20,12,12) <b>셋 다</b>: 최근 10일 안에 20 이하였다가 지금은 20 위 · 어제보다 오름</dd>
+      <dt>240분 스토캐</dt>
+      <dd>240분봉(09:00~12:59 · 13:00~15:30) 스토캐 셋 중 <b>둘 이상</b>이 앞 봉보다 오름</dd>
+      <dt>거름망</dt>
+      <dd><ul>
+        <li>전날 +6.65%보다 많이 오른 종목 뺌</li>
+        <li>15:15 장중 위치(오늘 저가~고가 사이 어디에 있는지)가 81.4%보다 위면 뺌(고가 근처 마감 제외)</li>
+        <li>15:15까지 정규장 대금 <b>300억↑</b> · 상한가 근처(+29.5%↑) 뺌 · 주가 1,000원↑</li>
+      </ul></dd>
+      <dt>매수</dt>
+      <dd>15:15 판정 → 대금 큰 순 → <b>15:19:50</b> 매도1호가 +2틱 지정가 · <b>현금만</b> · 한 종목 최대 2억 · 15:00~15:20 대금의 10%까지 · 호가 총잔량보다 많이는 안 삼</dd>
+      <dt>매도</dt>
+      <dd>다음 날 <b>09:00 시초가에 시장가 전량</b>, 무조건. 08:00·09:15나 반반 매도도 재 봤지만 09:00이 가장 좋았음</dd>
+    </dl>
+  </article>
+
+  <section class="common">
+    <h2>네 매매법에 같이 걸린 규칙</h2>
+    <ul>
+      <li>계좌를 <b>2칸</b>으로 나눔. 한 칸 = 예탁자산 × 배수 ÷ 2. 호라이즌존과 대장 눌림목은 미수 2.5배, 🔥·🌙는 현금</li>
+      <li>칸 우선순위: 🌅 → 🗻 → 🔥 → 🌙. 정오 호라이즌존 매수가 기다리고 있으면 그 몫은 오전 매매에 내주지 않음</li>
+      <li>같은 종목은 한 매매법으로 한 번만 삼</li>
+      <li>하룻밤 매매 셋(🗻 🔥 🌙)은 손절 없이 다음 날 시초가에 무조건 정리. 손절을 좁힐수록 결과가 나빠졌음</li>
+      <li>호라이즌존만 2~4일 보유하며 손절·익절·청산날 규칙을 씀</li>
+    </ul>
+  </section>
+
+  <p class="foot">검증 기간이 1년 남짓이고 하룻밤 매매는 그날 밤 시장 갭에 크게 흔들립니다. 과거 숫자는 앞으로를 보장하지 않으니 참고용으로만 보세요.</p>
+</div>
+
+</body>
+</html>
