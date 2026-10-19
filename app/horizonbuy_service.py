@@ -25,7 +25,7 @@ class HorizonBuySettings(BaseModel):
 
 
 class HorizonBuyService:
-    def __init__(self, settings, sell, horizon, exit_service, custom, auto_buy, closebet, notifier=None):
+    def __init__(self, settings, sell, horizon, exit_service, custom, auto_buy, closebet, notifier=None, breakers=None):
         self.settings, self.sell, self.horizon, self.exit_service = settings, sell, horizon, exit_service
         self.task, self.token = None, secrets.token_urlsafe(32)
         self.notifier = notifier
@@ -35,7 +35,7 @@ class HorizonBuyService:
                                  self.broker, self.connected, exit_service.phase, sell.monitor, now_kst,
                                  candidates=self.candidates, exit_engine=lambda: exit_service.engine,
                                  peers=(exit_service.engine, custom.engine, auto_buy.engine, closebet.engine),
-                                 notify=self.notify)
+                                 notify=self.notify, breakers=breakers)
 
     def notify(self, text):
         if self.notifier and self.notifier.enabled:

@@ -107,6 +107,8 @@ from app.collectors.naver_theme import collect
 
 from app.config import settings
 
+from app.autosell import now_kst as autosell_now_kst
+
 from app.autosell_service import SellService, create_router
 
 from app.autoexit_service import ExitService, create_exit_router
@@ -114,6 +116,8 @@ from app.autoexit_service import ExitService, create_exit_router
 from app.custom_exit_service import CustomExitService, create_custom_exit_router
 
 from app.auto_buy_service import AutoBuyService, create_auto_buy_router
+
+from app.breakers import create_breakers, create_breakers_router
 
 from app.closebet_service import CloseBetService, create_closebet_router
 
@@ -870,6 +874,9 @@ async def lifespan(app: FastAPI):
 
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
 
+    if hasattr(breakers, 'loop'):
+        tasks.append(asyncio.create_task(breakers.loop(), name="breakers"))   # 예탁자산 차단기 (08:30~15:40, 1분)
+
     if settings.collect_minutes > 0:
 
         tasks.append(asyncio.create_task(autocollect(), name="autocollect"))
@@ -938,16 +945,28 @@ app.include_router(create_custom_exit_router(custom_exit_service))
 
 app.include_router(create_auto_buy_router(auto_buy_service))
 
-closebet_service = CloseBetService(settings, sell_service, exit_service, custom_exit_service, auto_buy_service, notifier)
+# 차단기: 네 매매법(🌅 🗻 🔥 🌙)이 같이 쓴다. 걸리면 **새 매수만** 멈춘다 (매도는 막지 않음). app/breakers.py
+
+def _breakers_notify(text):
+    if notifier and notifier.enabled:
+        asyncio.create_task(notifier.send(text), name='breakers-telegram')
+
+breakers = create_breakers(settings, lambda: closebet_service.broker(), autosell_now_kst, notify=_breakers_notify)
+
+closebet_service = CloseBetService(settings, sell_service, exit_service, custom_exit_service, auto_buy_service,
+                                   notifier, breakers=breakers)
 
 app.include_router(create_closebet_router(closebet_service))
+
+app.include_router(create_breakers_router(breakers))
 
 horizon_service = HorizonService(settings, lambda: feed, lambda: state)
 
 app.include_router(create_horizon_router(horizon_service))
 
 horizonbuy_service = HorizonBuyService(settings, sell_service, horizon_service, exit_service,
-                                       custom_exit_service, auto_buy_service, closebet_service, notifier)
+                                       custom_exit_service, auto_buy_service, closebet_service, notifier,
+                                       breakers=breakers)
 
 app.include_router(create_horizonbuy_router(horizonbuy_service))
 
@@ -955,10 +974,11 @@ _overnight_peers = (exit_service.engine, custom_exit_service.engine, auto_buy_se
                     closebet_service.engine, horizonbuy_service.engine)
 
 firebar_service = OvernightService(settings, sell_service, exit_service, FireBar, 'firebar',
-                                   peers=_overnight_peers, notifier=notifier)
+                                   peers=_overnight_peers, notifier=notifier, breakers=breakers)
 
 leaderdip_service = OvernightService(settings, sell_service, exit_service, LeaderDip, 'leaderdip',
-                                     peers=_overnight_peers + (firebar_service.engine,), notifier=notifier)
+                                     peers=_overnight_peers + (firebar_service.engine,), notifier=notifier,
+                                     breakers=breakers)
 
 firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
 

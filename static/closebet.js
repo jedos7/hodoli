@@ -38,6 +38,7 @@
       : `<tr><td colspan="4" class="empty">${scan.error || '문턱을 넘는 종목이 없습니다'}</td></tr>`;
   }
   function render(s) {
+    if (window.renderBreakers) renderBreakers(s.breakers);
     state = s; if (s.token) token = s.token;
     const live = s.live;
     $('status').textContent = s.error ? '상태 확인 필요' : !s.enabled ? '자동매매 꺼짐' : live ? '실전 자동매매 켜짐' : '흉내 모드 켜짐';

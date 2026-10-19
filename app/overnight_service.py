@@ -40,7 +40,7 @@ class DipSettings(BaseModel):
 
 
 class OvernightService:
-    def __init__(self, settings, sell, horizon, engine_cls, file_prefix, peers=(), notifier=None):
+    def __init__(self, settings, sell, horizon, engine_cls, file_prefix, peers=(), notifier=None, breakers=None):
         self.settings, self.sell, self.horizon = settings, sell, horizon
         self.task, self.token = None, secrets.token_urlsafe(32)
         self.notifier = notifier
@@ -48,7 +48,7 @@ class OvernightService:
         from app.autosell import now_kst
         self.engine = engine_cls(settings.data_dir / f'{file_prefix}_{identity}.json', settings.kiwoom_env,
                                  self.broker, self.connected, horizon.phase, sell.monitor, now_kst,
-                                 peers=tuple(peers), notify=self.notify)
+                                 peers=tuple(peers), notify=self.notify, breakers=breakers)
 
     def notify(self, text):
         if self.notifier and self.notifier.enabled:

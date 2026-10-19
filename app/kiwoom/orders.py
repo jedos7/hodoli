@@ -1,8 +1,11 @@
 """Cash sell transport. One submission only; an uncertain reply is never retried."""
 import asyncio
+import logging
 import time
 
 from app.autosell import normal_code, positive
+
+log = logging.getLogger(__name__)
 
 
 class NotSent(RuntimeError):
@@ -54,6 +57,20 @@ class KiwoomOrders:
     async def positions(self):
         return cash_positions(await self.pages('kt00018', {'qry_tp': '2', 'dmst_stex_tp': 'KRX'},
                                                'acnt_evlt_remn_indv_tot'))
+
+    _equity_logged = False
+
+    async def equity(self):
+        """kt00018 추정예탁자산(원). 차단기의 기준값 (app/breakers.py)."""
+        data, _ = await self.rest.post('/api/dostk/acnt', 'kt00018', {'qry_tp': '2', 'dmst_stex_tp': 'KRX'})
+        if not KiwoomOrders._equity_logged:
+            KiwoomOrders._equity_logged = True
+            log.info('kt00018 상위 항목: %s', {k: v for k, v in data.items() if not isinstance(v, (list, dict))})
+        for key in ('prsm_dpst_aset_amt', 'tot_evlt_amt'):
+            text = str(data.get(key, '')).strip().lstrip('+')
+            if text.isdigit():
+                return int(text)
+        raise ValueError('kt00018 에서 예탁자산(추정예탁자산) 항목을 찾지 못했습니다')
 
     async def open_orders(self, code):
         rows = await self.pages('ka10075', {'all_stk_tp': '1', 'trde_tp': '0',

@@ -25,6 +25,7 @@ from datetime import date, datetime, time
 
 from app.autoexit import PENDING, AutoExit
 from app.closebet import buy_price, in_window, plan_quantity
+from app.breakers import NO_BREAKERS
 from app.kiwoom.orders import NotSent, OrderRejected
 
 TOTAL_CAP_MAX = 9_990_000       # 총 투입 1,000만 원 미만 (종가배팅과 같은 상한)
@@ -79,10 +80,11 @@ class HorizonBuy(AutoExit):
     """plans 는 쓰지 않는다. positions = 호라이즌존으로 산 보유, days = 날짜별 진행, settings."""
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock,
-                 candidates=None, exit_engine=None, peers=(), notify=None):
+                 candidates=None, exit_engine=None, peers=(), notify=None, breakers=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.candidates, self.exit_engine = candidates or (lambda: []), exit_engine
         self.peers, self.notify = peers, notify or (lambda text: None)
+        self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.days, self.last_pick = {}, {}, {}
 
@@ -231,6 +233,7 @@ class HorizonBuy(AutoExit):
         try:
             async with self.lock:
                 self.guard_live(epoch)
+                self.breakers.check_buy(code)          # 차단기: 멈춤·되풀이·건수 (흉내에서도 본다)
                 broker = self.broker()
                 book = await broker.book(code)
                 price = buy_price(book['ask'])          # 매도1호가 + 2틱
@@ -246,6 +249,7 @@ class HorizonBuy(AutoExit):
                 if qty <= 0:
                     raise NotSent(why)
                 self.guard_live(epoch)
+                self.breakers.check_buy(code, qty * price)      # 차단기: 한 번 금액
                 order = {'id': secrets.token_hex(12), 'side': 'buy', 'code': code, 'name': r['name'], 'quantity': qty,
                          'limit_price': price, 'reason': f"HORIZON_{r['grade']}", 'environment': self.env,
                          'day': now.date().isoformat(), 'at': now.isoformat(), 'status': 'submitting', 'order_no': '',
@@ -263,6 +267,7 @@ class HorizonBuy(AutoExit):
                                             'grade': r['grade'], 'bought_on': now.date().isoformat(),
                                             'status': 'held', 'dry': True, 'buy_order': order['id'],
                                             'note': '흉내 보유 · 자동매도는 연결하지 않음'}
+                self.breakers.record_buy(code, qty * price, '호라이즌존')
                 self.persist()
                 return True
         except NotSent as exc:
@@ -271,6 +276,7 @@ class HorizonBuy(AutoExit):
             self.day().setdefault('skipped', []).append(f"{r['name']}: {exc}")
         except OrderRejected as exc:
             order['status'], order['note'] = 'rejected', str(exc)
+            self.breakers.record_reject(code, exc, '호라이즌존 매수')
         except (Exception, asyncio.CancelledError) as exc:
             if order:
                 order['status'], order['note'] = 'unknown', '전송/저장 결과 불명 · 재전송 차단 · 키움 주문내역 확인'
@@ -344,5 +350,5 @@ class HorizonBuy(AutoExit):
                 'enabled': self.settings['enabled'], 'connected': bool(self.connected()), 'error': self.error,
                 'asof': self.clock().isoformat(), 'invested': self.invested(),
                 'positions': list(self.positions.values()), 'day': self.days.get(self.today(), {}),
-                'lastPick': self.last_pick, 'orders': self.orders[-100:],
+                'lastPick': self.last_pick, 'orders': self.orders[-100:], 'breakers': self.breakers.snapshot(),
                 'windows': {'buy': '12:00', 'settle': '12:05'}}

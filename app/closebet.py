@@ -30,6 +30,7 @@ from time import monotonic
 
 from app.autoexit import PENDING, AutoExit
 from app.autosell import normal_code
+from app.breakers import NO_BREAKERS
 from app.fanout import fanout
 from app.kiwoom.extended_sell import tick
 from app.kiwoom.orders import NotSent, OrderRejected
@@ -215,9 +216,10 @@ class CloseBet(AutoExit):
     sell_end, retry_window = SELL_WINDOW[1], RETRY_WINDOW
     normalizer = staticmethod(normalize_settings)
 
-    def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None):
+    def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None, breakers=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.peers, self.notify = peers, notify or (lambda text: None)
+        self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.scans, self.days = {}, {}, {}
         self.scan_task = None
@@ -433,6 +435,7 @@ class CloseBet(AutoExit):
         try:
             async with self.lock:
                 self.guard_live(epoch)
+                self.breakers.check_buy(code)          # 차단기: 멈춤·되풀이·건수 (흉내에서도 본다)
                 broker = self.broker()
                 book = await broker.book(code)
                 five = await broker.minutes(code, '5')
@@ -450,6 +453,7 @@ class CloseBet(AutoExit):
                 if qty <= 0:
                     raise NotSent(why)
                 self.guard_live(epoch)
+                self.breakers.check_buy(code, qty * price)      # 차단기: 한 번 금액
                 order = {'id': secrets.token_hex(12), 'side': 'buy', 'code': code, 'name': r['name'], 'quantity': qty, 'limit_price': price,
                          'reason': 'CLOSE_BET', 'environment': self.env, 'day': now.date().isoformat(), 'at': now.isoformat(),
                          'status': 'submitting', 'order_no': '', 'filled': 0, 'remaining': qty, 'note': why, 'checked_at': None,
@@ -463,6 +467,7 @@ class CloseBet(AutoExit):
                     order['status'], order['note'], order['filled'], order['remaining'] = 'dry', '흉내: 전송하지 않음 · 매도1호가+2틱에 전량 체결로 가정', qty, 0
                     self.positions[code] = {'code': code, 'name': r['name'], 'quantity': qty, 'average': price, 'bought_on': now.date().isoformat(),
                                             'status': 'held', 'dry': True, 'buy_order': order['id']}
+                self.breakers.record_buy(code, qty * price, self.label)
                 self.persist()
                 return True
         except NotSent as exc:
@@ -471,6 +476,7 @@ class CloseBet(AutoExit):
             self.day().setdefault('skipped', []).append(f"{r['name']}: {exc}")
         except OrderRejected as exc:
             order['status'], order['note'] = 'rejected', str(exc)
+            self.breakers.record_reject(code, exc, f'{self.label} 매수')
         except (Exception, asyncio.CancelledError) as exc:
             if order:
                 order['status'], order['note'] = 'unknown', '전송/저장 결과 불명 · 재전송 차단 · 키움 주문내역 확인'
@@ -531,6 +537,7 @@ class CloseBet(AutoExit):
                     self.persist()
                     return True
                 self.guard_sell(epoch)
+                self.breakers.check_sell(code)          # 고장 되풀이만 막는다 (10분 8건)
                 if self.blocked(code):
                     raise NotSent('이 종목에 미확정 주문이 있음 · 재전송 차단')
                 if self.peer_busy(code):
@@ -552,6 +559,7 @@ class CloseBet(AutoExit):
                          'filled': 0, 'remaining': qty, 'note': '시장가 매도 전송 중', 'checked_at': None, 'dry': False}
                 self.orders.append(order)
                 self.persist()
+                self.breakers.record_sell(code, self.label)
                 order['order_no'] = await broker.sell_market_once(code, qty, lambda: self.guard_sell(epoch))
                 order['status'], order['note'] = 'accepted', '시장가 매도 접수 · 체결 확인 중'
                 p['status'], p['sell_order'] = 'selling', order['id']
@@ -564,6 +572,7 @@ class CloseBet(AutoExit):
         except OrderRejected as exc:
             order['status'], order['note'] = 'rejected', str(exc)
             p['note'] = f'매도 거부: {exc}'
+            self.breakers.record_reject(code, exc, f'{self.label} 매도')
         except (Exception, asyncio.CancelledError):
             if order:
                 order['status'], order['note'] = 'unknown', '전송/저장 결과 불명 · 재전송 차단 · 키움 주문내역 확인'
@@ -592,4 +601,5 @@ class CloseBet(AutoExit):
                 'invested': self.invested(), 'positions': list(self.positions.values()),
                 'day': self.days.get(today, {}), 'scan': self.scans.get(today), 'scan_dates': sorted(self.scans),
                 'orders': self.orders[-100:], 'scanning': self.scan_task is not None,
+                'breakers': self.breakers.snapshot(),
                 'windows': {'scan': '15:15', 'buy': '15:19:50', 'sell': self.settings['sell_time'], 'retry': '09:03', 'fill': '15:31'}}

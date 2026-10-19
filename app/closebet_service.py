@@ -25,13 +25,14 @@ class CloseBetSettings(BaseModel):
 
 
 class CloseBetService:
-    def __init__(self, settings, sell, horizon, custom, auto_buy, notifier=None):
+    def __init__(self, settings, sell, horizon, custom, auto_buy, notifier=None, breakers=None):
         self.settings, self.sell, self.horizon = settings, sell, horizon
         self.task, self.token = None, secrets.token_urlsafe(32)
         identity = hashlib.sha256((settings.kiwoom_env + settings.kiwoom_app_key).encode()).hexdigest()[:12]
         from app.autosell import now_kst
         self.engine = CloseBet(settings.data_dir / f'closebet_{identity}.json', settings.kiwoom_env, self.broker, self.connected,
-                               horizon.phase, sell.monitor, now_kst, peers=(horizon.engine, custom.engine, auto_buy.engine), notify=self.notify)
+                               horizon.phase, sell.monitor, now_kst, peers=(horizon.engine, custom.engine, auto_buy.engine),
+                               notify=self.notify, breakers=breakers)
         self.notifier = notifier
 
     def notify(self, text):

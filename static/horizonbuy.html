@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 호라이즌존 자동매수</title><link rel="stylesheet" href="/auto-buy.css?v=2"><script src="/app-windows.js?v=2" defer></script>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 호라이즌존 자동매수</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=2"><script src="/app-windows.js?v=2" defer></script>
 <style>
 .hb-grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
 @media(max-width:1000px){.hb-grid{grid-template-columns:1fr}}
@@ -24,6 +24,7 @@ button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-ra
 <section class="hero"><div><p class="eyebrow">기준봉 → D+1 횡보 → D+2 저점 유지 → <b>정오 매수</b></p><h1>🌅 호라이즌존 자동매수</h1><p class="intro">관제탑이 <b>D+2 12:00 정각</b>에 "정오 조건 충족"으로 올린 자리를 그 자리에서 삽니다.<br>체결되면 기존 호라이즌 자동매도(익절 +15%에 70% · 손절 −10% · 청산날)에 자동으로 넘깁니다.</p></div>
 <div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
 <section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
+<section id="breakerBar" class="breakers" hidden></section>
 <div id="error" class="alert" role="alert" hidden></div>
 <div class="hb-grid">
 <section class="panel hb-settings"><p class="eyebrow">01 · 설정</p><h2>한 자리에 얼마</h2>
@@ -60,4 +61,4 @@ button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-ra
 <li>체결되면 자동매도로 넘깁니다. 연결에 실패하면 텔레그램으로 알리니 자동매도 화면에서 직접 켜세요.</li>
 <li>비상 정지는 새 주문만 막습니다. 이미 산 종목은 자동매도가 계속 들고 갑니다.</li>
 </ul></section>
-<footer>호라이즌존 자동매수는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/horizonbuy.js?v=1" defer></script></body></html>
+<footer>호라이즌존 자동매수는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/breakers.js?v=1" defer></script><script src="/horizonbuy.js?v=1" defer></script></body></html>

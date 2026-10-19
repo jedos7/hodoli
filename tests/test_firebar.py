@@ -235,3 +235,52 @@ def test_order_price_and_pre_buy_check_share_one_quote(eng):
 async def _quote(into, code, info):
     into.append(code)
     return info
+
+
+def test_a_tripped_breaker_stops_the_buy_but_not_the_next_morning_sell(tmp_path, eng):
+    """차단기가 걸리면 새 매수는 안 나가고, 이미 산 종목의 다음 날 시초가 매도는 그대로 나간다."""
+    from app.breakers import Breakers
+    br = Breakers(tmp_path / 'br.json', 'real', lambda: None, lambda: eng.now[0])
+    br.open()
+    eng.e.breakers = br
+    on(eng.e)
+
+    # 평범하게 하루를 사고 체결까지
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 40, tzinfo=KST)
+    run(eng.e.tick())
+    assert eng.b.calls == [('buy', '000001', 41, 12020)]
+    assert br.day()['buys'][0]['code'] == '000001'
+    eng.b.detail_response = {'filled': 41, 'remaining': 0, 'rejected': False}
+    eng.b.rows['000001'] = {'code': '000001', 'name': '종목A', 'quantity': 41, 'available': 41, 'average': 12020.0}
+    eng.now[0] = datetime(2026, 10, 19, 15, 31, 0, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert eng.e.positions['000001']['status'] == 'held'
+
+    # 다음 날 아침, 매도 직전에 차단기가 걸린다 (차단기 기록은 하루 단위다)
+    eng.now[0] = datetime(2026, 10, 20, 8, 35, 0, tzinfo=KST)
+    br.feed_equity(10_000_000)
+    br.feed_equity(8_000_000)
+    assert br.tripped()
+    eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert ('sell', '000001', 41) in eng.b.calls           # 매도는 막지 않는다
+    assert br.day()['sells'][0]['code'] == '000001'
+
+    # 같은 날 새 매수는 차단기에 막혀 전송이 없다 (다른 종목으로)
+    before = list(eng.b.calls)
+
+    async def other(market):
+        return [{'code': '000002', 'name': '종목B', 'price': 12000, 'amount_eok': 500, 'chg': 20.0}] if market == '001' else []
+
+    async def other_daily(code):
+        return daily([(10000, 10000, 10e8)] * 30 + [(12000, 12050, 500e8)], today='20261020')
+    eng.b.ranking, eng.b.daily = other, other_daily
+    eng.now[0] = datetime(2026, 10, 20, 15, 10, 0, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert eng.e.scans['2026-10-20']['passed'] == ['000002']
+    eng.now[0] = datetime(2026, 10, 20, 15, 19, 40, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert eng.b.calls == before                           # 아무것도 전송하지 않았다
+    assert any('차단기' in x for x in eng.e.day()['skipped'])
+    assert len(br.day()['buys']) == 0                      # 그 날 매수 기록도 없다

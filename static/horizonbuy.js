@@ -37,6 +37,7 @@
     $('skipped').textContent = (skipped || []).length ? '걸러짐: ' + skipped.join(' · ') : '';
   }
   function render(s) {
+    if (window.renderBreakers) renderBreakers(s.breakers);
     if (s.token) token = s.token;
     const live = s.live;
     $('status').textContent = s.error ? '상태 확인 필요' : !s.enabled ? '자동매수 꺼짐' : live ? '실전 자동매수 켜짐' : '흉내 모드 켜짐';
