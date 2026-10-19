@@ -204,7 +204,14 @@ def normalize_settings(raw):
 
 # ── 엔진 ─────────────────────────────────────────────────────
 class CloseBet(AutoExit):
-    """plans 는 쓰지 않는다. positions = 종배로 산 보유 {code: {...}}, scans = 날짜별 후보 판정, settings."""
+    """종가 매수 → 다음 날 시초가 매도 공통 뼈대. plans 는 쓰지 않는다.
+    positions = 이 전략으로 산 보유 {code: {...}}, scans = 날짜별 후보 판정, settings.
+    🔥 기준봉 종가(app/firebar.py)와 🗻 대장 눌림목(app/leaderdip.py)이 이 클래스를 물려받아 후보·매수만 바꾼다."""
+
+    label, icon = '종배', '🌙'
+    scan_window, buy_window, fill_window = SCAN_WINDOW, BUY_WINDOW, FILL_WINDOW
+    sell_end, retry_window = SELL_WINDOW[1], RETRY_WINDOW
+    normalizer = staticmethod(normalize_settings)
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
@@ -223,14 +230,14 @@ class CloseBet(AutoExit):
                 extra = {}
         super().open()
         if self.owner and not self.error:
-            self.settings = normalize_settings(extra.get('settings') or {})
+            self.settings = self.normalizer(extra.get('settings') or {})
             self.positions, self.scans, self.days = extra.get('positions') or {}, extra.get('scans') or {}, extra.get('days') or {}
             self.scans = dict(sorted(self.scans.items())[-10:])
             self.save()
 
     def save(self):
         if not self.owner:
-            raise RuntimeError('종가배팅 실행 잠금을 확보하지 못했습니다')
+            raise RuntimeError(f'{self.label} 실행 잠금을 확보하지 못했습니다')
         import os
         tmp = self.path.with_suffix('.tmp')
         with open(tmp, 'w', encoding='utf-8') as f:
@@ -242,7 +249,7 @@ class CloseBet(AutoExit):
         os.replace(tmp, self.path)
 
     def update_settings(self, raw):
-        s = normalize_settings(raw)
+        s = self.normalizer(raw)
         if s['mode'] == 'live' and self.env != 'real':
             raise ValueError('실전 전송(live)은 실전 계좌 환경(KIWOOM_ENV=real)에서만 켤 수 있습니다')
         self.settings = s
@@ -297,7 +304,7 @@ class CloseBet(AutoExit):
             return
         self.gate()
         if epoch != self.epoch or not self.settings['enabled']:
-            raise NotSent('종가배팅이 꺼졌습니다')
+            raise NotSent(f'{self.label}이 꺼졌습니다')
 
     # ── 1초마다 ──
     async def tick(self):
@@ -305,28 +312,40 @@ class CloseBet(AutoExit):
         if now.weekday() >= 5 or not self.owner or self.error:
             return
         d = self.day()
-        if in_window(now, SCAN_WINDOW) and not d.get('scanned') and not self.scan_task:
-            self.scan_task = asyncio.create_task(self.scan(), name='closebet-scan')
+        if in_window(now, self.scan_window) and not d.get('scanned') and not self.scan_task:
+            self.scan_task = asyncio.create_task(self.scan(), name=f'{type(self).__name__}-scan')
             self.tasks.add(self.scan_task)
             self.scan_task.add_done_callback(self.tasks.discard)
-        if in_window(now, BUY_WINDOW) and d.get('scanned') and not d.get('bought') and self.settings['enabled']:
+        if in_window(now, self.buy_window) and d.get('scanned') and not d.get('bought') and self.settings['enabled']:
             d['bought'] = now.isoformat()
             self.persist()
             await self.buy_all(now)
-        if in_window(now, (datetime.strptime(self.settings['sell_time'], '%H:%M').time(), SELL_WINDOW[1])) and not d.get('sold') and self.held_codes():
+        await self.tick_sell(now, d)
+
+    async def tick_sell(self, now, d):
+        """다음 날 아침 매도·재시도와 당일 체결 확인. 하룻밤 전략 셋(🌙 🔥 🗻)이 같이 쓴다."""
+        if in_window(now, (datetime.strptime(self.settings['sell_time'], '%H:%M').time(), self.sell_end)) and not d.get('sold') and self.held_codes():
             d['sold'] = now.isoformat()
             self.persist()
             await self.sell_all(now, 'OPEN_AUCTION')
-        if in_window(now, RETRY_WINDOW) and not d.get('retried') and self.held_codes():
+        if in_window(now, self.retry_window) and not d.get('retried') and self.held_codes():
             d['retried'] = now.isoformat()
             self.persist()
             await self.reconcile()
             await self.sell_all(now, 'OPEN_RETRY', only_without_pending=True)
-        if in_window(now, FILL_WINDOW) and d.get('bought') and not d.get('filled'):
+        if in_window(now, self.fill_window) and d.get('bought') and not d.get('filled'):
             d['filled'] = now.isoformat()
             self.persist()
             await self.reconcile()
             await self.settle_buys()
+
+    async def order_price(self, broker, book, r):
+        """매수 지정가. 기본은 매도1호가 +2틱 (🌙 종가배팅 규칙). 다른 전략은 이 함수만 바꾼다."""
+        return buy_price(book['ask'])
+
+    async def pre_buy_check(self, broker, r, price):
+        """주문 직전 재확인 자리. 기본은 아무것도 안 한다. NotSent 를 올리면 그 종목만 건너뛴다."""
+        return
 
     # ── 15:15 후보 선정 ──
     async def scan(self, preview=False):
@@ -362,7 +381,7 @@ class CloseBet(AutoExit):
             self.scans = dict(sorted(self.scans.items())[-10:])
             self.persist()
             passed = [r for r in result['rows'] if r['pass']]
-            self.notify('🌙 종배 15:15 후보 ' + (f"{len(passed)}종목: " + ', '.join(f"{r['name']}({r['amount_eok']:,.0f}억)" for r in passed[:5])
+            self.notify(f'{self.icon} {self.label} 후보 ' + (f"{len(passed)}종목: " + ', '.join(f"{r['name']}({r['amount_eok']:,.0f}억)" for r in passed[:5])
                                              if passed else f"없음 (문턱 {self.settings['threshold_eok']}억 넘는 {len(result['rows'])}종목 중 조건 통과 0)")
                         + ('' if self.settings['enabled'] else ' · 자동매매 꺼져 있어 매수 안 함') + ('' if self.live() else ' · 흉내 모드'))
         self.scan_task = None
@@ -389,7 +408,7 @@ class CloseBet(AutoExit):
         if self.owner and not self.error:
             self.persist()
         mode = '실전' if self.live() else '흉내'
-        self.notify(f"🌙 종배 매수({mode}) " + (', '.join(bought) if bought else '없음') + (f" · 건너뜀 {len(self.day().get('skipped', []))}" if self.day().get('skipped') else ''))
+        self.notify(f"{self.icon} {self.label} 매수({mode}) " + (', '.join(bought) if bought else '없음') + (f" · 건너뜀 {len(self.day().get('skipped', []))}" if self.day().get('skipped') else ''))
 
     async def buy_one(self, r, now):
         code, epoch = r['code'], self.epoch
@@ -401,13 +420,14 @@ class CloseBet(AutoExit):
                 book = await broker.book(code)
                 five = await broker.minutes(code, '5')
                 remaining = self.settings['total_cap'] - self.committed()
-                price = buy_price(book['ask'])        # 매도1호가 + 2틱
+                price = await self.order_price(broker, book, r)
+                await self.pre_buy_check(broker, r, price)
                 cap_qty = 10 ** 8
                 if self.live():
                     await broker.stock(code, price or 1)   # 거래정지·투자유의·호가단위 확인
                     cap_qty = (await broker.capacity(code, price))['quantity'] if price else 0
                     if code in (await broker.positions()):
-                        raise NotSent('이미 계좌에 있는 종목 (종배 외 보유) · 섞이지 않게 건너뜀')
+                        raise NotSent(f'이미 계좌에 있는 종목 ({self.label} 외 보유) · 섞이지 않게 건너뜀')
                 qty, why = plan_quantity(price, book['total_ask_qty'], self.settings['per_trade_amount'], remaining,
                                          late_amount(five, self.today().replace('-', '')), cap_qty)
                 if qty <= 0:
@@ -463,7 +483,7 @@ class CloseBet(AutoExit):
         self.persist()
         held = [p for p in self.positions.values() if p['status'] == 'held' and p['bought_on'] == self.today()]
         if held:
-            self.notify('🌙 종배 체결 보유: ' + ', '.join(f"{p['name']} {p['quantity']}주@{p['average']:,.0f}" for p in held)
+            self.notify(f'{self.icon} {self.label} 체결 보유: ' + ', '.join(f"{p['name']} {p['quantity']}주@{p['average']:,.0f}" for p in held)
                         + f" · 내일 {self.settings['sell_time']} 시장가 매도 예정")
 
     # ── 다음 날 매도 ──
@@ -478,7 +498,7 @@ class CloseBet(AutoExit):
         if self.owner and not self.error:
             self.persist()
         if sold:
-            self.notify(f"🌙 종배 매도 주문({'실전' if self.live() else '흉내'}, {reason}): " + ', '.join(sold))
+            self.notify(f"{self.icon} {self.label} 매도 주문({'실전' if self.live() else '흉내'}, {reason}): " + ', '.join(sold))
 
     async def sell_one(self, p, now, reason):
         code, epoch = p['code'], self.epoch

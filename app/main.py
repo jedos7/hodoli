@@ -34,6 +34,9 @@
 
   GET  /api/nxtclose          19:50 NXT 하락 마감 종가배팅 후보 (KRX 종가 대비 NXT 가격). POST /api/nxtclose/run 즉시 점검
 
+  GET  /api/firebar           기준봉 종가 자동매매 (15:10 후보 → 15:19:40 매수 → 다음 날 시초가 매도) — 화면 /firebar.html
+  GET  /api/leaderdip         대장 눌림목 자동매매 (코스피 대장주 F존 10:00~14:59 → 다음 날 시초가 매도) — 화면 /leaderdip.html
+
   GET  /api/horizonbuy        호라이즌존 자동매수 상태 (D+2 12:00 정오 매수 → 자동매도 연결). POST /settings · /stop · /preview · /reconcile — 화면 /horizonbuy.html
 
   GET  /api/closebet          종가배팅 자동매매 상태 (설정·오늘 후보·보유·주문). POST /settings · /stop · /scan(미리보기) · /reconcile — 화면 /closebet.html
@@ -115,6 +118,12 @@ from app.auto_buy_service import AutoBuyService, create_auto_buy_router
 from app.closebet_service import CloseBetService, create_closebet_router
 
 from app.horizonbuy_service import HorizonBuyService, create_horizonbuy_router
+
+from app.firebar import FireBar
+
+from app.leaderdip import LeaderDip
+
+from app.overnight_service import DipSettings, FireBarSettings, OvernightService, create_overnight_router
 
 from app.horizon_service import HorizonService, create_horizon_router
 
@@ -853,6 +862,10 @@ async def lifespan(app: FastAPI):
 
     await horizonbuy_service.start()
 
+    await firebar_service.start()
+
+    await leaderdip_service.start()
+
     log.info("돌파 감시 목록 %d종목 (%s)", len(state.watch.items), state.watch.loaded_from)
 
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
@@ -882,6 +895,10 @@ async def lifespan(app: FastAPI):
             t.cancel()
 
         await horizon_service.stop()
+
+        await leaderdip_service.stop()
+
+        await firebar_service.stop()
 
         await horizonbuy_service.stop()
 
@@ -933,6 +950,21 @@ horizonbuy_service = HorizonBuyService(settings, sell_service, horizon_service, 
                                        custom_exit_service, auto_buy_service, closebet_service, notifier)
 
 app.include_router(create_horizonbuy_router(horizonbuy_service))
+
+_overnight_peers = (exit_service.engine, custom_exit_service.engine, auto_buy_service.engine,
+                    closebet_service.engine, horizonbuy_service.engine)
+
+firebar_service = OvernightService(settings, sell_service, exit_service, FireBar, 'firebar',
+                                   peers=_overnight_peers, notifier=notifier)
+
+leaderdip_service = OvernightService(settings, sell_service, exit_service, LeaderDip, 'leaderdip',
+                                     peers=_overnight_peers + (firebar_service.engine,), notifier=notifier)
+
+firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
+
+app.include_router(create_overnight_router(firebar_service, '/api/firebar', 'x-firebar-token', FireBarSettings))
+
+app.include_router(create_overnight_router(leaderdip_service, '/api/leaderdip', 'x-leaderdip-token', DipSettings, scan_preview=False))
 
 price_chart_service = PriceChartService(lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 

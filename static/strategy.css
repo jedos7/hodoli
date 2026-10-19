@@ -1,0 +1,28 @@
+/* 전략 화면 공통 (🔥 기준봉 종가 · 🗻 대장 눌림목). auto-buy.css 다음에 읽는다. */
+.st-grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
+@media(max-width:1000px){.st-grid{grid-template-columns:1fr}}
+.st-settings label{display:block;margin:10px 0 4px;font-size:13px;color:#b9c6d8}
+.st-settings input[type=number],.st-settings input[type=time]{width:100%;padding:8px 10px;background:#0f1520;color:#edf4ff;border:1px solid #38485f;border-radius:6px;font:inherit}
+.st-settings .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.st-mode{display:flex;gap:10px;margin-top:6px}
+.st-mode label{flex:1;margin:0;padding:10px;border:1px solid #38485f;border-radius:8px;cursor:pointer;text-align:center}
+.st-mode input{margin-right:6px}.st-mode label.live{border-color:#d94c4c}.st-mode label.on{background:#1d2a3e}
+.st-live-confirm{margin-top:8px;padding:10px;background:#3a1c1c;border:1px solid #d94c4c;border-radius:8px;font-size:13px}
+.st-timeline{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
+.st-timeline span{padding:5px 10px;background:#17202d;border-radius:99px;font-size:12px;color:#b9c6d8}
+.st-timeline span.done{color:#8fe3a8;background:#15301f}
+.cond{display:inline-block;margin:1px 4px 1px 0;padding:1px 7px;border-radius:4px;font-size:11.5px;background:#2a1f1f;color:#f0a0a0}
+.cond.ok{background:#17301f;color:#9fe3b3}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:7px 8px;border-bottom:1px solid #243041;text-align:left;vertical-align:top}
+th{color:#b9c6d8;font-weight:600;font-size:12.5px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.pass td,tr.touched td{background:#13201a}
+.muted{color:#8da0b8;font-size:12.5px}
+button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer}
+.rulebox{background:#141b25;border:1px solid #2a3647;border-left:3px solid #e0a040;border-radius:6px;padding:12px 14px;font-size:13px;line-height:1.75;color:#c3d0e0}
+.rulebox b{color:#efc766}
+.zone{font-variant-numeric:tabular-nums}
+.zone b{color:#efc766}
+.bar{position:relative;height:6px;background:#1d2733;border-radius:3px;margin-top:4px;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:0;background:#4a7fb5}

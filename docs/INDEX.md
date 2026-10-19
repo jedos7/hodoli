@@ -13,6 +13,8 @@
 | [호라이즌_매매법_넷.html](호라이즌_매매법_넷.html) | **원본 규칙 문서** (2026-10-19 변성환 제공): 네 매매법의 매수·매도 조건 전부 |
 | [장세와 매매 성적.html](장세와 매매 성적.html) | 원본 자료: 장세 지표별 매매 성적 (유동성·대금·상한가·예탁금·반대매매) |
 | [HORIZONBUY.md](HORIZONBUY.md) | 호라이즌존 자동매수 (D+2 12:00 정오 매수 → 기존 자동매도 연결) |
+| [FIREBAR.md](FIREBAR.md) | 기준봉 종가 (🔥): 윗꼬리 없는 기준봉을 종가에 사고 다음 날 시초가 매도 |
+| [LEADERDIP.md](LEADERDIP.md) | 대장 눌림목 (🗻): 코스피 대장주 F존에서 반씩 받고 다음 날 시초가 매도 |
 | [CLOSEBET.md](CLOSEBET.md) | 종가배팅 자동매매 (변성환 규칙): 흐름, 조건, 수량, 안전장치, 검증 결과 |
 
 공식 키움 REST API 명세: https://github.com/Kiwoom-Securities/Kiwoom-REST-API

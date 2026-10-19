@@ -9,6 +9,8 @@
 |---|---|---|
 | `/` → `/horizon.html` | **호라이즌 관제탑** (첫 화면) | 시장 지수·수급·해외 지표, 기준봉 뒤 D+1/D+2 조건 판정, 보유 종목 매도 상태 |
 | `/horizonbuy.html` | **호라이즌존 자동매수** | 관제탑이 D+2 12:00 정각에 올린 자리를 사고 자동매도에 연결. 흉내/실전 모드 ([docs/HORIZONBUY.md](docs/HORIZONBUY.md)) |
+| `/leaderdip.html` | **대장 눌림목** | 코스피 대장주가 고가라인 −10%(F2)·−12%(F3)까지 밀리면 반씩 받고 다음 날 시초가 매도 ([docs/LEADERDIP.md](docs/LEADERDIP.md)) |
+| `/firebar.html` | **기준봉 종가** | 윗꼬리 없이 마감하는 기준봉을 15:19:40에 사고 다음 날 시초가 매도 ([docs/FIREBAR.md](docs/FIREBAR.md)) |
 | `/closebet.html` | **종가배팅 자동매매** | 15:15 후보 → 15:19:50 매수 → 다음 날 09:00 시초가 매도. 흉내/실전 모드 ([docs/CLOSEBET.md](docs/CLOSEBET.md)) |
 | `/auto-buy.html` | 내 조건 자동매수 | 종목·가격·수량을 정해 지정가 1회 매수, 체결 후 익절·손절 연결 ([docs/AUTO_BUY.md](docs/AUTO_BUY.md)) |
 | `/custom-exit.html` | 내 조건 자동매도 | 보유 종목의 익절·손절·이익보전·시간외 매도 티켓, 호라이즌 D+2 자동매도 ([docs/CUSTOM_EXIT.md](docs/CUSTOM_EXIT.md), [docs/AUTOEXIT.md](docs/AUTOEXIT.md)) |
@@ -35,7 +37,8 @@ theme_radar/
 │  ├─ horizon*.py              호라이즌 판정(horizon.py) · 수집 서비스 · D+2 자동매도 계획 · 시간외
 │  ├─ auto_buy*.py             내 조건 자동매수
 │  ├─ custom_exit*.py, exit_tickets.py, after_hours_exit.py, exit_coordination.py   내 조건 자동매도와 엔진 간 충돌 방지
-│  ├─ closebet.py, closebet_service.py   종가배팅 자동매매 (🌙 15:19:50 매수 → 다음 날 시초가 매도)
+│  ├─ closebet.py, closebet_service.py   종가배팅 (🌙 15:19:50 매수 → 다음 날 시초가 매도) · 하룻밤 전략 셋의 공통 뼈대
+│  ├─ firebar.py                        기준봉 종가 (🔥 15:19:40 매수) · leaderdip.py 대장 눌림목 (🗻 F존) · overnight_service.py 둘의 공통 서비스
 │  ├─ horizonbuy.py, horizonbuy_service.py  호라이즌존 자동매수 (🌅 D+2 12:00 매수 → 기존 자동매도에 연결)
 │  ├─ autosell.py, autosell_service.py   계좌 잔고 읽기·매도조건 검증(주문 없음) — 다른 엔진이 계좌 이벤트를 여기서 받는다
 │  ├─ state.py, supply.py      테마 지표(활동도·5분 유입) · 수급 점수

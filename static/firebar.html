@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 기준봉 종가</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=1"><script src="/app-windows.js?v=2" defer></script></head>
+<body><header><a href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기">⌁ 호라이즌</a><span class="mode">기준봉 종가</span><nav aria-label="매매 화면 이동"><a class="return-link" href="/horizon.html" target="themeRadarHorizon">← 관제탑</a><a class="return-link" href="/horizonbuy.html" target="themeRadarHorizonBuy">🌅 호라이즌존</a><a class="return-link" href="/leaderdip.html" target="themeRadarLeaderDip">🗻 대장 눌림목</a><a class="return-link" href="/closebet.html" target="themeRadarCloseBet">🌙 종가배팅</a></nav></header>
+<main>
+<section class="hero"><div><p class="eyebrow">15:10 후보 → 15:19:40 매수 → 다음 날 09:00 시초가 매도</p><h1>🔥 기준봉 종가</h1><p class="intro">오늘 대금이 터진 기준봉 가운데 <b>윗꼬리 없이</b> 마감하는 종목을 종가에 사서 다음 날 시초가에 팝니다.<br>손절 없이 무조건 시초가 매도입니다. 종가배팅보다 10초 먼저 주문합니다.</p></div>
+<div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
+<section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
+<div id="error" class="alert" role="alert" hidden></div><div id="feedback" class="feedback" role="status" hidden></div>
+<div class="st-grid">
+<section class="panel st-settings"><p class="eyebrow">01 · 설정</p><h2>얼마를, 몇 종목까지</h2>
+<form id="settingsForm">
+<div class="st-mode"><label id="modeDryLabel"><input type="radio" name="mode" value="dry" id="modeDry"> 흉내 (기록만)</label><label id="modeLiveLabel" class="live"><input type="radio" name="mode" value="live" id="modeLive"> 실전 전송</label></div>
+<div id="liveConfirm" class="st-live-confirm" hidden><label style="margin:0"><input type="checkbox" id="confirmLive"> 실전 계좌로 실제 주문이 나가는 것을 이해했습니다. 제작자 자료도 최근 30번은 PF 2.44로 누적(4.34)보다 낮습니다.</label></div>
+<label><input type="checkbox" id="enabled"> 자동매매 켜기 (끄면 후보 선정만 하고 주문하지 않음)</label>
+<div class="row"><div><label for="perTrade">한 종목 금액 (원)</label><input id="perTrade" type="number" min="10000" step="10000"></div><div><label for="totalCap">총 투입 상한 (원, 999만 이하)</label><input id="totalCap" type="number" min="10000" max="9990000" step="10000"></div></div>
+<div class="row"><div><label for="maxPositions">최대 종목 수 (≤5)</label><input id="maxPositions" type="number" min="1" max="5"></div><div><label for="threshold">거래대금 문턱 (억)</label><input id="threshold" type="number" min="10" step="10"></div></div>
+<label for="sellTime">매도 주문 시각 (08:30~08:59, 장전 동시호가)</label><input id="sellTime" type="time" min="08:30" max="08:59">
+<p class="help">수량은 호가 총잔량과 주문가능 금액 안에서 깎입니다. 현금 1배로만 삽니다.</p>
+<button id="save" class="primary" type="submit" disabled>설정 저장</button><p id="saveNote" class="help" role="status"></p></form>
+<section class="rulebox" style="margin-top:14px"><b>사는 조건</b><br>오늘 등락 <b>+15% ~ +29% 미만</b> (상한가에 잠기면 종가에 못 사므로 제외)<br>거래대금 문턱 이상 · 앞 20일 평균 대금의 <b>5배 이상</b> · 전날 종가 1,000원 이상<br><b>윗꼬리 = (고가 − 지금 값) ÷ 전날 종가 &lt; 2%p</b> → 고가 근처에서 끝나는 종목만<br><br><b>사는 법</b><br>15:10에 1차로 고르고, <b>15:19:40 주문 직전에 다시 확인</b>합니다. 지금 값 +2틱 지정가(상한가는 넘지 않게).</section></section>
+<section class="panel"><p class="eyebrow">02 · 오늘</p><h2>오늘 흐름</h2>
+<div class="st-timeline" id="timeline"></div>
+<div class="section-heading"><h3>후보 (15:10 자동 · 또는 지금 미리보기)</h3><button id="preview" disabled>지금 후보 미리보기</button></div>
+<p id="scanMeta" class="muted">—</p>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">거래대금</th><th class="num">등락</th><th>조건</th></tr></thead><tbody id="scanRows"><tr><td colspan="4" class="empty">아직 후보 선정 전</td></tr></tbody></table></div>
+<p id="skipped" class="muted"></p></section></div>
+<section class="panel"><div class="section-heading"><h2>보유 · 매도 예정</h2><span class="muted">투입 <b id="invested">0</b>원 / 상한 <b id="capShown">—</b>원</span></div>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">수량</th><th class="num">평단</th><th>매수일</th><th>상태</th><th>비고</th></tr></thead><tbody id="positions"><tr><td colspan="6" class="empty">보유 없음</td></tr></tbody></table></div></section>
+<section class="panel"><div class="section-heading"><h2>주문 기록</h2><button id="reconcile" disabled>체결 다시 조회</button></div>
+<div class="table-scroll"><table><thead><tr><th>시각</th><th>종목</th><th>구분</th><th class="num">수량</th><th class="num">가격</th><th>상태</th><th>비고</th></tr></thead><tbody id="orders"><tr><td colspan="7" class="empty">주문 기록 없음</td></tr></tbody></table></div></section>
+<section class="panel guide"><h2>알아두세요</h2><ul>
+<li>서버가 15:10 · 15:19:40 · 다음 날 아침에 떠 있어야 합니다. <b>매수만 되고 아침에 꺼져 있으면 그날 안 팔립니다.</b></li>
+<li>🌙 종가배팅과 같은 종목이 겹치면 먼저 산 쪽만 삽니다(서로 건드리지 않음).</li>
+<li>제작자 성적은 213번 PF 4.34이지만 네 매매를 같이 돌리면 129번 PF 3.20이고, 최근 30번은 2.44입니다.</li>
+<li>비상 정지는 새 주문만 막습니다. 이미 접수된 주문은 키움에서 직접 취소하세요.</li></ul></section>
+<footer>기준봉 종가는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/firebar.js?v=1" defer></script></body></html>

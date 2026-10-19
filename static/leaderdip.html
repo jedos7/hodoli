@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 대장 눌림목</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=1"><script src="/app-windows.js?v=2" defer></script></head>
+<body><header><a href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기">⌁ 호라이즌</a><span class="mode">대장 눌림목</span><nav aria-label="매매 화면 이동"><a class="return-link" href="/horizon.html" target="themeRadarHorizon">← 관제탑</a><a class="return-link" href="/horizonbuy.html" target="themeRadarHorizonBuy">🌅 호라이즌존</a><a class="return-link" href="/firebar.html" target="themeRadarFireBar">🔥 기준봉 종가</a><a class="return-link" href="/closebet.html" target="themeRadarCloseBet">🌙 종가배팅</a></nav></header>
+<main>
+<section class="hero"><div><p class="eyebrow">10:00~14:59 F존 터치 → 반씩 받기 → 다음 날 09:00 시초가 매도</p><h1>🗻 대장 눌림목</h1><p class="intro">코스피 <b>시총 상위 대장주</b>가 장중에 크게 밀릴 때 F존에서 반씩 받습니다.<br>고가라인에서 <b>−10%(F2)</b>와 <b>−12%(F3)</b>에 지정가를 동시에 걸고, 다음 날 시초가에 전량 팝니다. 손절은 없습니다.</p></div>
+<div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
+<section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
+<div id="error" class="alert" role="alert" hidden></div>
+<div class="st-grid">
+<section class="panel st-settings"><p class="eyebrow">01 · 설정</p><h2>한 칸에 얼마</h2>
+<form id="settingsForm">
+<div class="st-mode"><label id="modeDryLabel"><input type="radio" name="mode" value="dry" id="modeDry"> 흉내 (기록만)</label><label id="modeLiveLabel" class="live"><input type="radio" name="mode" value="live" id="modeLive"> 실전 전송</label></div>
+<div id="liveConfirm" class="st-live-confirm" hidden><label style="margin:0"><input type="checkbox" id="confirmLive"> 실전 계좌로 실제 주문이 나가는 것을 이해했습니다. 대장주가 하루 −10% 빠지는 날에 사는 전략이라, 다음 날 더 빠지면 손절 없이 그대로 떠안습니다.</label></div>
+<label><input type="checkbox" id="enabled"> 자동매매 켜기 (끄면 감시만 하고 주문하지 않음)</label>
+<div class="row"><div><label for="slotAmount">한 칸 금액 (원)</label><input id="slotAmount" type="number" min="20000" step="10000"></div><div><label for="totalCap">총 투입 상한 (원, 999만 이하)</label><input id="totalCap" type="number" min="10000" max="9990000" step="10000"></div></div>
+<div class="row"><div><label for="maxPositions">최대 종목 수 (≤5)</label><input id="maxPositions" type="number" min="1" max="5"></div><div><label for="topN">대장주 수 (문서 10)</label><input id="topN" type="number" min="3" max="30"></div></div>
+<label for="sellTime">매도 주문 시각 (08:30~08:59, 장전 동시호가)</label><input id="sellTime" type="time" min="08:30" max="08:59">
+<p class="help">한 칸의 <b>반은 F2, 반은 F3</b>에 걸립니다. 몰린 날(F2에 닿은 대장주 3종목 이상)에는 반 칸만 씁니다. 현금으로만 삽니다.</p>
+<button id="save" class="primary" type="submit" disabled>설정 저장</button><p id="saveNote" class="help" role="status"></p></form>
+<section class="rulebox" style="margin-top:14px"><b>고가라인</b><br>그날 <b>09:00부터</b>의 15분봉에서 '새 고가를 만든 봉' 또는 '봉 안에서 4% 넘게 반등한 봉'의 고가 중 <b>가장 최근 것</b>. (문서에 수식이 없어 이렇게 정했습니다. 08:00 NXT부터 잡으면 성적이 나빠진다고 돼 있어 09:00부터 잡습니다.)<br><br>
+<b>F존</b> · F2 = 고가라인 × 0.90 · F3 = 고가라인 × 0.88<br><br>
+<b>사는 법</b><br>10:00~14:59에 값이 F2 아래로 내려오면 그 순간 고가라인을 고정하고 반씩 F2·F3 지정가. F3가 <b>15:19까지 안 체결되면 취소</b>합니다. 한 종목 하루 한 번.</section></section>
+<section class="panel"><p class="eyebrow">02 · 오늘</p><h2>대장주 감시</h2>
+<div class="st-timeline" id="timeline"></div>
+<div class="section-heading"><h3>F존 (1분마다 갱신)</h3><button id="preview" disabled>지금 F존 보기</button></div>
+<p id="watchMeta" class="muted">—</p>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">고가라인</th><th class="num">F2 (−10%)</th><th class="num">F3 (−12%)</th><th class="num">지금</th><th class="num">고가 대비</th></tr></thead><tbody id="watchRows"><tr><td colspan="6" class="empty">감시 전</td></tr></tbody></table></div>
+<h3 style="margin-top:18px">오늘 걸린 자리</h3>
+<div class="table-scroll"><table><thead><tr><th>시각</th><th>종목</th><th class="num">고가라인</th><th class="num">F2</th><th class="num">F3</th><th>비고</th></tr></thead><tbody id="setupRows"><tr><td colspan="6" class="empty">아직 F2에 닿은 대장주가 없습니다</td></tr></tbody></table></div>
+<p id="skipped" class="muted"></p></section></div>
+<section class="panel"><div class="section-heading"><h2>보유 · 매도 예정</h2><span class="muted">투입 <b id="invested">0</b>원 / 상한 <b id="capShown">—</b>원</span></div>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">수량</th><th class="num">평단</th><th>받은 자리</th><th>매수일</th><th>상태</th><th>비고</th></tr></thead><tbody id="positions"><tr><td colspan="7" class="empty">보유 없음</td></tr></tbody></table></div></section>
+<section class="panel"><div class="section-heading"><h2>주문 기록</h2><button id="reconcile" disabled>체결 다시 조회</button></div>
+<div class="table-scroll"><table><thead><tr><th>시각</th><th>종목</th><th>자리</th><th class="num">수량</th><th class="num">가격</th><th>상태</th><th>비고</th></tr></thead><tbody id="orders"><tr><td colspan="7" class="empty">주문 기록 없음</td></tr></tbody></table></div></section>
+<section class="panel guide"><h2>알아두세요</h2><ul>
+<li>대장주가 하루에 10% 빠지는 날에만 걸립니다. 제작자 자료로 1년에 53번이었습니다. <b>며칠씩 아무 일도 없는 게 정상</b>입니다.</li>
+<li>서버가 10:00~15:19와 다음 날 아침에 떠 있어야 합니다. 15:19 취소를 못 하면 F3 주문이 그대로 남습니다.</li>
+<li>손절이 없습니다. 다음 날 시초가에 무조건 팝니다.</li>
+<li>문서의 미수 2.5배는 쓰지 않고 현금으로만 삽니다.</li>
+<li>비상 정지는 새 주문만 막습니다. 이미 접수된 주문은 키움에서 직접 취소하세요.</li></ul></section>
+<footer>대장 눌림목은 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/leaderdip.js?v=1" defer></script></body></html>

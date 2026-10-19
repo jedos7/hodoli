@@ -8,6 +8,8 @@
     '/custom-exit.html': {name:'themeRadarCustomExit', width:1680},
     '/closebet.html': {name:'themeRadarCloseBet', width:1500},
     '/horizonbuy.html': {name:'themeRadarHorizonBuy', width:1500},
+    '/firebar.html': {name:'themeRadarFireBar', width:1500},
+    '/leaderdip.html': {name:'themeRadarLeaderDip', width:1500},
   };
   const current = routes[location.pathname];
   if (current) window.name = current.name;
