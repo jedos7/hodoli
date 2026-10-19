@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 호라이즌존 자동매수</title><link rel="stylesheet" href="/auto-buy.css?v=2"><script src="/app-windows.js?v=2" defer></script>
+<style>
+.hb-grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
+@media(max-width:1000px){.hb-grid{grid-template-columns:1fr}}
+.hb-settings label{display:block;margin:10px 0 4px;font-size:13px;color:#b9c6d8}
+.hb-settings input[type=number]{width:100%;padding:8px 10px;background:#0f1520;color:#edf4ff;border:1px solid #38485f;border-radius:6px;font:inherit}
+.hb-settings .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hb-mode{display:flex;gap:10px;margin-top:6px}.hb-mode label{flex:1;margin:0;padding:10px;border:1px solid #38485f;border-radius:8px;cursor:pointer;text-align:center}
+.hb-mode input{margin-right:6px}.hb-mode label.live{border-color:#d94c4c}.hb-mode label.on{background:#1d2a3e}
+.hb-live-confirm{margin-top:8px;padding:10px;background:#3a1c1c;border:1px solid #d94c4c;border-radius:8px;font-size:13px}
+.hb-timeline{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}.hb-timeline span{padding:5px 10px;background:#17202d;border-radius:99px;font-size:12px;color:#b9c6d8}
+.hb-timeline span.done{color:#8fe3a8;background:#15301f}
+.grade{display:inline-block;min-width:22px;padding:1px 7px;border-radius:4px;font-size:12px;font-weight:700;text-align:center}
+.grade.S{background:#4a3a12;color:#efc766}.grade.A{background:#352a4a;color:#c3a8ea}.grade.B{background:#1f3448;color:#9cc4ea}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:7px 8px;border-bottom:1px solid #243041;text-align:left;vertical-align:top}th{color:#b9c6d8;font-weight:600;font-size:12.5px}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:#8da0b8;font-size:12.5px}
+button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer}
+.rulebox{background:#141b25;border:1px solid #2a3647;border-left:3px solid #e0a040;border-radius:6px;padding:12px 14px;font-size:13px;line-height:1.75;color:#c3d0e0}
+.rulebox b{color:#efc766}
+</style></head>
+<body><header><a href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기">⌁ 호라이즌</a><span class="mode">호라이즌존 자동매수</span><nav aria-label="매매 화면 이동"><a class="return-link" href="/horizon.html" target="themeRadarHorizon">← 관제탑</a><a class="return-link" href="/closebet.html" target="themeRadarCloseBet">🌙 종가배팅</a><a class="return-link" href="/custom-exit.html" target="themeRadarCustomExit">내 조건 자동매도</a></nav></header>
+<main>
+<section class="hero"><div><p class="eyebrow">기준봉 → D+1 횡보 → D+2 저점 유지 → <b>정오 매수</b></p><h1>🌅 호라이즌존 자동매수</h1><p class="intro">관제탑이 <b>D+2 12:00 정각</b>에 "정오 조건 충족"으로 올린 자리를 그 자리에서 삽니다.<br>체결되면 기존 호라이즌 자동매도(익절 +15%에 70% · 손절 −10% · 청산날)에 자동으로 넘깁니다.</p></div>
+<div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
+<section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
+<div id="error" class="alert" role="alert" hidden></div>
+<div class="hb-grid">
+<section class="panel hb-settings"><p class="eyebrow">01 · 설정</p><h2>한 자리에 얼마</h2>
+<form id="settingsForm">
+<div class="hb-mode"><label id="modeDryLabel"><input type="radio" name="mode" value="dry" id="modeDry"> 흉내 (기록만)</label><label id="modeLiveLabel" class="live"><input type="radio" name="mode" value="live" id="modeLive"> 실전 전송</label></div>
+<div id="liveConfirm" class="hb-live-confirm" hidden><label style="margin:0"><input type="checkbox" id="confirmLive"> 실전 계좌로 실제 주문이 나가는 것을 이해했습니다. 제작자 자료는 73자리 PF 9.4지만 1년치 표본이고, 2~4일 들고 가므로 갭 손실이 날 수 있습니다.</label></div>
+<label><input type="checkbox" id="enabled"> 자동매수 켜기 (끄면 아무것도 사지 않음)</label>
+<label><input type="checkbox" id="linkExit"> 체결되면 호라이즌 자동매도 자동 연결 (권장)</label>
+<div class="row"><div><label for="slotAmount">한 자리 금액 (원)</label><input id="slotAmount" type="number" min="10000" step="10000"></div><div><label for="totalCap">총 투입 상한 (원, 999만 이하)</label><input id="totalCap" type="number" min="10000" max="9990000" step="10000"></div></div>
+<div class="row"><div><label for="maxPositions">최대 자리 수 (≤5)</label><input id="maxPositions" type="number" min="1" max="5"></div><div><label for="minBase">기준봉 대금 문턱 (억)</label><input id="minBase" type="number" min="100" step="100"></div></div>
+<p class="help"><b>S 등급은 두 자리</b>를 씁니다(한 자리 금액 × 2). A·B는 한 자리입니다. 수량은 호가 총잔량과 주문가능 금액 안에서 깎입니다.</p>
+<button id="save" class="primary" type="submit" disabled>설정 저장</button><p id="saveNote" class="help" role="status"></p></form>
+<section class="rulebox" style="margin-top:14px">
+<b>사는 조건</b> (관제탑 판정 + 여기 거름망)<br>
+기준봉(상한가형 또는 대금폭발형) → 앞 10거래일 중복 없음 → D+1 고가 +15% 미만·오후 횡보 → D+2 오전 D+1 저가 유지·폭 4%↑ → <b>12:00 정각 충족</b><br>
+여기서 더: 주가 1,000원↑ · 기준봉 대금 문턱↑ · 등급 S·A·B<br><br>
+<b>파는 조건</b> (자동매도가 맡음)<br>
+손절 −10% 전량 · 익절 +15%에 70% 지정가 → 남은 건 고점 −3% 트레일링 · 청산날(산 날 +2거래일) 본전 지정가 → 15:20 종가 전량
+</section></section>
+<section class="panel"><p class="eyebrow">02 · 오늘</p><h2>오늘 흐름</h2>
+<div class="hb-timeline" id="timeline"></div>
+<div class="section-heading"><h3>정오 자리</h3><button id="preview" disabled>지금 자리 미리보기</button></div>
+<p id="pickMeta" class="muted">—</p>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th>등급</th><th class="num">기준봉 대금</th><th class="num">주가</th><th class="num">자리</th></tr></thead><tbody id="pickRows"><tr><td colspan="5" class="empty">아직 자리 없음</td></tr></tbody></table></div>
+<p id="skipped" class="muted"></p></section></div>
+<section class="panel"><div class="section-heading"><h2>보유 · 자동매도 연결</h2><span class="muted">투입 <b id="invested">0</b>원 / 상한 <b id="capShown">—</b>원</span></div>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th>등급</th><th class="num">수량</th><th class="num">평단</th><th>매수일</th><th>상태</th><th>비고</th></tr></thead><tbody id="positions"><tr><td colspan="7" class="empty">보유 없음</td></tr></tbody></table></div></section>
+<section class="panel"><div class="section-heading"><h2>주문 기록</h2><button id="reconcile" disabled>체결 다시 조회</button></div>
+<div class="table-scroll"><table><thead><tr><th>시각</th><th>종목</th><th class="num">수량</th><th class="num">매수가</th><th>상태</th><th>비고</th></tr></thead><tbody id="orders"><tr><td colspan="6" class="empty">주문 기록 없음</td></tr></tbody></table></div></section>
+<section class="panel guide"><h2>알아두세요</h2><ul>
+<li><b>12:00 정각 1분</b>에만 삽니다. 그 시각에 서버와 관제탑 수집이 돌고 있어야 합니다. 자동매수를 켜 두면 관제탑 수집이 자동으로 시작됩니다.</li>
+<li>문서에는 주문 방식이 없어 <b>매도1호가 +2틱 지정가</b>로 삽니다(종가배팅과 같은 방식). 시장가로 쓸어 담지 않습니다.</li>
+<li>문서의 미수 2.5배는 쓰지 않고 <b>현금</b>으로만 삽니다. 총 투입 상한은 1,000만 원 미만으로 고정입니다.</li>
+<li>체결되면 자동매도로 넘깁니다. 연결에 실패하면 텔레그램으로 알리니 자동매도 화면에서 직접 켜세요.</li>
+<li>비상 정지는 새 주문만 막습니다. 이미 산 종목은 자동매도가 계속 들고 갑니다.</li>
+</ul></section>
+<footer>호라이즌존 자동매수는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/horizonbuy.js?v=1" defer></script></body></html>

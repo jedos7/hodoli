@@ -12,6 +12,7 @@
 | [INTRADAY_SESSION_FIX.md](INTRADAY_SESSION_FIX.md) | 장중 접속 시 장 상태 판정 수정 기록 |
 | [호라이즌_매매법_넷.html](호라이즌_매매법_넷.html) | **원본 규칙 문서** (2026-10-19 변성환 제공): 네 매매법의 매수·매도 조건 전부 |
 | [장세와 매매 성적.html](장세와 매매 성적.html) | 원본 자료: 장세 지표별 매매 성적 (유동성·대금·상한가·예탁금·반대매매) |
+| [HORIZONBUY.md](HORIZONBUY.md) | 호라이즌존 자동매수 (D+2 12:00 정오 매수 → 기존 자동매도 연결) |
 | [CLOSEBET.md](CLOSEBET.md) | 종가배팅 자동매매 (변성환 규칙): 흐름, 조건, 수량, 안전장치, 검증 결과 |
 
 공식 키움 REST API 명세: https://github.com/Kiwoom-Securities/Kiwoom-REST-API

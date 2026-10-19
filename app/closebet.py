@@ -272,6 +272,20 @@ class CloseBet(AutoExit):
     def held_codes(self):
         return [c for c, p in self.positions.items() if p['status'] in ('held', 'selling')]
 
+    def committed(self):
+        """보유한 돈 + 아직 보유로 안 잡힌 접수·미확정 매수 주문 금액.
+        실전에서는 체결 확인 전까지 보유가 안 잡히므로, 이걸 안 쓰면 같은 묶음 안에서 총액 상한이 뚫린다."""
+        spent = self.invested()
+        for o in self.orders:
+            if o['side'] != 'buy' or o.get('dry') or o['status'] not in PENDING:
+                continue
+            p = self.positions.get(o['code'])
+            if p and p.get('buy_order') == o['id'] and p['status'] in ('held', 'selling'):
+                continue
+            spent += o['quantity'] * o['limit_price']
+        return spent
+
+
     def peer_busy(self, code):
         for peer in self.peers:
             if peer.plans.get(code, {}).get('status') in ('prepared', 'armed', 'checking', 'ordered', 'remainder_check') or peer.blocked(code):
@@ -386,7 +400,7 @@ class CloseBet(AutoExit):
                 broker = self.broker()
                 book = await broker.book(code)
                 five = await broker.minutes(code, '5')
-                remaining = self.settings['total_cap'] - self.invested()
+                remaining = self.settings['total_cap'] - self.committed()
                 price = buy_price(book['ask'])        # 매도1호가 + 2틱
                 cap_qty = 10 ** 8
                 if self.live():

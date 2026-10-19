@@ -7,6 +7,7 @@
     '/autoexit.html': {name:'themeRadarAutoExit', width:1280},
     '/custom-exit.html': {name:'themeRadarCustomExit', width:1680},
     '/closebet.html': {name:'themeRadarCloseBet', width:1500},
+    '/horizonbuy.html': {name:'themeRadarHorizonBuy', width:1500},
   };
   const current = routes[location.pathname];
   if (current) window.name = current.name;

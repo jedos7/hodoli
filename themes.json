@@ -62,7 +62,7 @@
    "newsAt": "",
    "newsPress": "뉴스1",
    "newsScore": 4,
-   "updatedAt": "2026-10-19T12:46:48"
+   "updatedAt": "2026-10-19T13:22:17"
   },
   {
    "id": "nv520",
@@ -131,7 +131,7 @@
    "newsAt": "",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-10-19T12:46:49"
+   "updatedAt": "2026-10-19T13:22:18"
   },
   {
    "id": "nv166",
@@ -186,7 +186,7 @@
    "newsAt": "2026-10-19 10:35",
    "newsPress": "KBS",
    "newsScore": 4,
-   "updatedAt": "2026-10-19T12:46:50"
+   "updatedAt": "2026-10-19T13:22:19"
   },
   {
    "id": "nv36",
@@ -194,7 +194,7 @@
    "name": "해운",
    "grade": "A",
    "report": "리포트 7일 4건 · 증권사 3곳 · 최근 하나 10/15",
-   "news": "HMM — HMM, 컨테이너선 12척에 2조2000억원 투자…선대 경쟁력 강화",
+   "news": "HMM — \"HMM, 2년만에 1조원대 영업익 달성…투자 '중립' 유지\"-한투",
    "chg": 4.9,
    "chg3d": 0.0,
    "up": 6,
@@ -253,11 +253,11 @@
     "신한투자증권",
     "유안타증권"
    ],
-   "newsUrl": "https://n.news.naver.com/mnews/article/030/0003475802",
-   "newsAt": "2026-10-16 13:18",
+   "newsUrl": "https://n.news.naver.com/mnews/article/008/0005428071",
+   "newsAt": "2026-10-19 08:53",
    "newsPress": "뉴스1",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:51"
+   "updatedAt": "2026-10-19T13:22:20"
   },
   {
    "id": "nv449",
@@ -265,7 +265,7 @@
    "name": "2차전지(생산)",
    "grade": "A",
    "report": "리포트 7일 8건 · 증권사 6곳 · 최근 삼성 10/15",
-   "news": "삼성SDI — \"미국 사업 사실상 포기\" 백기 든 중국 ESS 기업들...2차전지주 '불기...",
+   "news": "LG에너지솔루션 — \"미국 사업 사실상 포기\" 백기 든 중국 ESS 기업들...2차전지주 '불기...",
    "chg": 4.18,
    "chg3d": 0.0,
    "up": 3,
@@ -308,7 +308,7 @@
    "newsAt": "2026-10-19 11:20",
    "newsPress": "매일신문",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:52"
+   "updatedAt": "2026-10-19T13:22:21"
   },
   {
    "id": "nv177",
@@ -364,7 +364,7 @@
    "newsAt": "2026-10-19 07:50",
    "newsPress": "뉴시스",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:52"
+   "updatedAt": "2026-10-19T13:22:21"
   },
   {
    "id": "nv592",
@@ -372,7 +372,7 @@
    "name": "부동산 보유 자산주",
    "grade": "B",
    "report": "리포트 7일 2건 · 증권사 2곳 · 최근 교보 10/19",
-   "news": "IPARK현대산업개발 — [부동산 100자 정보] 3기 신도시 첫 민간 분양 카이브 유보라 외",
+   "news": "이마트 — ‘자이갤러리’ 부지에 들어서는 랜드마크… ‘연제갤러리자이’ 499...",
    "chg": 3.7,
    "chg3d": 0.0,
    "up": 18,
@@ -431,11 +431,11 @@
     "신한투자증권",
     "한화투자증권"
    ],
-   "newsUrl": "https://n.news.naver.com/mnews/article/023/0004004535",
-   "newsAt": "2026-10-19 00:37",
+   "newsUrl": "https://n.news.naver.com/mnews/article/014/0005591114",
+   "newsAt": "2026-10-19 13:05",
    "newsPress": "",
    "newsScore": null,
-   "updatedAt": "2026-10-19T12:46:54"
+   "updatedAt": "2026-10-19T13:22:22"
   },
   {
    "id": "nv559",
@@ -504,7 +504,7 @@
    "newsAt": "2026-10-18 13:00",
    "newsPress": "디지털데일리",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:55"
+   "updatedAt": "2026-10-19T13:22:24"
   },
   {
    "id": "nv600",
@@ -512,7 +512,7 @@
    "name": "주유소",
    "grade": "B",
    "report": "리포트 7일 없음",
-   "news": "HD현대 — HD현대, 美서 무인수상함 자율운항 첫 시연",
+   "news": "HD현대 — 'HD현대 정기선號' 1년…경영은 모범생, 투자는 승부사",
    "chg": 2.81,
    "chg3d": 0.0,
    "up": 13,
@@ -543,11 +543,11 @@
    ],
    "reportCount": 0,
    "brokers": [],
-   "newsUrl": "https://n.news.naver.com/mnews/article/629/0000543244",
-   "newsAt": "2026-10-19 11:49",
+   "newsUrl": "https://n.news.naver.com/mnews/article/015/0005343684",
+   "newsAt": "2026-10-18 17:23",
    "newsPress": "헤럴드경제",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:55"
+   "updatedAt": "2026-10-19T13:22:24"
   },
   {
    "id": "nv79",
@@ -613,7 +613,7 @@
    "newsAt": "2026-10-19 11:23",
    "newsPress": "뉴스1",
    "newsScore": 2,
-   "updatedAt": "2026-10-19T12:46:56"
+   "updatedAt": "2026-10-19T13:22:25"
   },
   {
    "id": "nv488",
@@ -684,7 +684,7 @@
    "newsAt": "2026-10-16 17:55",
    "newsPress": "머니투데이",
    "newsScore": 4,
-   "updatedAt": "2026-10-19T12:46:57"
+   "updatedAt": "2026-10-19T13:22:26"
   },
   {
    "id": "nv329",
@@ -761,7 +761,7 @@
    "newsAt": "2026-10-17 14:00",
    "newsPress": "파이낸셜뉴스",
    "newsScore": 4,
-   "updatedAt": "2026-10-19T12:46:59"
+   "updatedAt": "2026-10-19T13:22:27"
   }
  ]
 }

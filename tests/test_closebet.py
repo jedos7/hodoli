@@ -317,3 +317,20 @@ def test_live_requires_real_env_and_rejected_order(eng, tmp_path):
     eng.now[0] = datetime(2026, 10, 19, 15, 20, 0, tzinfo=KST)
     run(eng.e.tick())
     assert eng.e.orders[-1]['status'] == 'rejected' and '000001' not in eng.e.positions
+
+
+def test_total_cap_holds_within_one_1519_batch(eng, monkeypatch):
+    """실전은 체결 확인 전까지 보유가 안 잡힌다 → 같은 묶음 안에서도 접수 금액을 총액 상한에 포함해야 한다."""
+    import app.closebet as cb
+    rows = [{'code': f'00000{i}', 'name': f'종목{i}', 'price': 10000, 'amount_eok': 500 - i, 'chg': 6.0} for i in (1, 2, 3)]
+
+    async def ranking(market):
+        return rows if market == '001' else []
+    eng.b.ranking = ranking
+    eng.e.update_settings({'mode': 'live', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 3,
+                           'total_cap': 700_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(eng.e.scan())
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    spent = sum(q * px for kind, _, q, px in eng.b.calls if kind == 'buy')
+    assert eng.b.calls and spent <= 700_000, (eng.b.calls, spent)

@@ -34,6 +34,8 @@
 
   GET  /api/nxtclose          19:50 NXT 하락 마감 종가배팅 후보 (KRX 종가 대비 NXT 가격). POST /api/nxtclose/run 즉시 점검
 
+  GET  /api/horizonbuy        호라이즌존 자동매수 상태 (D+2 12:00 정오 매수 → 자동매도 연결). POST /settings · /stop · /preview · /reconcile — 화면 /horizonbuy.html
+
   GET  /api/closebet          종가배팅 자동매매 상태 (설정·오늘 후보·보유·주문). POST /settings · /stop · /scan(미리보기) · /reconcile — 화면 /closebet.html
 
   GET  /api/notify            텔레그램 알림 상태 · GET /api/notify/chatid 채팅 ID 찾기 · POST /api/notify/test 테스트 전송
@@ -111,6 +113,8 @@ from app.custom_exit_service import CustomExitService, create_custom_exit_router
 from app.auto_buy_service import AutoBuyService, create_auto_buy_router
 
 from app.closebet_service import CloseBetService, create_closebet_router
+
+from app.horizonbuy_service import HorizonBuyService, create_horizonbuy_router
 
 from app.horizon_service import HorizonService, create_horizon_router
 
@@ -847,6 +851,8 @@ async def lifespan(app: FastAPI):
 
     await closebet_service.start()
 
+    await horizonbuy_service.start()
+
     log.info("돌파 감시 목록 %d종목 (%s)", len(state.watch.items), state.watch.loaded_from)
 
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
@@ -876,6 +882,8 @@ async def lifespan(app: FastAPI):
             t.cancel()
 
         await horizon_service.stop()
+
+        await horizonbuy_service.stop()
 
         await closebet_service.stop()
 
@@ -920,6 +928,11 @@ app.include_router(create_closebet_router(closebet_service))
 horizon_service = HorizonService(settings, lambda: feed, lambda: state)
 
 app.include_router(create_horizon_router(horizon_service))
+
+horizonbuy_service = HorizonBuyService(settings, sell_service, horizon_service, exit_service,
+                                       custom_exit_service, auto_buy_service, closebet_service, notifier)
+
+app.include_router(create_horizonbuy_router(horizonbuy_service))
 
 price_chart_service = PriceChartService(lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 
