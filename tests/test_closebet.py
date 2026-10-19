@@ -334,3 +334,18 @@ def test_total_cap_holds_within_one_1519_batch(eng, monkeypatch):
     run(eng.e.tick())
     spent = sum(q * px for kind, _, q, px in eng.b.calls if kind == 'buy')
     assert eng.b.calls and spent <= 700_000, (eng.b.calls, spent)
+
+
+def test_stop_never_blocks_selling_or_cancelling(eng):
+    """비상 정지·자동매매 끄기는 새 매수만 막는다. 이미 산 종목은 다음 날 반드시 팔려야 한다."""
+    eng.e.update_settings({'mode': 'live', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    eng.e.positions['000001'] = {'code': '000001', 'name': '종목A', 'quantity': 10, 'average': 10000,
+                                 'bought_on': '2026-10-19', 'status': 'held', 'dry': False}
+    eng.b.rows['000001'] = {'code': '000001', 'name': '종목A', 'quantity': 10, 'available': 10, 'average': 10000.0}
+    eng.e.persist()
+    eng.e.stop()                                        # 비상 정지
+    eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
+    run(eng.e.tick())
+    assert ('sell', '000001', 10) in eng.b.calls
+    assert eng.e.positions['000001']['status'] == 'selling'

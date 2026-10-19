@@ -240,3 +240,13 @@ def test_dry_mode_records_both_halves_as_one_holding(eng):
     assert eng.b.calls == []
     p = eng.e.positions['000001']
     assert p['dry'] and p['quantity'] == 111 and 8800 < p['average'] < 9000
+
+
+def test_stop_does_not_block_cancelling_unfilled_buys(eng):
+    """비상 정지해도 15:19 미체결 취소는 보낸다. 미체결 매수를 밤새 남기는 쪽이 더 위험하다."""
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    eng.e.stop()
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 0, tzinfo=KST)
+    run(eng.e.tick())
+    assert sorted(eng.b.cancels) == ['ord1', 'ord2']

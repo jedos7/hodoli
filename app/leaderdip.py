@@ -294,10 +294,10 @@ class LeaderDip(CloseBet):
             epoch = self.epoch
             try:
                 async with self.lock:
-                    self.guard_live(epoch)
+                    self.guard_sell(epoch)      # 취소는 비상 정지해도 막지 않는다 (미체결 매수를 남기는 쪽이 더 위험)
                     o['cancel_sent'] = now.isoformat()
                     self.persist()      # 취소 의도를 먼저 남긴다
-                    await self.broker().cancel_once(o, lambda: self.guard_live(epoch))
+                    await self.broker().cancel_once(o, lambda: self.guard_sell(epoch))
                     o['note'] = f"{o.get('zone', '')} 미체결 잔량 취소 요청 · 키움에서 확인"
                     cancelled.append(f"{o['name']} {o.get('zone', '')}")
             except Exception as exc:

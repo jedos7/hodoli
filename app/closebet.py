@@ -300,11 +300,22 @@ class CloseBet(AutoExit):
         return False
 
     def guard_live(self, epoch):
+        """새 **매수** 전송 직전 확인. 자동매매가 꺼져 있으면 사지 않는다."""
         if not self.live():
             return
         self.gate()
         if epoch != self.epoch or not self.settings['enabled']:
             raise NotSent(f'{self.label}이 꺼졌습니다')
+
+    def guard_sell(self, epoch):
+        """**매도·취소** 전송 직전 확인. 자동매매를 끄거나 비상 정지해도 막지 않는다.
+        이미 산 종목은 다음 날 시초가에 반드시 팔아야 하고, 미체결 매수 취소는 위험을 줄이는 쪽이다.
+        연결·저장 상태와 '전송 준비 중 상태 변경' 만 본다."""
+        if not self.live():
+            return
+        self.gate()
+        if epoch != self.epoch:
+            raise NotSent('전송 준비 중 상태가 바뀌었습니다 · 다시 확인하세요')
 
     # ── 1초마다 ──
     async def tick(self):
@@ -513,7 +524,7 @@ class CloseBet(AutoExit):
                     p['status'], p['sold_on'] = 'sold', now.date().isoformat()
                     self.persist()
                     return True
-                self.guard_live(epoch)
+                self.guard_sell(epoch)
                 if self.blocked(code):
                     raise NotSent('이 종목에 미확정 주문이 있음 · 재전송 차단')
                 if self.peer_busy(code):
@@ -529,13 +540,13 @@ class CloseBet(AutoExit):
                 qty = min(p['quantity'], row['available'])
                 if qty <= 0:
                     raise NotSent('주문가능 수량 0')
-                self.guard_live(epoch)
+                self.guard_sell(epoch)
                 order = {'id': secrets.token_hex(12), 'side': 'sell', 'code': code, 'name': p['name'], 'quantity': qty, 'reason': reason,
                          'environment': self.env, 'day': now.date().isoformat(), 'at': now.isoformat(), 'status': 'submitting', 'order_no': '',
                          'filled': 0, 'remaining': qty, 'note': '시장가 매도 전송 중', 'checked_at': None, 'dry': False}
                 self.orders.append(order)
                 self.persist()
-                order['order_no'] = await broker.sell_market_once(code, qty, lambda: self.guard_live(epoch))
+                order['order_no'] = await broker.sell_market_once(code, qty, lambda: self.guard_sell(epoch))
                 order['status'], order['note'] = 'accepted', '시장가 매도 접수 · 체결 확인 중'
                 p['status'], p['sell_order'] = 'selling', order['id']
                 self.persist()
