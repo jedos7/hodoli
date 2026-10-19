@@ -68,6 +68,8 @@
 
 검증 기간이 1년 남짓이고 2~4일 들고 가므로 갭 손실이 날 수 있습니다. 원본은 [호라이즌_매매법_넷.html](호라이즌_매매법_넷.html)과 [장세와 매매 성적.html](장세와%20매매%20성적.html)에 그대로 보관돼 있습니다.
 
+오늘이 이 매매법에 유리한 날인지는 화면의 **오늘 장세** 줄에 나옵니다 ([REGIME.md](REGIME.md)). 표시만 하고 매수는 그대로 돕니다.
+
 ## API
 
 `GET /api/horizonbuy` 상태 · `POST /api/horizonbuy/settings` · `POST /api/horizonbuy/stop` 비상 정지 · `POST /api/horizonbuy/preview` 지금 자리 미리보기(11시 미리보기 포함, 저장·주문 없음) · `POST /api/horizonbuy/reconcile`. 로컬 주소·같은 출처·화면 토큰만 받습니다. 저장 파일 `data/horizonbuy_<계좌해시>.json`.

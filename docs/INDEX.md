@@ -17,6 +17,7 @@
 | [LEADERDIP.md](LEADERDIP.md) | 대장 눌림목 (🗻): 코스피 대장주 F존에서 반씩 받고 다음 날 시초가 매도 |
 | [CLOSEBET.md](CLOSEBET.md) | 종가배팅 자동매매 (변성환 규칙): 흐름, 조건, 수량, 안전장치, 검증 결과 |
 | [BREAKERS.md](BREAKERS.md) | 차단기(안전장치): 예탁자산 −12% · 주문 거부 6건 · 매수 건수·금액 · 되풀이 매매 |
+| [REGIME.md](REGIME.md) | 오늘 장세 맥락(표시만): 전날 코스피·S&P·원달러로 보는 좋은 칸/나쁜 칸 |
 | [API_RATE.md](API_RATE.md) | 키움 조회 초당 3건을 누가 쓰는지 보는 법, 겹쳐 보내기(fanout), 재시작 주의 |
 
 공식 키움 REST API 명세: https://github.com/Kiwoom-Securities/Kiwoom-REST-API

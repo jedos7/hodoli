@@ -119,6 +119,8 @@ from app.auto_buy_service import AutoBuyService, create_auto_buy_router
 
 from app.breakers import create_breakers, create_breakers_router
 
+from app.regime import Regime, create_regime_router
+
 from app.closebet_service import CloseBetService, create_closebet_router
 
 from app.horizonbuy_service import HorizonBuyService, create_horizonbuy_router
@@ -959,6 +961,12 @@ closebet_service = CloseBetService(settings, sell_service, exit_service, custom_
 app.include_router(create_closebet_router(closebet_service))
 
 app.include_router(create_breakers_router(breakers))
+
+# 오늘 장세 맥락 (표시만 · 매수 여부는 바꾸지 않는다). app/regime.py
+
+regime = Regime(autosell_now_kst)
+
+app.include_router(create_regime_router(regime))
 
 horizon_service = HorizonService(settings, lambda: feed, lambda: state)
 

@@ -57,6 +57,8 @@
 
 **1년에 53번**입니다. 며칠씩 아무 일도 없는 것이 정상입니다. 손절이 없으므로 다음 날 더 빠지면 그대로 떠안습니다.
 
+오늘이 이 매매법에 유리한 날인지는 화면의 **오늘 장세** 줄에 나옵니다 ([REGIME.md](REGIME.md)). 표시만 하고 매수는 그대로 돕니다.
+
 ## API
 
 `GET /api/leaderdip` · `POST /api/leaderdip/settings` · `/stop` · `/scan`(지금 F존 보기) · `/reconcile`. 로컬 주소·같은 출처·화면 토큰(`X-Leaderdip-Token`)만 받습니다. 저장 파일 `data/leaderdip_<계좌해시>.json`.

@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 기준봉 종가</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=2"><script src="/app-windows.js?v=2" defer></script></head>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 기준봉 종가</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=3"><script src="/app-windows.js?v=2" defer></script></head>
 <body><header><a href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기">⌁ 호라이즌</a><span class="mode">기준봉 종가</span><nav aria-label="매매 화면 이동"><a class="return-link" href="/horizon.html" target="themeRadarHorizon">← 관제탑</a><a class="return-link" href="/horizonbuy.html" target="themeRadarHorizonBuy">🌅 호라이즌존</a><a class="return-link" href="/leaderdip.html" target="themeRadarLeaderDip">🗻 대장 눌림목</a><a class="return-link" href="/closebet.html" target="themeRadarCloseBet">🌙 종가배팅</a></nav></header>
 <main>
 <section class="hero"><div><p class="eyebrow">15:10 후보 → 15:19:40 매수 → 다음 날 09:00 시초가 매도</p><h1>🔥 기준봉 종가</h1><p class="intro">오늘 대금이 터진 기준봉 가운데 <b>윗꼬리 없이</b> 마감하는 종목을 종가에 사서 다음 날 시초가에 팝니다.<br>손절 없이 무조건 시초가 매도입니다. 종가배팅보다 10초 먼저 주문합니다.</p></div>
 <div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
 <section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
 <section id="breakerBar" class="breakers" hidden></section>
+<section id="regimeBar" class="regime" data-key="firebar" hidden></section>
 <div id="error" class="alert" role="alert" hidden></div><div id="feedback" class="feedback" role="status" hidden></div>
 <div class="st-grid">
 <section class="panel st-settings"><p class="eyebrow">01 · 설정</p><h2>얼마를, 몇 종목까지</h2>
@@ -34,4 +35,4 @@
 <li>🌙 종가배팅과 같은 종목이 겹치면 먼저 산 쪽만 삽니다(서로 건드리지 않음).</li>
 <li>제작자 성적은 213번 PF 4.34이지만 네 매매를 같이 돌리면 129번 PF 3.20이고, 최근 30번은 2.44입니다.</li>
 <li>비상 정지는 새 주문만 막습니다. 이미 접수된 주문은 키움에서 직접 취소하세요.</li></ul></section>
-<footer>기준봉 종가는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/breakers.js?v=1" defer></script><script src="/firebar.js?v=1" defer></script></body></html>
+<footer>기준봉 종가는 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/breakers.js?v=1" defer></script><script src="/regime.js?v=1" defer></script><script src="/firebar.js?v=1" defer></script></body></html>

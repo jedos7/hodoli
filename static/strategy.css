@@ -32,3 +32,8 @@ button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-ra
 .breakers.tripped strong{color:#ffb4ab}.breakers.tripped p{color:#e6c3c0}.breakers.tripped p b{color:#ffd9d4}
 .breakers button{margin-left:auto;white-space:nowrap;background:#b23a3a;color:#fff;border:0;padding:9px 15px;border-radius:7px;font-weight:700;cursor:pointer}
 .breakers button:disabled{opacity:.5;cursor:wait}
+.regime{margin:-10px 0 20px;padding:10px 16px;border:1px solid #2a3647;border-left:3px solid #5b6b82;border-radius:8px;background:#131a24;font-size:12.5px}
+.regime strong{color:#b9c6d8}.regime p{margin:3px 0 0;color:#8da0b8;font-size:12px;line-height:1.7}
+.regime p b{color:#dce5f1}.regime p i{font-style:normal;color:#6f8097}
+.regime.good{border-left-color:#4a9a6a;background:#13201a}.regime.good strong{color:#9fe3b3}
+.regime.bad{border-left-color:#c07a3a;background:#241b14}.regime.bad strong{color:#efc766}
