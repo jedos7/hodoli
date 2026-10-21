@@ -93,6 +93,7 @@ def evaluate(row, daily, threshold_eok, today):
 
 class FireBar(CloseBet):
     label, icon = '기준봉 종가', '🔥'
+    gate_key = None                # 제작자 규칙에 🔥 맥락 문은 없다
     scan_window, buy_window = SCAN_WINDOW, BUY_WINDOW
 
     def __init__(self, *args, **kwargs):

@@ -37,3 +37,5 @@ button.danger{background:#b23a3a;color:#fff;border:0;padding:10px 16px;border-ra
 .regime p b{color:#dce5f1}.regime p i{font-style:normal;color:#6f8097}
 .regime.good{border-left-color:#4a9a6a;background:#13201a}.regime.good strong{color:#9fe3b3}
 .regime.bad{border-left-color:#c07a3a;background:#241b14}.regime.bad strong{color:#efc766}
+.regime.rest{border-left-color:#d94c4c;background:#2c1a1c}.regime.rest strong{color:#ffb4ab}
+.regime.rest p{color:#e6c3c0}.regime.rest p b{color:#ffd9d4}

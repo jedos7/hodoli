@@ -349,3 +349,37 @@ def test_stop_never_blocks_selling_or_cancelling(eng):
     run(eng.e.tick())
     assert ('sell', '000001', 10) in eng.b.calls
     assert eng.e.positions['000001']['status'] == 'selling'
+
+
+def test_rests_when_the_won_weakened_but_still_picks_candidates(eng):
+    """🧭 제작자 10-20 규칙: 전날 밤 원달러가 올랐으면(원화 약세) 🌙 은 그날 쉰다.
+    후보 선정은 그대로 해서 무엇을 건너뛰었는지 남기고, **매수만** 안 한다."""
+    async def gate(key):
+        assert key == 'closebet'
+        return True, '전날 원달러 +0.31% · 원화가 약해졌습니다 (원달러 오름)'
+    eng.e.gate_for = gate
+    eng.e.update_settings({'mode': 'live', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    assert eng.e.scans['2026-10-19']['passed'] == ['000001']    # 후보는 그대로 고른다
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert eng.b.calls == [] and eng.e.orders == []             # 전송도 기록도 없다
+    assert '원화' in eng.e.day()['resting']
+    assert any('오늘은 쉽니다' in n for n in eng.notes)
+
+
+def test_a_sell_still_goes_out_on_a_resting_day(eng):
+    """쉬는 날이어도 이미 산 종목은 다음 날 시초가에 판다."""
+    async def gate(key):
+        return True, '원화 약세'
+    eng.e.update_settings({'mode': 'dry', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    assert eng.e.positions['000001']['status'] == 'held'
+    eng.e.gate_for = gate                                       # 다음 날은 쉬는 날
+    eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
+    run(tick_and_wait(eng.e))
+    assert eng.e.positions['000001']['status'] == 'sold'

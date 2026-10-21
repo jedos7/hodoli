@@ -87,6 +87,7 @@ def zones(anchor):
 
 class LeaderDip(CloseBet):
     label, icon = '대장 눌림목', '🗻'
+    gate_key = 'leaderdip'         # 🧭 전날 코스피가 0% 위면 그날은 쉼
     fill_window = FILL_WINDOW
     normalizer = staticmethod(normalize_settings)
 
@@ -181,6 +182,7 @@ class LeaderDip(CloseBet):
             # 대장주 15분봉을 몇 개씩 겹쳐 받는다. 판단과 주문은 받은 뒤 **목록 순서대로** 한다 (자리 상한·몰린 날 셈이 어긋나지 않게).
             fetched = await fanout(codes, lambda c: broker.minutes(c, '15'))
             touched_today = {s['code'] for s in self.setups.values() if s['day'] == self.today()}
+            resting = await self.resting()      # 🧭 맥락 문 · 쉬는 날이어도 화면 값은 계속 갱신한다
             for code, got in zip(codes, fetched):
                 info = universe[code]
                 if isinstance(got, Exception):
@@ -195,7 +197,7 @@ class LeaderDip(CloseBet):
                 info.update(anchor=anchor, anchorAt=anchor_at, f2=f2, f3=f3, last=last,
                             gap=round((last / anchor - 1) * 100, 2) if anchor else None, at=now.isoformat())
                 key = f'{self.today()}:{code}'
-                if key in self.setups or anchor <= 0 or last >= f2:
+                if resting or key in self.setups or anchor <= 0 or last >= f2:
                     continue
                 if code in self.positions and self.positions[code]['status'] in ('held', 'selling'):
                     continue

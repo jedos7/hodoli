@@ -47,6 +47,14 @@ RULES = (
 STEADY = {'key': 'horizonbuy', 'icon': '🌅', 'label': '호라이즌존', 'cell': 'steady',
           'what': '맥락을 덜 탑니다', 'note': '어느 칸이든 PF 2.8 위'}
 
+# 🧭 맥락 문 — 제작자 프로그램의 **실제 규칙**(2026-10-20). 위 칸 표는 분석표이고, 쉬고 말고는 이 문이 정한다.
+#   🗻 "전날 코스피가 0% 위면 그날은 쉼" · 🌙 "전날 밤 원달러가 올랐으면(원화 약세) 그날은 쉼"
+#   원달러는 '그날 아침에 아는 값' 이라는 자료 규약대로 **앞 거래일 일간 등락**으로 본다.
+GATES = {
+    'leaderdip': (0.0, 'above', '전날 코스피가 올랐습니다', '0% 위면 쉼'),
+    'closebet': (0.0, 'above', '원화가 약해졌습니다 (원달러 오름)', '0% 위면 쉼'),
+}
+
 
 def edge(spec):
     """'+0.43% 위' · '0% 위' 처럼 사람이 읽는 문턱."""
@@ -147,8 +155,31 @@ class Regime:
                 out['rows'].append(dict(STEADY))
             except Exception as exc:
                 out['error'] = f'장세 맥락 조회 실패: {str(exc)[:100]}'
+            for row in out['rows']:
+                rule = GATES.get(row['key'])
+                if not rule or row.get('value') is None:
+                    continue
+                threshold, which, why, note = rule
+                row['rest'] = side(row['value'], threshold, which)
+                row['restRule'] = note
+                row['restWhy'] = f"{row['what']} {row['value']:+g}% · {why}" if row['rest'] else ''
             self.cached, self.at = out, now
             return out
+
+    async def gate(self, key):
+        """그 매매법이 오늘 **새로 사지 말아야** 하나 → (쉼, 까닭). 제작자 10-20 규칙 그대로.
+
+        맥락 값을 못 읽으면 막지 않는다(쉼 아님). 문은 기본 규칙에 **더한** 것이라,
+        자료가 끊겼다고 매매 자체를 바꾸지는 않는다."""
+        try:
+            d = await self.read()
+        except Exception as exc:
+            log.warning('맥락 문 조회 실패 (%s): %s', key, exc)
+            return False, ''
+        for row in d.get('rows') or []:
+            if row.get('key') == key:
+                return bool(row.get('rest')), row.get('restWhy', '')
+        return False, ''
 
 
 def create_regime_router(regime):

@@ -947,6 +947,10 @@ app.include_router(create_custom_exit_router(custom_exit_service))
 
 app.include_router(create_auto_buy_router(auto_buy_service))
 
+# 🧭 오늘 장세 맥락 — 표시와 '맥락 문'(🗻 전날 코스피 0% 위면 쉼 · 🌙 원화 약세면 쉼). app/regime.py
+
+regime = Regime(autosell_now_kst)
+
 # 차단기: 네 매매법(🌅 🗻 🔥 🌙)이 같이 쓴다. 걸리면 **새 매수만** 멈춘다 (매도는 막지 않음). app/breakers.py
 
 def _breakers_notify(text):
@@ -956,15 +960,11 @@ def _breakers_notify(text):
 breakers = create_breakers(settings, lambda: closebet_service.broker(), autosell_now_kst, notify=_breakers_notify)
 
 closebet_service = CloseBetService(settings, sell_service, exit_service, custom_exit_service, auto_buy_service,
-                                   notifier, breakers=breakers)
+                                   notifier, breakers=breakers, gate=regime.gate)
 
 app.include_router(create_closebet_router(closebet_service))
 
 app.include_router(create_breakers_router(breakers))
-
-# 오늘 장세 맥락 (표시만 · 매수 여부는 바꾸지 않는다). app/regime.py
-
-regime = Regime(autosell_now_kst)
 
 app.include_router(create_regime_router(regime))
 
@@ -986,7 +986,7 @@ firebar_service = OvernightService(settings, sell_service, exit_service, FireBar
 
 leaderdip_service = OvernightService(settings, sell_service, exit_service, LeaderDip, 'leaderdip',
                                      peers=_overnight_peers + (firebar_service.engine,), notifier=notifier,
-                                     breakers=breakers)
+                                     breakers=breakers, gate=regime.gate)
 
 firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
 

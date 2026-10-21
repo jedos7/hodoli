@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 import pytest
 
 from app.autosell import KST
-from app.regime import MAX_AGE_DAYS, RULES, Regime, cell, naver_index_change, yahoo_change
+from app.regime import GATES, MAX_AGE_DAYS, RULES, Regime, cell, naver_index_change, yahoo_change
 
 TODAY = date(2026, 10, 20)
 NOW = datetime(2026, 10, 20, 8, 0, tzinfo=KST)
@@ -141,3 +141,54 @@ def test_result_is_remembered_for_the_day(monkeypatch):
     assert len(client.urls) == calls                  # 30분 안에는 다시 받지 않는다
     asyncio.run(r.read(force=True))
     assert len(client.urls) > calls
+
+
+# ── 🧭 맥락 문 (제작자 10-20 실제 규칙) ──────────────────────
+def test_gate_rests_leaderdip_when_kospi_rose_yesterday(monkeypatch):
+    """제작자 규칙 그대로: 전날 코스피가 0% 위면 🗻 는 그날 쉰다 (분석표의 +2.3% 가 아니다)."""
+    r = Regime(lambda: NOW)
+    import app.regime as mod
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Client(payloads(kospi='0.01')))
+    assert asyncio.run(r.gate('leaderdip'))[0] is True
+    r2 = Regime(lambda: NOW)
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Client(payloads(kospi='-0.01')))
+    skip, why = asyncio.run(r2.gate('leaderdip'))
+    assert skip is False and why == ''
+
+
+def test_gate_rests_closebet_when_the_won_weakened(monkeypatch):
+    """전날 원달러가 올랐으면(원화 약세) 🌙 는 그날 쉰다."""
+    import app.regime as mod
+    r = Regime(lambda: NOW)
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Client(payloads(krw=(1330.0, 1331.0))))
+    assert asyncio.run(r.gate('closebet'))[0] is True
+    r2 = Regime(lambda: NOW)
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Client(payloads(krw=(1340.0, 1333.0))))
+    assert asyncio.run(r2.gate('closebet'))[0] is False
+
+
+def test_firebar_and_horizonbuy_have_no_gate(monkeypatch):
+    """제작자 규칙에 🔥·🌅 맥락 문은 없다."""
+    import app.regime as mod
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Client(payloads()))
+    r = Regime(lambda: NOW)
+    assert asyncio.run(r.gate('firebar')) == (False, '')
+    assert asyncio.run(r.gate('horizonbuy')) == (False, '')
+    assert set(GATES) == {'leaderdip', 'closebet'}
+
+
+def test_gate_does_not_block_when_the_value_cannot_be_read(monkeypatch):
+    """맥락을 못 읽으면 막지 않는다 — 문은 기본 규칙에 더한 것이라 자료가 끊겼다고 매매를 바꾸지 않는다."""
+    import app.regime as mod
+
+    class Broken:
+        async def get(self, *a, **k):
+            raise OSError('그물 끊김')
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+    monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Broken())
+    assert asyncio.run(Regime(lambda: NOW).gate('leaderdip')) == (False, '')

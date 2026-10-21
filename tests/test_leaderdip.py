@@ -250,3 +250,32 @@ def test_stop_does_not_block_cancelling_unfilled_buys(eng):
     eng.now[0] = datetime(2026, 10, 19, 15, 19, 0, tzinfo=KST)
     run(eng.e.tick())
     assert sorted(eng.b.cancels) == ['ord1', 'ord2']
+
+
+def test_rests_when_the_market_gate_says_so(eng):
+    """🧭 제작자 10-20 규칙: 전날 코스피가 0% 위면 🗻 는 그날 쉰다.
+    화면 값(F존)은 계속 갱신하되 **새 매수만** 멈춘다."""
+    async def gate(key):
+        assert key == 'leaderdip'
+        return True, '전날 코스피 등락 +3.29% · 전날 코스피가 올랐습니다'
+    uni = {'000001': {'code': '000001', 'name': '대장주A', 'cap_eok': 5_000_000}}
+
+    async def universe():
+        return uni
+    eng.e.universe, eng.e.gate_for = universe, gate
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    assert eng.b.calls == []                                  # 아무 주문도 안 나갔다
+    assert eng.e.setups == {}
+    assert '코스피' in eng.e.day()['resting']
+    assert any('오늘은 쉽니다' in n for n in eng.notes)
+    assert uni['000001'].get('f2')                            # F존 값은 그대로 갱신됐다
+
+
+def test_does_not_rest_when_the_gate_is_open(eng):
+    async def gate(key):
+        return False, ''
+    eng.e.gate_for = gate
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    assert eng.b.calls and not eng.e.day().get('resting')      # 평소처럼 산다

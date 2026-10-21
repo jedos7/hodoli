@@ -212,14 +212,17 @@ class CloseBet(AutoExit):
     🔥 기준봉 종가(app/firebar.py)와 🗻 대장 눌림목(app/leaderdip.py)이 이 클래스를 물려받아 후보·매수만 바꾼다."""
 
     label, icon = '종배', '🌙'
+    gate_key = 'closebet'          # 🧭 전날 밤 원달러가 올랐으면(원화 약세) 그날은 쉼
     scan_window, buy_window, fill_window = SCAN_WINDOW, BUY_WINDOW, FILL_WINDOW
     sell_end, retry_window = SELL_WINDOW[1], RETRY_WINDOW
     normalizer = staticmethod(normalize_settings)
 
-    def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None, breakers=None):
+    def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None,
+                 breakers=None, gate=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.peers, self.notify = peers, notify or (lambda text: None)
         self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
+        self.gate_for = gate                           # 🧭 맥락 문 (app/regime.py) · 없으면 안 막는다
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.scans, self.days = {}, {}, {}
         self.scan_task = None
@@ -302,6 +305,20 @@ class CloseBet(AutoExit):
             if peer.plans.get(code, {}).get('status') in ('prepared', 'armed', 'checking', 'ordered', 'remainder_check') or peer.blocked(code):
                 return True
         return False
+
+    async def resting(self):
+        """🧭 맥락 문: 오늘 이 매매법이 쉬어야 하나 (제작자 10-20 규칙). 하루 한 번만 알리고 기록한다."""
+        if not self.gate_for or not self.gate_key:
+            return False
+        skip, why = await self.gate_for(self.gate_key)
+        if not skip:
+            return False
+        if not self.day().get('resting'):
+            self.day()['resting'] = why
+            if self.owner and not self.error:
+                self.persist()
+            self.notify(f'{self.icon} {self.label} 오늘은 쉽니다 · {why}')
+        return True
 
     def guard_live(self, epoch):
         """새 **매수** 전송 직전 확인. 자동매매가 꺼져 있으면 사지 않는다."""
@@ -408,6 +425,8 @@ class CloseBet(AutoExit):
 
     # ── 15:19:50 매수 ──
     async def buy_all(self, now):
+        if await self.resting():
+            return
         scan = self.scans.get(self.today()) or {}
         picks = [r for r in scan.get('rows', []) if r.get('pass')]
         room = self.settings['max_positions'] - len(self.held_codes())
