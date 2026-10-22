@@ -23,6 +23,28 @@ class CloseBetBroker(KiwoomBuyOrders):
                         'amount_eok': num(r.get('trde_prica')) / 100, 'chg': num(r.get('flu_rt'))})
         return out
 
+    async def rising(self, market, top=50):
+        """ka10027 전일대비등락률 상위 (market '001' 코스피 · '101' 코스닥).
+
+        🔥 기준봉 종가는 거래대금 순위 밖의 급등주도 본다("등락률 상위 50 과 거래대금 상위에서 찾는다").
+        이 응답에는 거래대금이 없어 amount_eok 를 None 으로 두고, 일봉을 받을 때 오늘 봉의 대금으로 채운다."""
+        data, _ = await self.rest.post('/api/dostk/rkinfo', 'ka10027',
+                                       {'mrkt_tp': market, 'sort_tp': '1', 'trde_qty_cnd': '0000',
+                                        'stk_cnd': '0', 'crd_cnd': '0', 'updown_incls': '1',
+                                        'pric_cnd': '0', 'trde_prica_cnd': '0', 'stex_tp': '1'})
+        rows = data.get('pred_pre_flu_rt_upper')
+        if not isinstance(rows, list):
+            raise ValueError('등락률 순위 응답 형식 확인 필요')
+        out = []
+        for r in rows[:top]:
+            code = str(r.get('stk_cd', '')).strip()
+            if len(code) != 6:
+                continue
+            out.append({'code': code, 'name': str(r.get('stk_nm', '')).strip(),
+                        'price': abs(int(num(r.get('cur_prc')))), 'amount_eok': None,
+                        'chg': num(r.get('flu_rt')), 'src': '등락률'})
+        return out
+
     async def daily(self, code, days=80):
         """오늘 봉(장중 잠정)을 포함한 일봉, 오래된 순."""
         data, _ = await self.rest.post('/api/dostk/chart', 'ka10081', {'stk_cd': code, 'base_dt': date.today().strftime('%Y%m%d'), 'upd_stkpc_tp': '1'})

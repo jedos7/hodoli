@@ -41,7 +41,7 @@
     if (!scan) { $('scanMeta').textContent = '아직 후보 선정 전 (매 거래일 15:15 자동)'; $('scanRows').innerHTML = '<tr><td colspan="4" class="empty">아직 후보 선정 전</td></tr>'; return; }
     const rows = scan.rows || [], passed = rows.filter(r => r.pass);
     $('scanMeta').textContent = `${label} ${scan.at.slice(5, 16).replace('T', ' ')} · 대금 ${fmt(scan.threshold_eok)}억 넘는 ${rows.length}종목 중 통과 ${passed.length}${took(scan)}${scan.error ? ' · ' + scan.error : ''}`;
-    $('scanRows').innerHTML = rows.length ? rows.map(r => `<tr class="${r.pass ? 'pass' : ''}"><td><b>${esc(r.name)}</b> <small>${esc(r.code)}</small>${r.pass ? ' <b style="color:#9fe3b3">통과</b>' : ''}</td><td class="num">${fmt(Math.round(r.amount_eok))}억</td><td class="num">${Number(r.chg).toFixed(2)}%</td><td>${conds(r.checks)}</td></tr>`).join('')
+    $('scanRows').innerHTML = rows.length ? rows.map(r => `<tr class="${r.pass ? 'pass' : ''}"><td><b>${esc(r.name)}</b> <small>${esc(r.code)}</small>${r.pass ? ' <b style="color:#9fe3b3">통과</b>' : ''}</td><td class="num">${r.amount_eok == null ? '—' : fmt(Math.round(r.amount_eok)) + '억'}${r.src ? ' <small>' + esc(r.src) + '</small>' : ''}</td><td class="num">${Number(r.chg).toFixed(2)}%</td><td>${conds(r.checks)}</td></tr>`).join('')
       : `<tr><td colspan="4" class="empty">${scan.error || '문턱을 넘는 종목이 없습니다'}</td></tr>`;
   }
   function render(s) {

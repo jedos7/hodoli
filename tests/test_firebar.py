@@ -67,6 +67,7 @@ class Basic:
 class Broker:
     def __init__(self):
         self.calls, self.rows, self.failure = [], {}, None
+        self.rising_rows = []
         self.basic_info = Basic(12000, 12050)
         self.rest = SimpleNamespace(basic=self._basic)
         self.detail_response = {'filled': 0, 'remaining': 0, 'rejected': False}
@@ -76,6 +77,9 @@ class Broker:
 
     async def ranking(self, market):
         return [{'code': '000001', 'name': '종목A', 'price': 12000, 'amount_eok': 500, 'chg': 20.0}] if market == '001' else []
+
+    async def rising(self, market, top=50):
+        return self.rising_rows if market == '001' else []
 
     async def daily(self, code):
         return good()
@@ -284,3 +288,44 @@ def test_a_tripped_breaker_stops_the_buy_but_not_the_next_morning_sell(tmp_path,
     assert eng.b.calls == before                           # 아무것도 전송하지 않았다
     assert any('차단기' in x for x in eng.e.day()['skipped'])
     assert len(br.day()['buys']) == 0                      # 그 날 매수 기록도 없다
+
+
+def test_scan_also_looks_at_the_top_50_risers(eng):
+    """규칙 문서: "등락률 상위 50 과 거래대금 상위에서 찾는다".
+    거래대금 순위 100위 밖이라도 +15~29% 면 보고, 대금은 일봉에서 채운다."""
+    eng.b.rising_rows = [
+        {'code': '000002', 'name': '종목B', 'price': 12000, 'amount_eok': None, 'chg': 20.0, 'src': '등락률'},
+        {'code': '000003', 'name': '종목C', 'price': 12000, 'amount_eok': None, 'chg': 5.0, 'src': '등락률'},
+    ]
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    scan = eng.e.scans['2026-10-19']
+    codes = [r['code'] for r in scan['rows']]
+    assert '000002' in codes and '000003' not in codes      # 등락 범위 밖은 아예 안 본다
+    assert scan['error'] == ''
+    b = {r['code']: r for r in scan['rows']}['000002']
+    assert b['pass'] and '일봉' in b['checks']['amount'][1]  # 대금은 일봉에서 채웠다
+    assert scan['passed'] == ['000001', '000002']
+
+
+def test_risers_below_the_amount_threshold_are_dropped(eng):
+    """등락률 상위라도 그날 대금이 문턱 미만이면 떨어진다 (일봉 대금으로 판정)."""
+    eng.b.rising_rows = [{'code': '000002', 'name': '종목B', 'price': 12000, 'amount_eok': None, 'chg': 20.0}]
+
+    async def small(code):
+        return good(amount=40e8) if code == '000002' else good()
+    eng.b.daily = small
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    row = {r['code']: r for r in eng.e.scans['2026-10-19']['rows']}['000002']
+    assert not row['pass'] and not row['checks']['amount'][0]
+
+
+def test_a_broken_rising_ranking_does_not_stop_the_scan(eng):
+    async def boom(market, top=50):
+        raise RuntimeError('순위 조회 실패')
+    eng.b.rising = boom
+    on(eng.e)
+    run(tick_and_wait(eng.e))
+    scan = eng.e.scans['2026-10-19']
+    assert scan['passed'] == ['000001'] and '등락률 순위' in scan['error']

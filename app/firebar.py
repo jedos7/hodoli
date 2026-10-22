@@ -52,8 +52,10 @@ def cheap_checks(row, threshold_eok):
     ka10081 일봉은 수정주가라 과거 종가가 실제와 다를 수 있다 (2026-10-19 에스엠벡셀: 일봉 3,150 / 실제 3,110
     → 등락이 28.25% 로 계산돼 상한가 제외를 빠져나갔다).
     등락이 +15~29% 밖인 종목(보통 거래대금 상위의 95%)은 여기서 끝나므로 일봉을 받지 않는다."""
-    checks = {'amount': (row['amount_eok'] >= threshold_eok,
-                         f"거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")}
+    checks = {}
+    if row.get('amount_eok') is not None:          # 등락률 순위에는 대금이 없어 일봉에서 채운다
+        checks['amount'] = (row['amount_eok'] >= threshold_eok,
+                            f"거래대금 {row['amount_eok']:,.0f}억 (문턱 {threshold_eok:,}억)")
     chg, price = row.get('chg'), row.get('price')
     if chg is None or 1 + chg / 100 <= 0 or not price:
         checks['data'] = (False, '순위 자료의 등락률·현재가 확인 필요')
@@ -82,6 +84,11 @@ def evaluate(row, daily, threshold_eok, today):
         checks['data'] = (False, '오늘 일봉 없음 또는 일봉 25개 미만')
         return out
     t = daily[-1]
+    if 'amount' not in checks:                     # 등락률 순위에서 온 종목: 오늘 일봉의 대금으로 판정
+        amount_eok = t.amount / 1e8
+        checks['amount'] = (amount_eok >= threshold_eok,
+                            f"거래대금 {amount_eok:,.0f}억 (문턱 {threshold_eok:,}억 · 일봉)")
+        out['amount_eok'] = round(amount_eok, 1)
     avg20 = mean(c.amount for c in daily[-21:-1]) if len(daily) >= 21 else 0
     mult = t.amount / avg20 if avg20 else 0
     checks['multiple'] = (mult >= MIN_MULTIPLE, f"평소(20일 평균) 대비 {mult:,.1f}배 ({MIN_MULTIPLE:.0f}배 이상)")
@@ -107,12 +114,27 @@ class FireBar(CloseBet):
                   'rows': [], 'error': ''}
         try:
             broker = self.broker()
-            rows = []
+            rows, seen = [], set()
             for market in ('001', '101'):
-                rows += await broker.ranking(market)
-            rows = [r for r in rows if r['amount_eok'] >= self.settings['threshold_eok']
-                    and not any(k in r['name'] for k in SKIP_NAME)]
-            rows.sort(key=lambda r: -r['amount_eok'])
+                for r in await broker.ranking(market):
+                    if r['amount_eok'] >= self.settings['threshold_eok'] and r['code'] not in seen:
+                        seen.add(r['code'])
+                        rows.append(r)
+            # 등락률 상위 50 도 본다 (규칙 문서: "등락률 상위 50 과 거래대금 상위에서 찾는다").
+            # 대금이 300억을 넘어도 거래대금 순위 100위 밖이면 여기서만 걸린다. 대금은 일봉에서 채운다.
+            for market in ('001', '101'):
+                try:
+                    extra = await broker.rising(market)
+                except Exception as exc:
+                    result['error'] = f'등락률 순위 조회 실패: {str(exc)[:60]}'
+                    continue
+                for r in extra:
+                    if r['code'] in seen or not MIN_RISE <= (r.get('chg') or 0) < MAX_RISE:
+                        continue
+                    seen.add(r['code'])
+                    rows.append(r)
+            rows = [r for r in rows if not any(k in r['name'] for k in SKIP_NAME)]
+            rows.sort(key=lambda r: -(r['amount_eok'] if r.get('amount_eok') is not None else 0))
             ymd = None if preview else today.replace('-', '')
             th = self.settings['threshold_eok']
 
@@ -123,7 +145,8 @@ class FireBar(CloseBet):
                     ev = evaluate(r, await broker.daily(r['code']), th, ymd)
                 return r | {'pass': ev['pass'], 'checks': {k: list(v) for k, v in ev['checks'].items()},
                             'prev_close': ev.get('prev_close'), 'upper_limit': ev.get('upper_limit'),
-                            'tail': ev.get('tail'), 'multiple': ev.get('multiple')}
+                            'tail': ev.get('tail'), 'multiple': ev.get('multiple'),
+                            'amount_eok': ev.get('amount_eok', r.get('amount_eok'))}
 
             for r, judged in zip(rows, await fanout(rows, judge)):
                 result['rows'].append(judged if not isinstance(judged, Exception) else
