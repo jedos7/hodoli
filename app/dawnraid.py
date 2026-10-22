@@ -42,6 +42,10 @@ TAKE_PROFIT_PCT = 7.0
 PREV_AMOUNT_SHARE = 0.02       # 한 종목 = 전날 대금의 2%까지
 POLL_SECONDS = 20
 NEAR_GAP = -5.0                # 주문 직전에 다시 볼 '가까운' 후보
+WATCH_MAX = 40                 # 예상체결가를 지켜볼 종목 수 (전날 대금 큰 순)
+#   키움 조회가 초당 3건이라 후보가 많으면 한 바퀴에 몇십 초가 걸려 예상가가 묵는다.
+#   살 때 어차피 **전날 대금 큰 순**으로 2종목을 고르므로, 상위 40 안에서 둘만 −7% 를 넘으면 결과가 같다.
+#   상위 40 중 −7% 이하가 둘이 안 될 때만 더 작은 종목이 밀려날 수 있다 (화면에 적는다).
 TOTAL_CAP_MAX = 9_990_000
 MAX_POSITIONS_MAX = 5
 DEFAULT_SETTINGS = {'mode': 'dry', 'enabled': False, 'slot_amount': 1_000_000,
@@ -198,7 +202,10 @@ class DawnRaid(CloseBet):
         finally:
             await api.close()
         if watch:
-            self.watch, self.index = watch, index
+            top = sorted(watch.values(), key=lambda r: -r['prev_amount_eok'])[:WATCH_MAX]
+            self.watch = {r['code']: r for r in top}
+            self.index = index
+            self.day()['found'] = len(watch)
         self.day()['candidates'] = len(self.watch)
         self.day()['based_on'] = based
         if preview:

@@ -65,7 +65,8 @@
     if (!preview) {
       const gap = d.index_gap == null ? '' : ` · 코스피 예상 갭 ${d.index_gap > 0 ? '+' : ''}${d.index_gap}%`;
       renderWatch(s.watch, s.watch && s.watch.length
-        ? `후보 ${s.watch.length}종목${d.based_on ? ' · ' + d.based_on + ' 자료' : ''}${gap}`
+        ? `후보 ${s.watch.length}종목${d.found && d.found > s.watch.length ? ` (조건 통과 ${d.found}종목 중 전날 대금 상위)` : ''}`
+          + `${d.based_on ? ' · ' + d.based_on + ' 자료' : ''}${gap}`
         : '자동매매를 켜면 08:10에 전날 자료로 후보를 고릅니다. "지금 후보 보기"로 바로 볼 수도 있습니다.');
     }
     $('skipped').textContent = (d.skipped || []).length ? '건너뜀: ' + d.skipped.join(' · ') : '';

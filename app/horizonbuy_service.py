@@ -86,7 +86,10 @@ class HorizonBuyService:
                         except Exception as exc:
                             self.engine.day()['connect_error'] = f'계좌 감시 연결 실패: {str(exc)[:80]}'
                 await self.engine.tick()
-                if count % 30 == 0 and any(o['status'] in PENDING for o in self.engine.orders):
+                # 미확정 주문이 있거나 **자동매도에 넘긴 보유가 남아 있으면** 주기적으로 맞춘다.
+                # 넘긴 보유가 팔렸는데 'linked' 로 남으면 다섯이 같이 쓰는 지갑(999만)을 계속 차지한다.
+                if count % 30 == 0 and (any(o['status'] in PENDING for o in self.engine.orders)
+                                        or self.engine.held_codes()):
                     await self.engine.reconcile()
             except Exception:
                 self.engine.stop(note='호라이즌 자동매수 처리 오류 · 새 전송 중단 · 키움 주문내역 확인')

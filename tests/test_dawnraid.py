@@ -263,3 +263,27 @@ def test_market_volume_multiplier_shrinks_the_slot(eng):
     on(eng.e)
     run(tick_and_wait(eng.e))
     assert ('buy', '000001', 54, 9220) in eng.b.calls            # 100만 → 50만 → 54주
+
+
+def test_watch_list_is_capped_by_yesterdays_amount(monkeypatch, eng):
+    """조회가 초당 3건이라 지켜볼 종목을 전날 대금 상위 40으로 자른다.
+    어차피 살 때도 전날 대금 큰 순으로 2종목을 고르므로 보통 결과가 같다."""
+    from app import dawnraid as mod
+
+    class FakeApi:
+        async def json(self, path, params):
+            if params['page'] > 1 or 'KOSPI' not in path:
+                return {'stocks': []}
+            return {'stocks': [{'itemCode': f'{i:06d}', 'stockName': f'종목{i}', 'stockEndType': 'stock',
+                                'closePrice': '10,000', 'fluctuationsRatio': '-5.0',
+                                'accumulatedTradingValue': f'{20_000 + i * 10}',   # 백만원 → 200억대
+                                'marketValue': '1,000', 'localTradedAt': '2026-10-21'} for i in range(1, 61)]}
+
+        async def close(self):
+            pass
+    monkeypatch.setattr(mod, 'NaverApi', FakeApi)
+    run(eng.e.build_list(eng.now[0]))
+    assert len(eng.e.watch) == mod.WATCH_MAX
+    assert eng.e.day()['found'] == 60 and eng.e.day()['based_on'] == '2026-10-21'
+    amounts = [r['prev_amount_eok'] for r in eng.e.watch.values()]
+    assert min(amounts) > 200.0 and len(set(amounts)) == mod.WATCH_MAX    # 대금 큰 것부터 남는다
