@@ -32,6 +32,7 @@ from app.autoexit import PENDING, AutoExit
 from app.autosell import normal_code
 from app.breakers import NO_BREAKERS
 from app.fanout import fanout
+from app.wallet import NO_WALLET
 from app.kiwoom.extended_sell import tick
 from app.kiwoom.orders import NotSent, OrderRejected
 
@@ -218,12 +219,13 @@ class CloseBet(AutoExit):
     normalizer = staticmethod(normalize_settings)
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None,
-                 breakers=None, gate=None, sizing=None):
+                 breakers=None, gate=None, sizing=None, wallet=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.peers, self.notify = peers, notify or (lambda text: None)
         self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
         self.gate_for = gate                           # 🧭 맥락 문 (app/regime.py) · 없으면 안 막는다
         self.sizing = sizing                           # 💧 시장 대금 배팅 크기 · 없으면 ×1
+        self.wallet = wallet or NO_WALLET              # 다섯이 같이 쓰는 지갑 (총 999만) · app/wallet.py
         self.size_mult = 1.0
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.scans, self.days = {}, {}, {}
@@ -484,7 +486,7 @@ class CloseBet(AutoExit):
                 broker = self.broker()
                 book = await broker.book(code)
                 five = await broker.minutes(code, '5')
-                remaining = self.settings['total_cap'] - self.committed()
+                remaining = self.wallet.room(self)      # 제 상한 + 다섯 합친 상한
                 price = await self.order_price(broker, book, r)
                 await self.pre_buy_check(broker, r, price)
                 cap_qty = 10 ** 8

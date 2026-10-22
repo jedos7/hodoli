@@ -300,7 +300,7 @@ class DawnRaid(CloseBet):
                 self.guard_live(epoch)
                 self.breakers.check_buy(code)
                 price = order_price(r['expected'])
-                remaining = self.settings['total_cap'] - self.committed()
+                remaining = self.wallet.room(self)      # 제 상한 + 다섯 합친 상한
                 cap_qty = 10 ** 8
                 broker = self.broker()
                 if self.live():

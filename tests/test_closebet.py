@@ -422,3 +422,17 @@ def test_one_stock_never_exceeds_the_morning_equity(eng):
     eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
     run(eng.e.tick())
     assert eng.e.positions['000001']['quantity'] == 29        # 30만 ÷ 10,020원 (50만이 아니라)
+
+
+def test_the_shared_wallet_stops_a_buy_when_other_engines_already_spent(eng):
+    """다섯 매매법이 같이 쓰는 지갑: 다른 매매가 이미 999만 가까이 넣었으면 더 사지 않는다."""
+    from types import SimpleNamespace
+    from app.wallet import Wallet
+    other = SimpleNamespace(settings={'total_cap': 9_990_000}, committed=lambda: 9_900_000)
+    eng.e.wallet = Wallet().register(other, eng.e)
+    eng.e.update_settings({'mode': 'dry', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    assert eng.e.positions['000001']['quantity'] == 8        # 남은 9만 ÷ 10,020원

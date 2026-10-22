@@ -26,6 +26,7 @@ from datetime import date, datetime, time
 from app.autoexit import PENDING, AutoExit
 from app.closebet import buy_price, in_window, plan_quantity
 from app.breakers import NO_BREAKERS
+from app.wallet import NO_WALLET
 from app.kiwoom.orders import NotSent, OrderRejected
 
 TOTAL_CAP_MAX = 9_990_000       # 총 투입 1,000만 원 미만 (종가배팅과 같은 상한)
@@ -80,12 +81,14 @@ class HorizonBuy(AutoExit):
     """plans 는 쓰지 않는다. positions = 호라이즌존으로 산 보유, days = 날짜별 진행, settings."""
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock,
-                 candidates=None, exit_engine=None, peers=(), notify=None, breakers=None, sizing=None):
+                 candidates=None, exit_engine=None, peers=(), notify=None, breakers=None, sizing=None,
+                 wallet=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.candidates, self.exit_engine = candidates or (lambda: []), exit_engine
         self.peers, self.notify = peers, notify or (lambda text: None)
         self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
         self.sizing = sizing                           # 💧 시장 대금 배팅 크기 · 없으면 ×1
+        self.wallet = wallet or NO_WALLET              # 다섯이 같이 쓰는 지갑 (총 999만)
         self.size_mult = 1.0
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.days, self.last_pick = {}, {}, {}
@@ -256,7 +259,7 @@ class HorizonBuy(AutoExit):
                 budget = int(self.settings['slot_amount'] * r['slots'] * self.size_mult)
                 cap = self.breakers.stock_cap()          # 🧱 한 종목 ≤ 아침 예탁자산
                 budget = min(budget, int(cap)) if cap else budget
-                remaining = self.settings['total_cap'] - self.committed()
+                remaining = self.wallet.room(self)      # 제 상한 + 다섯 합친 상한
                 cap_qty = 10 ** 8
                 if self.live():
                     await broker.stock(code, price or 1)       # 거래정지·투자유의·호가단위 확인

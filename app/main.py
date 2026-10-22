@@ -121,6 +121,8 @@ from app.breakers import create_breakers, create_breakers_router
 
 from app.regime import Regime, create_regime_router
 
+from app.wallet import Wallet
+
 from app.closebet_service import CloseBetService, create_closebet_router
 
 from app.horizonbuy_service import HorizonBuyService, create_horizonbuy_router
@@ -966,8 +968,13 @@ def _breakers_notify(text):
 
 breakers = create_breakers(settings, lambda: closebet_service.broker(), autosell_now_kst, notify=_breakers_notify)
 
+# 다섯 매매법이 같이 쓰는 지갑 — 합쳐서 999만 원을 넘지 않게 한다 (매매법마다 제 상한도 따로 있다)
+
+wallet = Wallet()
+
 closebet_service = CloseBetService(settings, sell_service, exit_service, custom_exit_service, auto_buy_service,
-                                   notifier, breakers=breakers, gate=regime.gate, sizing=regime.multiplier)
+                                   notifier, breakers=breakers, gate=regime.gate, sizing=regime.multiplier,
+                                   wallet=wallet)
 
 app.include_router(create_closebet_router(closebet_service))
 
@@ -981,7 +988,7 @@ app.include_router(create_horizon_router(horizon_service))
 
 horizonbuy_service = HorizonBuyService(settings, sell_service, horizon_service, exit_service,
                                        custom_exit_service, auto_buy_service, closebet_service, notifier,
-                                       breakers=breakers, sizing=regime.multiplier)
+                                       breakers=breakers, sizing=regime.multiplier, wallet=wallet)
 
 app.include_router(create_horizonbuy_router(horizonbuy_service))
 
@@ -990,11 +997,11 @@ _overnight_peers = (exit_service.engine, custom_exit_service.engine, auto_buy_se
 
 firebar_service = OvernightService(settings, sell_service, exit_service, FireBar, 'firebar',
                                    peers=_overnight_peers, notifier=notifier, breakers=breakers,
-                                   sizing=regime.multiplier)
+                                   sizing=regime.multiplier, wallet=wallet)
 
 leaderdip_service = OvernightService(settings, sell_service, exit_service, LeaderDip, 'leaderdip',
                                      peers=_overnight_peers + (firebar_service.engine,), notifier=notifier,
-                                     breakers=breakers, gate=regime.gate, sizing=regime.multiplier)
+                                     breakers=breakers, gate=regime.gate, sizing=regime.multiplier, wallet=wallet)
 
 firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
 
@@ -1006,9 +1013,12 @@ app.include_router(create_overnight_router(leaderdip_service, '/api/leaderdip', 
 
 dawnraid_service = OvernightService(settings, sell_service, exit_service, DawnRaid, 'dawnraid',
                                     peers=_overnight_peers + (firebar_service.engine, leaderdip_service.engine),
-                                    notifier=notifier, breakers=breakers, sizing=regime.multiplier)
+                                    notifier=notifier, breakers=breakers, sizing=regime.multiplier, wallet=wallet)
 
 app.include_router(create_overnight_router(dawnraid_service, '/api/dawnraid', 'x-dawnraid-token', RaidSettings))
+
+wallet.register(closebet_service.engine, horizonbuy_service.engine, firebar_service.engine,
+                leaderdip_service.engine, dawnraid_service.engine)
 
 price_chart_service = PriceChartService(lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 

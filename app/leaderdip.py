@@ -246,7 +246,7 @@ class LeaderDip(CloseBet):
             async with self.lock:
                 self.guard_live(epoch)
                 broker = self.broker()
-                remaining = self.settings['total_cap'] - self.committed()
+                remaining = self.wallet.room(self)      # 제 상한 + 다섯 합친 상한
                 cap_qty = 10 ** 8
                 if self.live():
                     await broker.stock(code, price or 1)
