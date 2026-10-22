@@ -16,6 +16,7 @@ PENDING = {'submitting', 'unknown', 'accepted', 'partial', 'attention'}
 class AutoExit:
     hold_sessions = HOLD_SESSIONS
     close_reason = "D2_CLOSE"
+    early_reason = "D2_CLOSE_EARLY"      # ⏩ 청산날 앞당기기 (app/earlyclose.py) · 정규장 시장가
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock=now_kst):
         self.path, self.env = Path(path), env
@@ -297,6 +298,38 @@ class AutoExit:
                     self.persist()
                 except Exception:
                     pass
+
+    def due_today(self):
+        """오늘이 **청산날**인 보유 종목 코드 (자동매도가 켜진 것만)."""
+        today = self.clock().date()
+        out = []
+        for p in self.plans.values():
+            if p['status'] != 'armed':
+                continue
+            held = self.monitor.days_held(Position(p['code'], p['name'], p['quantity'],
+                                                  p['average'], p['bought_on']), today)
+            if held is not None and held >= self.hold_sessions:
+                out.append(p['code'])
+        return out
+
+    async def close_early(self, code, note=''):
+        """⏩ 청산날 앞당기기 — 오늘이 청산날인 보유를 **정규장에서 지금** 시장가로 판다.
+
+        청산날이 아닌 종목은 건드리지 않는다. 익절·손절 감시와 같은 전송 규율을 그대로 쓴다
+        (전송 전 저널 · 1회 전송 · 잔고 재확인). 원래는 15:20 종가 단일가에 파는 것을
+        15:13 으로 앞당기는 것뿐이다."""
+        p = self.plans.get(code)
+        at = self.clock()
+        if not p or p['status'] != 'armed':
+            raise NotSent('자동매도가 켜진 보유가 아닙니다')
+        if code not in self.due_today():
+            raise NotSent('오늘은 이 종목의 청산날이 아닙니다')
+        if self.market(at) != '3':
+            raise NotSent('정규장 거래 상태를 확인하세요')
+        p['status'], p['note'] = 'checking', note or '⏩ 청산날 앞당기기 · 주문 전 잔고 확인 중'
+        self.persist()
+        await self.execute(p, self.early_reason, at, self.epoch)
+        return p['status']
 
     def account_changed(self):
         for p in self.plans.values():

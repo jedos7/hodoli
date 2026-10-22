@@ -481,3 +481,39 @@ def test_concurrent_reconciliation_does_not_overlap(rig):
         assert rig.e.orders[0]['status'] == 'filled'
         assert rig.e.plans['005930']['status'] == 'completed'
     asyncio.run(run())
+
+
+# ── ⏩ 청산날 앞당기기 (app/earlyclose.py 가 부른다) ────────────
+def test_close_early_sells_at_market_on_the_close_day(rig):
+    """원래 15:20 종가에 팔 종목을 정규장에서 지금 시장가로 판다. D+2(청산날)에만 된다."""
+    async def run():
+        await arm(rig)
+        rig.now[0] = datetime(2026, 9, 21, 15, 13, tzinfo=KST)        # 아직 청산날이 아님
+        rig.phase[0] = {'value': '3', 'at': rig.now[0].isoformat(), 'remaining': 0}
+        assert rig.e.due_today() == []
+        with pytest.raises(NotSent, match='청산날'):
+            await rig.e.close_early('005930')
+        assert rig.b.calls == []
+
+        rig.now[0] = datetime(2026, 9, 22, 15, 13, tzinfo=KST)        # 청산날
+        rig.phase[0] = {'value': '3', 'at': rig.now[0].isoformat(), 'remaining': 0}
+        assert rig.e.due_today() == ['005930']
+        await rig.e.close_early('005930', '⏩ 시험')
+        await drain(rig)
+        assert rig.b.calls == [('005930', 10)]
+        order = rig.e.orders[-1]
+        assert order['reason'] == 'D2_CLOSE_EARLY' and order['status'] == 'accepted'
+        assert rig.e.plans['005930']['status'] == 'ordered'
+    asyncio.run(run())
+
+
+def test_close_early_refuses_outside_the_regular_session(rig):
+    """장 상태가 정규장이 아니면 보내지 않는다 (종가 단일가·장 마감 뒤 포함)."""
+    async def run():
+        await arm(rig)
+        rig.now[0] = datetime(2026, 9, 22, 15, 13, tzinfo=KST)
+        rig.phase[0] = {'value': '2', 'at': rig.now[0].isoformat(), 'remaining': 0}   # 종가 단일가
+        with pytest.raises(NotSent, match='정규장'):
+            await rig.e.close_early('005930')
+        assert rig.b.calls == []
+    asyncio.run(run())

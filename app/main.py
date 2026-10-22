@@ -121,6 +121,8 @@ from app.breakers import create_breakers, create_breakers_router
 
 from app.regime import Regime, create_regime_router
 
+from app.earlyclose import EarlyClose
+
 from app.wallet import Wallet
 
 from app.closebet_service import CloseBetService, create_closebet_router
@@ -395,6 +397,23 @@ def market_hours(now: datetime) -> bool:
 
 
 
+
+
+async def early_close_loop() -> None:
+
+    """⏩ 청산날 앞당기기. 1초마다 보지만 실제로 움직이는 건 15:12·15:13 두 번뿐이다."""
+
+    while True:
+
+        try:
+
+            await early_close.tick()
+
+        except Exception:
+
+            log.exception("청산날 앞당기기")
+
+        await asyncio.sleep(1)
 
 
 async def autocollect() -> None:
@@ -886,6 +905,8 @@ async def lifespan(app: FastAPI):
     if hasattr(breakers, 'loop'):
         tasks.append(asyncio.create_task(breakers.loop(), name="breakers"))   # 예탁자산 차단기 (08:30~15:40, 1분)
 
+    tasks.append(asyncio.create_task(early_close_loop(), name="earlyclose"))  # ⏩ 청산날 앞당기기
+
     if settings.collect_minutes > 0:
 
         tasks.append(asyncio.create_task(autocollect(), name="autocollect"))
@@ -1019,6 +1040,12 @@ app.include_router(create_overnight_router(dawnraid_service, '/api/dawnraid', 'x
 
 wallet.register(closebet_service.engine, horizonbuy_service.engine, firebar_service.engine,
                 leaderdip_service.engine, dawnraid_service.engine)
+
+# ⏩ 청산날 앞당기기 — 15:12 에 🔥·🌙 후보가 살 자리보다 많으면 오늘 청산날인 🌅 보유를 15:13 에 먼저 판다
+
+early_close = EarlyClose((firebar_service.engine, closebet_service.engine),
+                         lambda: exit_service.engine, wallet, autosell_now_kst,
+                         notify=_breakers_notify)
 
 price_chart_service = PriceChartService(lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 
