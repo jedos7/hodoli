@@ -218,11 +218,13 @@ class CloseBet(AutoExit):
     normalizer = staticmethod(normalize_settings)
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock, peers=(), notify=None,
-                 breakers=None, gate=None):
+                 breakers=None, gate=None, sizing=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.peers, self.notify = peers, notify or (lambda text: None)
         self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
         self.gate_for = gate                           # 🧭 맥락 문 (app/regime.py) · 없으면 안 막는다
+        self.sizing = sizing                           # 💧 시장 대금 배팅 크기 · 없으면 ×1
+        self.size_mult = 1.0
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.scans, self.days = {}, {}, {}
         self.scan_task = None
@@ -305,6 +307,23 @@ class CloseBet(AutoExit):
             if peer.plans.get(code, {}).get('status') in ('prepared', 'armed', 'checking', 'ordered', 'remainder_check') or peer.blocked(code):
                 return True
         return False
+
+    async def read_sizing(self):
+        """💧 오늘 한 칸에 곱할 배수를 읽어 둔다 (전날 시장 대금 ÷ 앞 20일 평균)."""
+        self.size_mult = 1.0
+        if not self.sizing:
+            return 1.0
+        try:
+            self.size_mult = float(await self.sizing())
+        except Exception:
+            self.size_mult = 1.0
+        if self.size_mult != 1.0:
+            self.day()['sizing'] = f'💧 시장 대금 배팅 크기 ×{self.size_mult:g}'
+        return self.size_mult
+
+    def slot_amount(self, base):
+        """설정 금액에 💧 배수를 곱한 한 칸 크기 (원 단위 내림)."""
+        return int(base * self.size_mult)
 
     async def resting(self):
         """🧭 맥락 문: 오늘 이 매매법이 쉬어야 하나 (제작자 10-20 규칙). 하루 한 번만 알리고 기록한다."""
@@ -427,6 +446,7 @@ class CloseBet(AutoExit):
     async def buy_all(self, now):
         if await self.resting():
             return
+        await self.read_sizing()
         scan = self.scans.get(self.today()) or {}
         picks = [r for r in scan.get('rows', []) if r.get('pass')]
         room = self.settings['max_positions'] - len(self.held_codes())
@@ -467,7 +487,7 @@ class CloseBet(AutoExit):
                     cap_qty = (await broker.capacity(code, price))['quantity'] if price else 0
                     if code in (await broker.positions()):
                         raise NotSent(f'이미 계좌에 있는 종목 ({self.label} 외 보유) · 섞이지 않게 건너뜀')
-                qty, why = plan_quantity(price, book['total_ask_qty'], self.settings['per_trade_amount'], remaining,
+                qty, why = plan_quantity(price, book['total_ask_qty'], self.slot_amount(self.settings['per_trade_amount']), remaining,
                                          late_amount(five, self.today().replace('-', '')), cap_qty)
                 if qty <= 0:
                     raise NotSent(why)

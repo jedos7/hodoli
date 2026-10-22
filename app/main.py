@@ -949,7 +949,7 @@ app.include_router(create_auto_buy_router(auto_buy_service))
 
 # 🧭 오늘 장세 맥락 — 표시와 '맥락 문'(🗻 전날 코스피 0% 위면 쉼 · 🌙 원화 약세면 쉼). app/regime.py
 
-regime = Regime(autosell_now_kst)
+regime = Regime(autosell_now_kst, get_rest=lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 
 # 차단기: 네 매매법(🌅 🗻 🔥 🌙)이 같이 쓴다. 걸리면 **새 매수만** 멈춘다 (매도는 막지 않음). app/breakers.py
 
@@ -960,7 +960,7 @@ def _breakers_notify(text):
 breakers = create_breakers(settings, lambda: closebet_service.broker(), autosell_now_kst, notify=_breakers_notify)
 
 closebet_service = CloseBetService(settings, sell_service, exit_service, custom_exit_service, auto_buy_service,
-                                   notifier, breakers=breakers, gate=regime.gate)
+                                   notifier, breakers=breakers, gate=regime.gate, sizing=regime.multiplier)
 
 app.include_router(create_closebet_router(closebet_service))
 
@@ -974,7 +974,7 @@ app.include_router(create_horizon_router(horizon_service))
 
 horizonbuy_service = HorizonBuyService(settings, sell_service, horizon_service, exit_service,
                                        custom_exit_service, auto_buy_service, closebet_service, notifier,
-                                       breakers=breakers)
+                                       breakers=breakers, sizing=regime.multiplier)
 
 app.include_router(create_horizonbuy_router(horizonbuy_service))
 
@@ -982,11 +982,12 @@ _overnight_peers = (exit_service.engine, custom_exit_service.engine, auto_buy_se
                     closebet_service.engine, horizonbuy_service.engine)
 
 firebar_service = OvernightService(settings, sell_service, exit_service, FireBar, 'firebar',
-                                   peers=_overnight_peers, notifier=notifier, breakers=breakers)
+                                   peers=_overnight_peers, notifier=notifier, breakers=breakers,
+                                   sizing=regime.multiplier)
 
 leaderdip_service = OvernightService(settings, sell_service, exit_service, LeaderDip, 'leaderdip',
                                      peers=_overnight_peers + (firebar_service.engine,), notifier=notifier,
-                                     breakers=breakers, gate=regime.gate)
+                                     breakers=breakers, gate=regime.gate, sizing=regime.multiplier)
 
 firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
 

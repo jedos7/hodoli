@@ -183,6 +183,8 @@ class LeaderDip(CloseBet):
             fetched = await fanout(codes, lambda c: broker.minutes(c, '15'))
             touched_today = {s['code'] for s in self.setups.values() if s['day'] == self.today()}
             resting = await self.resting()      # 🧭 맥락 문 · 쉬는 날이어도 화면 값은 계속 갱신한다
+            if not resting:
+                await self.read_sizing()        # 💧 배팅 크기
             for code, got in zip(codes, fetched):
                 info = universe[code]
                 if isinstance(got, Exception):
@@ -221,7 +223,7 @@ class LeaderDip(CloseBet):
         """F2 아래로 내려온 순간: 한 칸(몰린 날이면 반 칸)을 반씩 F2·F3 지정가로 동시에 건다."""
         code = info['code']
         key = f'{self.today()}:{code}'
-        budget = self.settings['slot_amount'] // (2 if crowded else 1)
+        budget = self.slot_amount(self.settings['slot_amount']) // (2 if crowded else 1)
         setup = {'key': key, 'day': self.today(), 'code': code, 'name': info['name'], 'anchor': anchor,
                  'f2': f2, 'f3': f3, 'crowded': crowded, 'at': now.isoformat(), 'orders': [], 'note': ''}
         self.setups[key] = setup

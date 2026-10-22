@@ -19,9 +19,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
+from statistics import mean
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
+
+from app.kiwoom.parse import num
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +53,11 @@ STEADY = {'key': 'horizonbuy', 'icon': '🌅', 'label': '호라이즌존', 'cell
 # 🧭 맥락 문 — 제작자 프로그램의 **실제 규칙**(2026-10-20). 위 칸 표는 분석표이고, 쉬고 말고는 이 문이 정한다.
 #   🗻 "전날 코스피가 0% 위면 그날은 쉼" · 🌙 "전날 밤 원달러가 올랐으면(원화 약세) 그날은 쉼"
 #   원달러는 '그날 아침에 아는 값' 이라는 자료 규약대로 **앞 거래일 일간 등락**으로 본다.
+# 💧 시장 대금 배팅 크기 (10-22) — 전날 시장 전체 거래대금 ÷ 앞 20거래일 평균
+#   0.87 아래(마름) ×0.5 · 1.111 이상(넘침) ×1.5 · 그 사이 ×1. 다섯 매매 모두 '한 칸 크기' 에 곱한다.
+VOLUME_LOW, VOLUME_HIGH = 0.87, 1.111
+VOLUME_TTL = 1800
+
 GATES = {
     'leaderdip': (0.0, 'above', '전날 코스피가 올랐습니다', '0% 위면 쉼'),
     'closebet': (0.0, 'above', '원화가 약해졌습니다 (원달러 오름)', '0% 위면 쉼'),
@@ -122,11 +130,44 @@ async def naver_index_change(client, code, today):
     raise ValueError('오늘 이전 자료가 없습니다')
 
 
+async def market_volume(rest, today):
+    """전날 시장 전체 거래대금 ÷ 앞 20거래일 평균 (키움 ka20006 업종 일봉 · 코스피+코스닥 · 백만원)."""
+    total = {}
+    for inds in ('001', '101'):
+        d, _ = await rest.post('/api/dostk/chart', 'ka20006',
+                               {'inds_cd': inds, 'base_dt': today.strftime('%Y%m%d')})
+        rows = d.get('inds_dt_pole_qry')
+        if not isinstance(rows, list) or not rows:
+            raise ValueError('업종 일봉 응답 형식 확인 필요')
+        for r in rows:
+            day = str(r.get('dt', ''))
+            amount = abs(num(r.get('trde_prica')))
+            if len(day) == 8 and day.isdigit() and amount > 0:
+                total[day] = total.get(day, 0) + amount
+    ymd = today.strftime('%Y%m%d')
+    past = sorted(d0 for d0 in total if d0 < ymd)       # 오늘은 아직 안 끝났으니 쓰지 않는다
+    if len(past) < 21:
+        raise ValueError(f'업종 일봉이 {len(past)}일뿐입니다 (21일 필요)')
+    prev = past[-1]
+    fresh(date(int(prev[:4]), int(prev[4:6]), int(prev[6:])), today)
+    avg = mean(total[d0] for d0 in past[-21:-1])
+    if avg <= 0:
+        raise ValueError('앞 20일 평균이 0입니다')
+    ratio = total[prev] / avg
+    mult = 0.5 if ratio < VOLUME_LOW else (1.5 if ratio >= VOLUME_HIGH else 1.0)
+    return {'day': f'{prev[:4]}-{prev[4:6]}-{prev[6:]}', 'ratio': round(ratio, 3), 'multiplier': mult,
+            'prevJo': round(total[prev] / 1_000_000, 2), 'avgJo': round(avg / 1_000_000, 2),
+            'low': VOLUME_LOW, 'high': VOLUME_HIGH, 'error': ''}
+
+
 class Regime:
-    def __init__(self, clock):
+    def __init__(self, clock, get_rest=None):
         self.clock = clock
+        self.get_rest = get_rest                       # 키움 조회(ka20006) · 없으면 💧 는 ×1
         self.cached, self.at = None, None
+        self.vol, self.vol_at = None, None
         self.lock = asyncio.Lock()
+        self.vol_lock = asyncio.Lock()
 
     async def read(self, force=False):
         now = self.clock()
@@ -155,6 +196,7 @@ class Regime:
                 out['rows'].append(dict(STEADY))
             except Exception as exc:
                 out['error'] = f'장세 맥락 조회 실패: {str(exc)[:100]}'
+            out['volume'] = await self.volume()      # 💧 배팅 크기 (스스로 오류를 삼킨다)
             for row in out['rows']:
                 rule = GATES.get(row['key'])
                 if not rule or row.get('value') is None:
@@ -165,6 +207,31 @@ class Regime:
                 row['restWhy'] = f"{row['what']} {row['value']:+g}% · {why}" if row['rest'] else ''
             self.cached, self.at = out, now
             return out
+
+    async def volume(self, force=False):
+        """오늘의 💧 배팅 크기. 못 읽으면 ×1 로 두고 까닭을 남긴다 (크기를 멋대로 바꾸지 않는다)."""
+        now = self.clock()
+        if not force and self.vol and self.vol_at and (now - self.vol_at).total_seconds() < VOLUME_TTL                 and self.vol.get('at', '')[:10] == now.date().isoformat():
+            return self.vol
+        async with self.vol_lock:
+            try:
+                if self.get_rest is None:
+                    raise ValueError('키움 시세 연결이 없습니다')
+                rest = self.get_rest()
+                if rest is None:
+                    raise ValueError('키움 시세 연결 대기')
+                out = await market_volume(rest, now.date())
+            except Exception as exc:
+                log.warning('시장 대금 배팅 크기 조회 실패: %s', exc)
+                out = {'multiplier': 1.0, 'error': str(exc)[:100], 'ratio': None,
+                       'low': VOLUME_LOW, 'high': VOLUME_HIGH}
+            out['at'] = now.isoformat()
+            self.vol, self.vol_at = out, now
+            return out
+
+    async def multiplier(self):
+        """한 칸 크기에 곱할 배수 (0.5 · 1 · 1.5)."""
+        return float((await self.volume()).get('multiplier') or 1.0)
 
     async def gate(self, key):
         """그 매매법이 오늘 **새로 사지 말아야** 하나 → (쉼, 까닭). 제작자 10-20 규칙 그대로.

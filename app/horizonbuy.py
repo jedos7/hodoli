@@ -80,11 +80,13 @@ class HorizonBuy(AutoExit):
     """plans 는 쓰지 않는다. positions = 호라이즌존으로 산 보유, days = 날짜별 진행, settings."""
 
     def __init__(self, path, env, broker, connected, phase, monitor, clock,
-                 candidates=None, exit_engine=None, peers=(), notify=None, breakers=None):
+                 candidates=None, exit_engine=None, peers=(), notify=None, breakers=None, sizing=None):
         super().__init__(path, env, broker, connected, phase, monitor, clock)
         self.candidates, self.exit_engine = candidates or (lambda: []), exit_engine
         self.peers, self.notify = peers, notify or (lambda text: None)
         self.breakers = breakers or NO_BREAKERS        # 차단기 (네 매매법이 같이 쓴다. app/breakers.py)
+        self.sizing = sizing                           # 💧 시장 대금 배팅 크기 · 없으면 ×1
+        self.size_mult = 1.0
         self.settings = dict(DEFAULT_SETTINGS)
         self.positions, self.days, self.last_pick = {}, {}, {}
 
@@ -193,8 +195,22 @@ class HorizonBuy(AutoExit):
             await self.reconcile()
             await self.settle(now)
 
+    async def read_sizing(self):
+        """💧 오늘 한 칸에 곱할 배수 (전날 시장 대금 ÷ 앞 20일 평균). 못 읽으면 ×1."""
+        self.size_mult = 1.0
+        if not self.sizing:
+            return 1.0
+        try:
+            self.size_mult = float(await self.sizing())
+        except Exception:
+            self.size_mult = 1.0
+        if self.size_mult != 1.0:
+            self.day()['sizing'] = f'💧 시장 대금 배팅 크기 ×{self.size_mult:g}'
+        return self.size_mult
+
     # ── 12:00 매수 ──
     async def buy_all(self, now):
+        await self.read_sizing()
         try:
             rows = self.candidates()
         except Exception as exc:
@@ -237,7 +253,7 @@ class HorizonBuy(AutoExit):
                 broker = self.broker()
                 book = await broker.book(code)
                 price = buy_price(book['ask'])          # 매도1호가 + 2틱
-                budget = self.settings['slot_amount'] * r['slots']
+                budget = int(self.settings['slot_amount'] * r['slots'] * self.size_mult)
                 remaining = self.settings['total_cap'] - self.committed()
                 cap_qty = 10 ** 8
                 if self.live():

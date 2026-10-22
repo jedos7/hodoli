@@ -6,7 +6,8 @@ from datetime import date, datetime, timedelta
 import pytest
 
 from app.autosell import KST
-from app.regime import GATES, MAX_AGE_DAYS, RULES, Regime, cell, naver_index_change, yahoo_change
+from app.regime import (GATES, MAX_AGE_DAYS, RULES, VOLUME_HIGH, VOLUME_LOW, Regime, cell,
+                        market_volume, naver_index_change, yahoo_change)
 
 TODAY = date(2026, 10, 20)
 NOW = datetime(2026, 10, 20, 8, 0, tzinfo=KST)
@@ -192,3 +193,55 @@ def test_gate_does_not_block_when_the_value_cannot_be_read(monkeypatch):
             return False
     monkeypatch.setattr(mod.httpx, 'AsyncClient', lambda **kw: Broken())
     assert asyncio.run(Regime(lambda: NOW).gate('leaderdip')) == (False, '')
+
+
+# ── 💧 시장 대금 배팅 크기 ───────────────────────────────────
+class Rest:
+    """키움 ka20006 업종 일봉 흉내. amounts = {날짜: 백만원} (코스피·코스닥 각각 절반씩 준다)."""
+
+    def __init__(self, amounts):
+        self.amounts, self.asked = amounts, []
+
+    async def post(self, path, api, body, next_key=''):
+        self.asked.append((api, body['inds_cd']))
+        rows = [{'dt': d, 'trde_prica': str(int(v / 2)), 'cur_prc': '100'} for d, v in sorted(self.amounts.items())]
+        return {'inds_dt_pole_qry': rows}, ''
+
+
+def amounts(prev, avg, days=22):
+    """전날만 prev, 그 앞 20일은 avg (백만원). 오늘 봉도 하나 넣는다."""
+    out = {(TODAY - timedelta(days=1)).strftime('%Y%m%d'): prev}
+    for i in range(2, days + 1):
+        out[(TODAY - timedelta(days=i)).strftime('%Y%m%d')] = avg
+    out[TODAY.strftime('%Y%m%d')] = 99_999_999          # 오늘은 아직 안 끝났다
+    return out
+
+
+def test_volume_multiplier_cuts_in_half_on_a_dry_day():
+    rest = Rest(amounts(prev=8_000, avg=10_000))      # 0.8배
+    d = asyncio.run(market_volume(rest, TODAY))
+    assert d['ratio'] == 0.8 and d['multiplier'] == 0.5 and d['day'] == '2026-10-19'
+    assert [a for a, _ in rest.asked] == ['ka20006', 'ka20006']       # 코스피·코스닥 둘 다
+
+
+def test_volume_multiplier_is_one_and_a_half_when_money_floods():
+    d = asyncio.run(market_volume(Rest(amounts(prev=12_000, avg=10_000)), TODAY))
+    assert d['ratio'] == 1.2 and d['multiplier'] == 1.5
+
+
+def test_volume_multiplier_stays_one_in_between():
+    for prev, want in ((8_700, 1.0), (11_100, 1.0), (10_000, 1.0)):
+        d = asyncio.run(market_volume(Rest(amounts(prev=prev, avg=10_000)), TODAY))
+        assert d['multiplier'] == want, (prev, d)
+
+
+def test_todays_bar_is_not_used_for_the_multiplier():
+    """오늘 대금은 아직 안 끝났으니 잣대에 넣지 않는다 (들어가면 아침마다 ×0.5 가 된다)."""
+    d = asyncio.run(market_volume(Rest(amounts(prev=10_000, avg=10_000)), TODAY))
+    assert d['ratio'] == 1.0
+
+
+def test_multiplier_falls_back_to_one_when_kiwoom_is_not_ready():
+    r = Regime(lambda: NOW, get_rest=lambda: None)
+    assert asyncio.run(r.multiplier()) == 1.0
+    assert asyncio.run(r.volume())['error']

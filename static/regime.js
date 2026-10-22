@@ -25,11 +25,15 @@
     }
     const row = (d.rows || []).find((x) => x.key === key);
     if (!row) { el.hidden = true; return; }
+    const v = d.volume || {};
+    const water = v.multiplier && v.multiplier !== 1
+      ? ` · 💧 오늘 배팅 크기 <b>×${v.multiplier}</b> (전날 시장 대금 ${v.prevJo}조 · 평소의 ${v.ratio}배)`
+      : (v.ratio ? ` · 💧 배팅 크기 ×1 (전날 시장 대금 ${v.prevJo}조 · 평소의 ${v.ratio}배)` : '');
     const [name, cls] = CELL[row.cell] || CELL.unknown;
     el.className = 'regime ' + cls;
     el.hidden = false;
     if (row.cell === 'steady') {
-      el.innerHTML = `<strong>오늘 장세 · ${esc(name)}</strong><p>${esc(row.what)} — ${esc(row.note)}</p>`;
+      el.innerHTML = `<strong>오늘 장세 · ${esc(name)}</strong><p>${esc(row.what)} — ${esc(row.note)}${water}</p>`;
       return;
     }
     const value = row.value === null || row.value === undefined ? '—' : `${row.value > 0 ? '+' : ''}${row.value}%`;
@@ -45,8 +49,8 @@
       : `${esc(row.what)} <b>${value}</b> (${esc(row.valueDay || '')}) · 좋은 칸 ${esc(row.goodAt || '')} ${esc(row.good)} · 나쁜 칸 ${esc(row.badAt || '')} ${esc(row.bad)}`;
     el.innerHTML = `<strong>오늘 장세 · ${esc(name)}</strong><p>${detail}`
       + (row.star ? ' · ★ 자료 앞뒤 반이 같은 방향' : '')
-      + (row.restRule ? ` · <i>맥락 문: ${esc(row.restRule)} — 오늘은 삽니다</i>` : ' · <i>표시만 합니다 — 매수 여부는 바뀌지 않습니다</i>')
-      + '</p>';
+      + (row.restRule ? ` · <i>맥락 문: ${esc(row.restRule)} — 오늘은 삽니다</i>` : '')
+      + water + '</p>';
   }
 
   load();

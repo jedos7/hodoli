@@ -383,3 +383,27 @@ def test_a_sell_still_goes_out_on_a_resting_day(eng):
     eng.now[0] = datetime(2026, 10, 20, 8, 40, 0, tzinfo=KST)
     run(tick_and_wait(eng.e))
     assert eng.e.positions['000001']['status'] == 'sold'
+
+
+def test_market_volume_multiplier_halves_the_slot(eng):
+    """💧 마른 날(전날 시장 대금이 평소의 87% 아래)은 한 칸을 반으로 줄여 산다."""
+    async def sizing():
+        return 0.5
+    eng.e.sizing = sizing
+    eng.e.update_settings({'mode': 'dry', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    p = eng.e.positions['000001']
+    assert p['quantity'] == 24                      # 50만 → 25만 · 10,020원 → 24주 (평소 49주)
+    assert '×0.5' in eng.e.day()['sizing']
+
+
+def test_no_sizing_source_keeps_the_slot_as_set(eng):
+    eng.e.update_settings({'mode': 'dry', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    assert eng.e.positions['000001']['quantity'] == 49 and 'sizing' not in eng.e.day()
