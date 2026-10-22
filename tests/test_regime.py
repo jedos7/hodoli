@@ -111,14 +111,14 @@ def read(monkeypatch, client):
     return asyncio.run(Regime(lambda: NOW).read())
 
 
-def test_reads_all_four_rows(monkeypatch):
+def test_reads_all_five_rows(monkeypatch):
     d = read(monkeypatch, Client(payloads()))
     rows = {r['key']: r for r in d['rows']}
-    assert d['error'] == '' and len(rows) == 4
+    assert d['error'] == '' and len(rows) == 5          # 🗻 🔥 🌙 + 🌅 · ⚡
     assert rows['leaderdip']['value'] == 1.76 and rows['leaderdip']['cell'] == 'mid'
     assert rows['firebar']['cell'] == 'good' and rows['firebar']['value'] == pytest.approx(0.99, abs=0.01)
     assert rows['closebet']['cell'] == 'good'          # 원달러 1340 → 1333 (원화 강세)
-    assert rows['horizonbuy']['cell'] == 'steady'
+    assert rows['horizonbuy']['cell'] == 'steady' and rows['dawnraid']['cell'] == 'steady'
 
 
 def test_one_source_failing_does_not_hide_the_others(monkeypatch):

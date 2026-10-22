@@ -86,6 +86,8 @@ class BasicInfo:
     open: int
     high: int
     low: int
+    expected: int = 0      # 동시호가 예상체결가 (exp_cntr_pric) · 정규장에는 0
+    expected_qty: int = 0  # 예상체결량
 
     @property
     def prev_close(self) -> int:
@@ -105,6 +107,8 @@ def parse_basic(body: dict, amount_unit: int = 1) -> BasicInfo:
         open=abs(inum(body.get("open_pric"))),
         high=abs(inum(body.get("high_pric"))),
         low=abs(inum(body.get("low_pric"))),
+        expected=abs(inum(body.get("exp_cntr_pric"))),
+        expected_qty=abs(inum(body.get("exp_cntr_qty"))),
     )
 
 

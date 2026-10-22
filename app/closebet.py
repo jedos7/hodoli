@@ -322,8 +322,10 @@ class CloseBet(AutoExit):
         return self.size_mult
 
     def slot_amount(self, base):
-        """설정 금액에 💧 배수를 곱한 한 칸 크기 (원 단위 내림)."""
-        return int(base * self.size_mult)
+        """설정 금액에 💧 배수를 곱하고 🧱 한 종목 상한(아침 예탁자산)으로 자른 한 칸 크기."""
+        amount = int(base * self.size_mult)
+        cap = self.breakers.stock_cap()
+        return min(amount, int(cap)) if cap else amount
 
     async def resting(self):
         """🧭 맥락 문: 오늘 이 매매법이 쉬어야 하나 (제작자 10-20 규칙). 하루 한 번만 알리고 기록한다."""
@@ -389,6 +391,10 @@ class CloseBet(AutoExit):
             self.persist()
             await self.reconcile()
             await self.settle_buys()
+
+    def sell_note(self):
+        """체결 알림 끝에 붙는 '언제 파는지'. ⚡ 처럼 당일 파는 전략은 이 함수만 바꾼다."""
+        return f" · 내일 {self.settings['sell_time']} 시장가 매도 예정"
 
     async def order_price(self, broker, book, r):
         """매수 지정가. 기본은 매도1호가 +2틱 (🌙 종가배팅 규칙). 다른 전략은 이 함수만 바꾼다."""
@@ -546,7 +552,7 @@ class CloseBet(AutoExit):
         held = [p for p in self.positions.values() if p['status'] == 'held' and p['bought_on'] == self.today()]
         if held:
             self.notify(f'{self.icon} {self.label} 체결 보유: ' + ', '.join(f"{p['name']} {p['quantity']}주@{p['average']:,.0f}" for p in held)
-                        + f" · 내일 {self.settings['sell_time']} 시장가 매도 예정")
+                        + self.sell_note())
 
     # ── 다음 날 매도 ──
     async def sell_all(self, now, reason, only_without_pending=False):
@@ -641,4 +647,4 @@ class CloseBet(AutoExit):
                 'day': self.days.get(today, {}), 'scan': self.scans.get(today), 'scan_dates': sorted(self.scans),
                 'orders': self.orders[-100:], 'scanning': self.scan_task is not None,
                 'breakers': self.breakers.snapshot(),
-                'windows': {'scan': '15:15', 'buy': '15:19:50', 'sell': self.settings['sell_time'], 'retry': '09:03', 'fill': '15:31'}}
+                'windows': {'scan': '15:15', 'buy': '15:19:50', 'sell': self.settings.get('sell_time', ''), 'retry': '09:03', 'fill': '15:31'}}

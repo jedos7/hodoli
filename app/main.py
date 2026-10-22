@@ -127,9 +127,12 @@ from app.horizonbuy_service import HorizonBuyService, create_horizonbuy_router
 
 from app.firebar import FireBar
 
+from app.dawnraid import DawnRaid
+
 from app.leaderdip import LeaderDip
 
-from app.overnight_service import DipSettings, FireBarSettings, OvernightService, create_overnight_router
+from app.overnight_service import (DipSettings, FireBarSettings, OvernightService, RaidSettings,
+                                   create_overnight_router)
 
 from app.horizon_service import HorizonService, create_horizon_router
 
@@ -872,6 +875,8 @@ async def lifespan(app: FastAPI):
 
     await leaderdip_service.start()
 
+    await dawnraid_service.start()
+
     log.info("돌파 감시 목록 %d종목 (%s)", len(state.watch.items), state.watch.loaded_from)
 
     tasks = [asyncio.create_task(broadcaster(), name="broadcaster"), asyncio.create_task(scheduler.loop(), name="scheduler")]
@@ -904,6 +909,8 @@ async def lifespan(app: FastAPI):
             t.cancel()
 
         await horizon_service.stop()
+
+        await dawnraid_service.stop()
 
         await leaderdip_service.stop()
 
@@ -994,6 +1001,14 @@ firebar_service.engine.peers = _overnight_peers + (leaderdip_service.engine,)
 app.include_router(create_overnight_router(firebar_service, '/api/firebar', 'x-firebar-token', FireBarSettings))
 
 app.include_router(create_overnight_router(leaderdip_service, '/api/leaderdip', 'x-leaderdip-token', DipSettings, scan_preview=False))
+
+# ⚡ 시초 역습 — 09:00 동시호가에 받아 10:00에 판다 (하룻밤 칸과 따로)
+
+dawnraid_service = OvernightService(settings, sell_service, exit_service, DawnRaid, 'dawnraid',
+                                    peers=_overnight_peers + (firebar_service.engine, leaderdip_service.engine),
+                                    notifier=notifier, breakers=breakers, sizing=regime.multiplier)
+
+app.include_router(create_overnight_router(dawnraid_service, '/api/dawnraid', 'x-dawnraid-token', RaidSettings))
 
 price_chart_service = PriceChartService(lambda: feed.rest if isinstance(feed, KiwoomFeed) else None)
 

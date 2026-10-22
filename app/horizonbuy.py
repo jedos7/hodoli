@@ -254,6 +254,8 @@ class HorizonBuy(AutoExit):
                 book = await broker.book(code)
                 price = buy_price(book['ask'])          # 매도1호가 + 2틱
                 budget = int(self.settings['slot_amount'] * r['slots'] * self.size_mult)
+                cap = self.breakers.stock_cap()          # 🧱 한 종목 ≤ 아침 예탁자산
+                budget = min(budget, int(cap)) if cap else budget
                 remaining = self.settings['total_cap'] - self.committed()
                 cap_qty = 10 ** 8
                 if self.live():

@@ -109,6 +109,10 @@ class Breakers:
         self.save()
         return freed
 
+    def stock_cap(self):
+        """🧱 한 종목에 넣을 수 있는 최대 금액 = **아침 예탁자산**(제작자 10-22 규칙). 모르면 None."""
+        return self.day().get('base_equity') or None
+
     # ── 매수 ──
     def check_buy(self, code=None, amount=0):
         """새 매수 전송 직전. 걸리면 NotSent (그 종목만 건너뛴다)."""
@@ -219,6 +223,9 @@ class NoBreakers:
 
     def tripped(self):
         return ''
+
+    def stock_cap(self):
+        return None
 
     def check_buy(self, code=None, amount=0):
         pass

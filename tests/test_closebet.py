@@ -407,3 +407,18 @@ def test_no_sizing_source_keeps_the_slot_as_set(eng):
     eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
     run(eng.e.tick())
     assert eng.e.positions['000001']['quantity'] == 49 and 'sizing' not in eng.e.day()
+
+
+def test_one_stock_never_exceeds_the_morning_equity(eng):
+    """🧱 한 종목 ≤ 아침 예탁자산. 지금 계좌에선 안 닿지만 작은 예탁자산으로 확인한다."""
+    from app.breakers import Breakers
+    br = Breakers(eng.e.path.parent / 'br.json', 'real', lambda: None, lambda: eng.now[0])
+    br.open()
+    br.feed_equity(300_000)                       # 아침 예탁 30만
+    eng.e.breakers = br
+    eng.e.update_settings({'mode': 'dry', 'enabled': True, 'per_trade_amount': 500_000, 'max_positions': 2,
+                           'total_cap': 1_000_000, 'threshold_eok': 300, 'sell_time': '08:40'})
+    run(tick_and_wait(eng.e))
+    eng.now[0] = datetime(2026, 10, 19, 15, 19, 50, tzinfo=KST)
+    run(eng.e.tick())
+    assert eng.e.positions['000001']['quantity'] == 29        # 30만 ÷ 10,020원 (50만이 아니라)

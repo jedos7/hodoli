@@ -27,6 +27,16 @@ class FireBarSettings(BaseModel):
     confirm_live: StrictBool = False
 
 
+class RaidSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    mode: str
+    enabled: StrictBool
+    slot_amount: StrictInt
+    max_positions: StrictInt
+    total_cap: StrictInt
+    confirm_live: StrictBool = False
+
+
 class DipSettings(BaseModel):
     model_config = ConfigDict(extra='forbid')
     mode: str

@@ -202,3 +202,14 @@ def test_non_kiwoom_setup_gets_no_breakers(tmp_path):
     from types import SimpleNamespace
     s = SimpleNamespace(broker='mock', data_dir=tmp_path, kiwoom_env='mock', kiwoom_app_key='')
     assert create_breakers(s, lambda: None, lambda: MORNING) is NO_BREAKERS
+
+
+def test_stock_cap_is_the_morning_equity(tmp_path):
+    """🧱 한 종목에 넣는 돈은 아침 예탁자산을 넘지 않는다 (제작자 10-22 규칙)."""
+    b, _, _, _ = make(tmp_path)
+    assert b.stock_cap() is None            # 아직 못 읽었으면 제한 없음
+    b.feed_equity(10_000_000)
+    assert b.stock_cap() == 10_000_000
+    b.feed_equity(9_000_000)                # 장중에 줄어도 기준은 아침 값
+    assert b.stock_cap() == 10_000_000
+    assert NO_BREAKERS.stock_cap() is None

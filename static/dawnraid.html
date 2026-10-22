@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주식자동프로그램 · 시초 역습</title><link rel="stylesheet" href="/auto-buy.css?v=2"><link rel="stylesheet" href="/strategy.css?v=4"><script src="/app-windows.js?v=2" defer></script></head>
+<body><header><a href="/horizon.html" target="themeRadarHorizon" title="별도 창으로 열기">⌁ 호라이즌</a><span class="mode">시초 역습</span><nav aria-label="매매 화면 이동"><a class="return-link" href="/horizon.html" target="themeRadarHorizon">← 관제탑</a><a class="return-link" href="/horizonbuy.html" target="themeRadarHorizonBuy">🌅 호라이즌존</a><a class="return-link" href="/leaderdip.html" target="themeRadarLeaderDip">🗻 대장 눌림목</a><a class="return-link" href="/firebar.html" target="themeRadarFireBar">🔥 기준봉 종가</a><a class="return-link" href="/closebet.html" target="themeRadarCloseBet">🌙 종가배팅</a></nav></header>
+<main>
+<section class="hero"><div><p class="eyebrow">08:59:45 예상체결 판단 → 09:00 동시호가 매수 → 10:00 정리</p><h1>⚡ 시초 역습</h1><p class="intro">전날 빠진 종목이 아침에 <b>−7% 넘게 갭하락</b>으로 열리면 동시호가에 받아 <b>10:00에 팝니다</b>.<br>밤을 넘기지 않아 하룻밤 전략(🌅 🗻 🔥 🌙)과 칸을 다투지 않습니다. 손절은 없습니다.</p></div>
+<div class="scope"><span>지금 상태</span><strong id="headline">상태 확인 중</strong><p id="headlineNote">—</p></div></section>
+<section class="statusbar" aria-live="polite"><div><i id="statusDot"></i><strong id="status">—</strong><span id="environment">—</span></div><p><span id="connection">—</span><time id="updated">—</time></p><button id="stopAll" class="danger" disabled>⛔ 비상 정지</button></section>
+<section id="breakerBar" class="breakers" hidden></section>
+<section id="regimeBar" class="regime" data-key="dawnraid" hidden></section>
+<div id="error" class="alert" role="alert" hidden></div><div id="feedback" class="feedback" role="status" hidden></div>
+<div class="st-grid">
+<section class="panel st-settings"><p class="eyebrow">01 · 설정</p><h2>한 칸에 얼마</h2>
+<form id="settingsForm">
+<div class="st-mode"><label id="modeDryLabel"><input type="radio" name="mode" value="dry" id="modeDry"> 흉내 (기록만)</label><label id="modeLiveLabel" class="live"><input type="radio" name="mode" value="live" id="modeLive"> 실전 전송</label></div>
+<div id="liveConfirm" class="st-live-confirm" hidden><label style="margin:0"><input type="checkbox" id="confirmLive"> 실전 계좌로 실제 주문이 나가는 것을 이해했습니다. <b>09:00 동시호가</b>에 들어가는 매매라 체결 값이 예상과 다를 수 있고, 손절이 없습니다.</label></div>
+<label><input type="checkbox" id="enabled"> 자동매매 켜기 (끄면 후보만 보고 주문하지 않음)</label>
+<div class="row"><div><label for="slotAmount">한 칸 금액 (원)</label><input id="slotAmount" type="number" min="20000" step="10000"></div><div><label for="totalCap">총 투입 상한 (원, 999만 이하)</label><input id="totalCap" type="number" min="10000" max="9990000" step="10000"></div></div>
+<label for="maxPositions">최대 종목 수 (하루 2종목까지 삽니다)</label><input id="maxPositions" type="number" min="1" max="5">
+<p class="help">한 종목에 넣는 돈은 <b>전날 거래대금의 2%</b>까지입니다. 💧 시장 대금 배수와 🧱 아침 예탁자산 상한도 함께 걸립니다. 현금으로만 삽니다.</p>
+<button id="save" class="primary" type="submit" disabled>설정 저장</button><p id="saveNote" class="help" role="status"></p></form>
+<section class="rulebox" style="margin-top:14px"><b>고르기</b> (그날 아침에 아는 값)<br>전날 등락 <b>−3~−10%</b> · 전날 거래대금 <b>100~1,000억</b> · 전날 종가 1,000원 이상<br><br>
+<b>판단</b> 08:59:45 동시호가 <b>예상체결가</b>로<br>· 예상 갭 <b>−7% 이하</b><br>· 🧭 코스피 예상 갭이 <b>−2%보다 덜 빠진 날</b>만 (시총 상위 10 가중)<br><br>
+<b>사기</b> 예상가 <b>+2틱</b> 지정가 · 하루 <b>2종목</b>(전날 대금 큰 순)<br><br>
+<b>팔기</b> 체결되면 바로 <b>+7% 익절 지정가</b> · 09:59:50에 거두고 <b>10:00 시장가 전량</b>. 손절 없음</section></section>
+<section class="panel"><p class="eyebrow">02 · 오늘</p><h2>후보와 예상 갭</h2>
+<div class="st-timeline" id="timeline"></div>
+<div class="section-heading"><h3>후보 (08:10 선정 · 08:50부터 예상체결 갱신)</h3><button id="preview" disabled>지금 후보 보기</button></div>
+<p id="watchMeta" class="muted">—</p>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">전날 등락</th><th class="num">전날 대금</th><th class="num">전날 종가</th><th class="num">예상체결</th><th class="num">예상 갭</th></tr></thead><tbody id="watchRows"><tr><td colspan="6" class="empty">아직 후보 선정 전 (매 거래일 08:10)</td></tr></tbody></table></div>
+<p id="skipped" class="muted"></p></section></div>
+<section class="panel"><div class="section-heading"><h2>보유 · 10:00 정리</h2><span class="muted">투입 <b id="invested">0</b>원 / 상한 <b id="capShown">—</b>원</span></div>
+<div class="table-scroll"><table><thead><tr><th>종목</th><th class="num">수량</th><th class="num">평단</th><th class="num">+7% 익절가</th><th>상태</th><th>비고</th></tr></thead><tbody id="positions"><tr><td colspan="6" class="empty">보유 없음</td></tr></tbody></table></div></section>
+<section class="panel"><div class="section-heading"><h2>주문 기록</h2><button id="reconcile" disabled>체결 다시 조회</button></div>
+<div class="table-scroll"><table><thead><tr><th>시각</th><th>종목</th><th>무엇</th><th class="num">수량</th><th class="num">가격</th><th>상태</th><th>비고</th></tr></thead><tbody id="orders"><tr><td colspan="7" class="empty">주문 기록 없음</td></tr></tbody></table></div></section>
+<section class="panel guide"><h2>알아두세요</h2><ul>
+<li><b>시각에 아주 민감한 매매입니다.</b> 제작자 자료로 09:05에 사면 PF가 8.12에서 1.35로 무너집니다 — 반등이 5분 안에 끝나기 때문입니다. 우리는 조회가 초당 3건이라 예상체결가가 몇 초 묵을 수 있습니다. <b>흉내로 먼저 체결 밀림을 재세요.</b></li>
+<li>흉내 모드는 <b>09:00 실제 시가</b>로 체결을 판정합니다. 시가가 지정가보다 높으면 미체결로 기록합니다. 10:00 정리도 그날 고가가 익절가에 닿았는지로 판정합니다.</li>
+<li>검증이 1년(144번)뿐입니다. 제작자도 10-22부터 실매매를 시작했습니다.</li>
+<li>손절이 없습니다. 10:00에 값이 어떻든 팝니다.</li>
+<li>서버가 08:10·08:50~09:00·10:00에 떠 있어야 합니다. 09:00에 샀는데 10:00에 꺼져 있으면 안 팔립니다.</li>
+<li>비상 정지는 새 매수만 막습니다. 익절 취소와 10:00 정리는 그대로 나갑니다.</li></ul></section>
+<footer>시초 역습은 설정에서 직접 켠 날만 주문합니다 · 실제 주문·체결은 증권사 내역에서 최종 확인하세요.</footer></main><script src="/breakers.js?v=1" defer></script><script src="/regime.js?v=3" defer></script><script src="/dawnraid.js?v=1" defer></script></body></html>

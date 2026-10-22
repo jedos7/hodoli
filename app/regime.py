@@ -47,6 +47,8 @@ RULES = (
     ('closebet', '🌙', '종가배팅', '전날 원달러', 'yahoo', 'KRW=X',
      (-0.25, 'below', 'PF 6.4 · 원화 강세'), (0.0, 'above', 'PF 1.0 · 원화 약세'), True),
 )
+RAID = {'key': 'dawnraid', 'icon': '⚡', 'label': '시초 역습', 'cell': 'steady',
+        'what': '08:59:45 코스피 예상 갭으로 봅니다', 'note': '−2%보다 덜 빠진 날만 삽니다 (맥락 문은 따로 없음)'}
 STEADY = {'key': 'horizonbuy', 'icon': '🌅', 'label': '호라이즌존', 'cell': 'steady',
           'what': '맥락을 덜 탑니다', 'note': '어느 칸이든 PF 2.8 위'}
 
@@ -194,6 +196,7 @@ class Regime:
                             row |= {'value': None, 'cell': 'unknown', 'error': str(exc)[:80]}
                         out['rows'].append(row)
                 out['rows'].append(dict(STEADY))
+                out['rows'].append(dict(RAID))
             except Exception as exc:
                 out['error'] = f'장세 맥락 조회 실패: {str(exc)[:100]}'
             out['volume'] = await self.volume()      # 💧 배팅 크기 (스스로 오류를 삼킨다)
